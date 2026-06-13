@@ -1,0 +1,97 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int       @id @default(autoincrement())
+  phone     String    @unique
+  name      String?
+  points    Int       @default(0)
+  cars      Car[]
+  bookings  Booking[]
+  createdAt DateTime  @default(now())
+}
+
+model Employee {
+  id        Int       @id @default(autoincrement())
+  phone     String    @unique
+  email     String    @unique
+  name      String
+  status    String    @default("ACTIVE") // ACTIVE, SUSPENDED
+  onDuty    Boolean   @default(false)
+  salary    Float     @default(0) // Monthly salary or hourly wage
+  bookings  Booking[]
+  leaves    Leave[]
+  createdAt DateTime  @default(now())
+}
+
+model Admin {
+  id        Int       @id @default(autoincrement())
+  email     String    @unique
+  password  String    // Hashed
+  createdAt DateTime  @default(now())
+}
+
+model Car {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id])
+  make      String
+  model     String
+  type      String    // Sedan, SUV, etc.
+  bookings  Booking[]
+}
+
+model Service {
+  id          Int       @id @default(autoincrement())
+  name        String
+  description String
+  price       Float
+  type        String    // Basic, Premium, Full
+  bookings    Booking[]
+}
+
+model Booking {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  user        User      @relation(fields: [userId], references: [id])
+  employeeId  Int?
+  employee    Employee? @relation(fields: [employeeId], references: [id])
+  carId       Int
+  car         Car       @relation(fields: [carId], references: [id])
+  serviceId   Int
+  service     Service   @relation(fields: [serviceId], references: [id])
+  date        DateTime
+  timeSlot    String
+  status      String    @default("PENDING") // PENDING, ASSIGNED, COMPLETED, CANCELLED
+  latitude    Float?
+  longitude   Float?
+  address     String?
+  paymentStatus String  @default("PENDING")
+  createdAt   DateTime  @default(now())
+}
+
+model Leave {
+  id          Int       @id @default(autoincrement())
+  employeeId  Int
+  employee    Employee  @relation(fields: [employeeId], references: [id])
+  startDate   DateTime
+  endDate     DateTime
+  reason      String
+  status      String    @default("PENDING") // PENDING, APPROVED, REJECTED
+}
+
+model Offer {
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String
+  discountPct Float
+  validUntil  DateTime
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+}
