@@ -62,25 +62,34 @@ const Schedule = () => {
                 </p>
                 
                 <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
-                  <span style={{background: '#E0F2FE', color: '#0369A1', padding: '0.25rem 0.75rem', borderRadius: '1rem', fontSize: '0.85rem', fontWeight: 500}}>
-                    Assigned
+                  <span style={{
+                    background: booking.status === 'COMPLETED' ? '#D1FAE5' : '#E0F2FE', 
+                    color: booking.status === 'COMPLETED' ? '#065F46' : '#0369A1', 
+                    padding: '0.25rem 0.75rem', 
+                    borderRadius: '1rem', 
+                    fontSize: '0.85rem', 
+                    fontWeight: 500
+                  }}>
+                    {booking.status}
                   </span>
                   
-                  <button 
-                    onClick={() => handleComplete(booking.id)}
-                    style={{
-                      background: 'var(--primary-blue)', 
-                      color: 'white', 
-                      border: 'none', 
-                      borderRadius: 'var(--radius-sm)',
-                      padding: '0.4rem 1.25rem', 
-                      fontSize: '0.9rem', 
-                      fontWeight: 600,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Start / Complete
-                  </button>
+                  {booking.status !== 'COMPLETED' && (
+                    <button 
+                      onClick={() => handleComplete(booking.id)}
+                      style={{
+                        background: 'var(--primary-blue)', 
+                        color: 'white', 
+                        border: 'none', 
+                        borderRadius: 'var(--radius-sm)',
+                        padding: '0.4rem 1.25rem', 
+                        fontSize: '0.9rem', 
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Task Completed
+                    </button>
+                  )}
                 </div>
               </div>
             );

@@ -81,11 +81,32 @@ export const createBooking = async (req, res) => {
       }
     }
 
+    // Auto-assign to employee
+    const activeEmployees = await prisma.employee.findMany({
+      where: { status: 'ACTIVE' },
+      include: {
+        _count: {
+          select: { bookings: { where: { status: 'ASSIGNED' } } }
+        }
+      }
+    });
+
+    let assignedEmployeeId = null;
+    let initialStatus = 'PENDING';
+
+    if (activeEmployees.length > 0) {
+      activeEmployees.sort((a, b) => a._count.bookings - b._count.bookings);
+      assignedEmployeeId = activeEmployees[0].id;
+      initialStatus = 'ASSIGNED';
+    }
+
     const booking = await prisma.booking.create({
       data: { 
         userId: req.user.id, 
         serviceId: Number(serviceId), 
         carId: finalCarId, 
+        employeeId: assignedEmployeeId,
+        status: initialStatus,
         date: new Date(date), 
         timeSlot, 
         latitude, 

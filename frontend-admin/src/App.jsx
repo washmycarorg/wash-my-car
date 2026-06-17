@@ -189,7 +189,7 @@ const Dashboard = () => {
                <DollarSign size={20} />
              </div>
            </div>
-           <h1>${stats?.totalRevenue || 0}</h1>
+           <h1>₹{stats?.totalRevenue || 0}</h1>
            <p className="text-sm text-success flex items-center gap-1 mt-2">↑ 12% from last month</p>
         </div>
         
@@ -299,7 +299,7 @@ const EmployeeManagement = () => {
                   <div style={{color: 'var(--text-muted)', fontSize: '0.85rem'}}>{emp.email}</div>
                 </td>
                 <td style={{padding: '1rem 1.5rem'}}>
-                  <div style={{fontWeight: 600}}>${emp.salary || 0}</div>
+                  <div style={{fontWeight: 600}}>₹{emp.salary || 0}</div>
                   <div style={{fontSize: '0.8rem', color: 'var(--text-muted)'}}>per month</div>
                 </td>
                 <td style={{padding: '1rem 1.5rem'}}>

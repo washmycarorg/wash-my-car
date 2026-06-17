@@ -54,7 +54,7 @@ const Services = () => {
               </select>
             </div>
             <div className="form-group" style={{margin: 0}}>
-              <label className="form-label">Price ($)</label>
+              <label className="form-label">Price (₹)</label>
               <input required type="number" min="0" step="0.01" className="form-input" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} placeholder="e.g. 49.99" />
             </div>
             <div className="form-group" style={{margin: 0}}>
@@ -88,7 +88,7 @@ const Services = () => {
                   <td style={{padding: '1rem 1.5rem'}}>
                     <span className="badge" style={{background: '#E0E7FF', color: '#4F46E5'}}>{s.type}</span>
                   </td>
-                  <td style={{padding: '1rem 1.5rem', fontWeight: 'bold'}}>${s.price}</td>
+                  <td style={{padding: '1rem 1.5rem', fontWeight: 'bold'}}>₹{s.price}</td>
                   <td style={{padding: '1rem 1.5rem'}} className="flex gap-2">
                     <button className="btn btn-danger text-xs" style={{padding: '0.25rem 0.5rem'}} onClick={() => handleDelete(s.id)}>Delete</button>
                   </td>

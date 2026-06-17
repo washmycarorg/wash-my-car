@@ -40,7 +40,7 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
         display: 'flex', flexDirection: 'column',
         boxShadow: isOpen ? '4px 0 10px rgba(0,0,0,0.1)' : 'none'
       }}>
-        <div style={{padding: '1.5rem', display: 'flex', alignItems: 'center', justify-content: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.1)'}}>
+        <div style={{padding: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.1)'}}>
            <div className="flex items-center gap-3">
              <div style={{background: 'white', padding: '0.25rem', borderRadius: '0.5rem'}}>
                <Droplets size={24} color="#025EBA" />

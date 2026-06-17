@@ -1,5 +1,15 @@
 const API_URL = 'http://localhost:5001/api';
 
+export const registerEmployee = async (name, phone, email) => {
+  const res = await fetch(`${API_URL}/auth/employee/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, phone, email })
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
 export const loginEmployee = async (phone, otp) => {
   const res = await fetch(`${API_URL}/auth/employee/login`, {
     method: 'POST',

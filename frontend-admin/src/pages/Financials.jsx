@@ -27,7 +27,7 @@ const Financials = () => {
             <h3 style={{color: 'rgba(255,255,255,0.8)', margin: 0}}>Total Earnings</h3>
             <div style={{background: 'rgba(255,255,255,0.2)', padding: '0.5rem', borderRadius: '50%'}}><TrendingUp size={24} /></div>
           </div>
-          <h1 style={{color: 'white', margin: 0}}>${revenue.toLocaleString()}</h1>
+          <h1 style={{color: 'white', margin: 0}}>₹{revenue.toLocaleString()}</h1>
           <p style={{color: 'rgba(255,255,255,0.6)', marginTop: '0.5rem'}}>Gross revenue from completed bookings</p>
         </div>
         
@@ -36,7 +36,7 @@ const Financials = () => {
             <h3 style={{color: 'var(--text-muted)', margin: 0}}>Cost to Company</h3>
             <div style={{background: '#FEE2E2', color: '#EF4444', padding: '0.5rem', borderRadius: '50%'}}><Users size={24} /></div>
           </div>
-          <h1 style={{color: 'var(--text-dark)', margin: 0}}>${cost.toLocaleString()}</h1>
+          <h1 style={{color: 'var(--text-dark)', margin: 0}}>₹{cost.toLocaleString()}</h1>
           <p className="text-muted" style={{marginTop: '0.5rem'}}>Total employee salaries</p>
         </div>
         
@@ -47,7 +47,7 @@ const Financials = () => {
               <DollarSign size={24} />
             </div>
           </div>
-          <h1 style={{color: profit >= 0 ? 'var(--success)' : 'var(--danger)', margin: 0}}>${profit.toLocaleString()}</h1>
+          <h1 style={{color: profit >= 0 ? 'var(--success)' : 'var(--danger)', margin: 0}}>₹{profit.toLocaleString()}</h1>
           <p className="text-muted" style={{marginTop: '0.5rem'}}>Profit Margin: {margin}%</p>
         </div>
       </div>

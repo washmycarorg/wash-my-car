@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
 import DashboardLayout from './components/DashboardLayout';
-import { loginEmployee } from './api';
+import { loginEmployee, registerEmployee } from './api';
 
 // Pages
 import Dashboard from './pages/Dashboard';
@@ -44,6 +44,62 @@ const EmployeeLogin = ({ setAuth }) => {
             background: 'var(--primary-blue)', color: 'white', border: 'none', padding: '0.875rem', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: '1rem', cursor: 'pointer', marginTop: '0.5rem'
           }}>Login</button>
         </form>
+        <div style={{textAlign: 'center', marginTop: '1.5rem'}}>
+          <p style={{color: 'var(--text-muted)', fontSize: '0.9rem'}}>Don't have an account? <Link to="/register" style={{color: 'var(--primary-blue)', fontWeight: 600}}>Register</Link></p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const EmployeeRegister = () => {
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const navigate = useNavigate();
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    try {
+      await registerEmployee(name, phone, email);
+      setSuccess('Registration successful! You can now log in.');
+      setError('');
+      setTimeout(() => navigate('/'), 2000);
+    } catch (err) {
+      setError(err.message || 'Registration failed');
+      setSuccess('');
+    }
+  };
+
+  return (
+    <div style={{minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-main)'}}>
+      <div className="card" style={{width: '100%', maxWidth: '400px', padding: '2rem'}}>
+        <h2 style={{color: 'var(--primary-navy)', textAlign: 'center', marginBottom: '0.5rem'}}>Join the Team</h2>
+        <p style={{color: 'var(--text-muted)', textAlign: 'center', marginBottom: '2rem'}}>Register as an employee</p>
+        {error && <div style={{background: '#FEF2F2', color: '#991B1B', padding: '0.75rem', borderRadius: 'var(--radius-md)', marginBottom: '1rem', textAlign: 'center'}}>{error}</div>}
+        {success && <div style={{background: '#D1FAE5', color: '#065F46', padding: '0.75rem', borderRadius: 'var(--radius-md)', marginBottom: '1rem', textAlign: 'center'}}>{success}</div>}
+        <form style={{display: 'flex', flexDirection: 'column', gap: '1rem'}} onSubmit={handleRegister}>
+          <div>
+            <label style={{display: 'block', marginBottom: '0.5rem', color: 'var(--primary-navy)', fontSize: '0.9rem'}}>Full Name</label>
+            <input type="text" value={name} onChange={e=>setName(e.target.value)} className="form-input" placeholder="John Doe" required />
+          </div>
+          <div>
+            <label style={{display: 'block', marginBottom: '0.5rem', color: 'var(--primary-navy)', fontSize: '0.9rem'}}>Email</label>
+            <input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="form-input" placeholder="john@example.com" required />
+          </div>
+          <div>
+            <label style={{display: 'block', marginBottom: '0.5rem', color: 'var(--primary-navy)', fontSize: '0.9rem'}}>Phone Number</label>
+            <input type="text" value={phone} onChange={e=>setPhone(e.target.value)} className="form-input" placeholder="+91 98765 43210" required />
+          </div>
+          <button type="submit" style={{
+            background: 'var(--primary-blue)', color: 'white', border: 'none', padding: '0.875rem', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: '1rem', cursor: 'pointer', marginTop: '0.5rem'
+          }}>Register</button>
+        </form>
+        <div style={{textAlign: 'center', marginTop: '1.5rem'}}>
+          <p style={{color: 'var(--text-muted)', fontSize: '0.9rem'}}>Already have an account? <Link to="/" style={{color: 'var(--primary-blue)', fontWeight: 600}}>Login</Link></p>
+        </div>
       </div>
     </div>
   );
@@ -56,6 +112,7 @@ const App = () => {
     <Router>
       <Routes>
         <Route path="/" element={auth ? <Navigate to="/dashboard"/> : <EmployeeLogin setAuth={setAuth} />} />
+        <Route path="/register" element={auth ? <Navigate to="/dashboard"/> : <EmployeeRegister />} />
         
         {/* Protected Dashboard Routes */}
         <Route path="/dashboard" element={auth ? <DashboardLayout><Dashboard /></DashboardLayout> : <Navigate to="/"/>} />

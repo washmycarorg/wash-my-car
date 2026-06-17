@@ -43,6 +43,38 @@ export const employeeLogin = async (req, res) => {
   res.json({ message: 'Login successful', token, employee });
 };
 
+export const employeeRegister = async (req, res) => {
+  try {
+    const { name, phone, email } = req.body;
+    
+    // Check if employee already exists
+    let existingEmployee = await prisma.employee.findFirst({
+      where: {
+        OR: [
+          { phone },
+          { email }
+        ]
+      }
+    });
+
+    if (existingEmployee) {
+      return res.status(400).json({ error: 'Employee with this phone or email already exists' });
+    }
+
+    const newEmployee = await prisma.employee.create({
+      data: {
+        name,
+        phone,
+        email
+      }
+    });
+
+    res.json({ message: 'Employee registered successfully', employeeId: newEmployee.id });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 export const adminLogin = async (req, res) => {
   const { email, password } = req.body;
   if (email === 'admin@washmycar.com' && password === 'admin123') {
