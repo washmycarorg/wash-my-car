@@ -37,7 +37,7 @@ const Financials = () => {
             <div style={{background: '#FEE2E2', color: '#EF4444', padding: '0.5rem', borderRadius: '50%'}}><Users size={24} /></div>
           </div>
           <h1 style={{color: 'var(--text-dark)', margin: 0}}>₹{cost.toLocaleString()}</h1>
-          <p className="text-muted" style={{marginTop: '0.5rem'}}>Total employee salaries</p>
+          <p className="text-muted" style={{marginTop: '0.5rem'}}>50% payout to employees</p>
         </div>
         
         <div className="card" style={{border: '1px solid #E2E8F0', borderTop: profit >= 0 ? '4px solid var(--success)' : '4px solid var(--danger)'}}>

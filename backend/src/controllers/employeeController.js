@@ -15,8 +15,31 @@ export const getProfile = async (req, res) => {
       where: { employeeId: req.user.id, status: 'ASSIGNED' }
     });
 
+    const completedBookingsList = await prisma.booking.findMany({
+      where: { employeeId: req.user.id, status: 'COMPLETED' },
+      include: { service: true, user: true },
+      orderBy: { date: 'desc' },
+      take: 10
+    });
+
+    const allCompletedBookings = await prisma.booking.findMany({
+      where: { employeeId: req.user.id, status: 'COMPLETED' },
+      include: { service: true }
+    });
+
+    const earnings = allCompletedBookings.reduce((sum, b) => sum + (b.service.price * 0.50), 0);
+    const recentPayouts = completedBookingsList.map(b => ({
+      id: b.id,
+      job: b.service.name,
+      date: b.date,
+      customer: b.user.name || b.user.phone,
+      amount: b.service.price * 0.50
+    }));
+
     res.json({
       ...employee,
+      earnings,
+      recentPayouts,
       stats: {
         completedJobs,
         pendingJobs

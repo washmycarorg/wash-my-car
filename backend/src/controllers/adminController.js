@@ -13,9 +13,8 @@ export const getDashboardStats = async (req, res) => {
     });
     const totalRevenue = completedBookings.reduce((sum, b) => sum + (b.service?.price || 0), 0);
     
-    // Calculate Cost to Company (sum of all active employee salaries)
-    const employees = await prisma.employee.findMany({ where: { status: 'ACTIVE' } });
-    const totalCostToCompany = employees.reduce((sum, e) => sum + (e.salary || 0), 0);
+    // Calculate Cost to Company (50% commission to employees, ignoring base salary)
+    const totalCostToCompany = totalRevenue * 0.50;
 
     res.json({
       totalRevenue,

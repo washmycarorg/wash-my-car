@@ -2,9 +2,10 @@ import React from 'react';
 import { Wallet } from 'lucide-react';
 
 const Earnings = ({ profile }) => {
-  const earnings = profile?.salary || 0;
+  const earnings = profile?.earnings || 0;
   const completedJobs = profile?.stats?.completedJobs || 0;
   const avg = completedJobs > 0 ? (earnings / completedJobs).toFixed(0) : '—';
+  const payouts = profile?.recentPayouts || [];
 
   return (
     <div style={{maxWidth: '600px', margin: '0 auto'}}>
@@ -50,9 +51,20 @@ const Earnings = ({ profile }) => {
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td colSpan="4" style={{padding: '2rem', textAlign: 'center', color: 'var(--text-muted)'}}>No completed jobs yet.</td>
-            </tr>
+            {payouts.length > 0 ? (
+              payouts.map((payout, i) => (
+                <tr key={i} style={{borderBottom: '1px solid #F1F5F9'}}>
+                  <td style={{padding: '1rem', fontWeight: 500, color: 'var(--primary-navy)'}}>{payout.job}</td>
+                  <td style={{padding: '1rem', color: 'var(--text-muted)'}}>{new Date(payout.date).toLocaleDateString()}</td>
+                  <td style={{padding: '1rem', color: 'var(--text-main)'}}>{payout.customer}</td>
+                  <td style={{padding: '1rem', textAlign: 'right', fontWeight: 600, color: 'var(--success)'}}>₹{payout.amount}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="4" style={{padding: '2rem', textAlign: 'center', color: 'var(--text-muted)'}}>No completed jobs yet.</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

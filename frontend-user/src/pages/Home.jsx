@@ -90,7 +90,7 @@ const Home = () => {
           <div className="card" style={{padding: 0, overflow: 'hidden'}}>
             <div style={{padding: '1.5rem', textAlign: 'center', background: 'white'}}>
               <h3 style={{fontSize: '1.5rem', color: 'var(--primary-navy)', marginBottom: '0.25rem'}}>Basic Wash</h3>
-              <p style={{color: 'var(--text-muted)', fontWeight: 600}}>From ₹499</p>
+              {/* <p style={{color: 'var(--text-muted)', fontWeight: 600}}>From ₹499</p> */}
             </div>
             <img src="/images/basic_wash.png" alt="Basic Wash" style={{width: '100%', height: '220px', objectFit: 'cover'}} />
           </div>
@@ -98,7 +98,7 @@ const Home = () => {
           <div className="card" style={{padding: 0, overflow: 'hidden', transform: 'scale(1.05)', zIndex: 2, boxShadow: 'var(--shadow-lg)'}}>
             <div style={{padding: '1.5rem', textAlign: 'center', background: 'white'}}>
               <h3 style={{fontSize: '1.5rem', color: 'var(--primary-navy)', marginBottom: '0.25rem'}}>Premium Wash</h3>
-              <p style={{color: 'var(--text-muted)', fontWeight: 600}}>From ₹899</p>
+              {/* <p style={{color: 'var(--text-muted)', fontWeight: 600}}>From ₹899</p> */}
             </div>
             <img src="/images/premium_wash.png" alt="Premium Wash" style={{width: '100%', height: '240px', objectFit: 'cover'}} />
           </div>
@@ -106,7 +106,7 @@ const Home = () => {
           <div className="card" style={{padding: 0, overflow: 'hidden'}}>
             <div style={{padding: '1.5rem', textAlign: 'center', background: 'white'}}>
               <h3 style={{fontSize: '1.5rem', color: 'var(--primary-navy)', marginBottom: '0.25rem'}}>Full Detailing</h3>
-              <p style={{color: 'var(--text-muted)', fontWeight: 600}}>From ₹2499</p>
+              {/* <p style={{color: 'var(--text-muted)', fontWeight: 600}}>From ₹2499</p> */}
             </div>
             <img src="/images/full_detailing.png" alt="Full Detailing" style={{width: '100%', height: '220px', objectFit: 'cover'}} />
           </div>
@@ -217,11 +217,11 @@ const Home = () => {
                 </div>
                 <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
                   <Mail color="var(--primary-blue)" />
-                  <span style={{fontWeight: 600}}>Email: info@washmycar.in</span>
+                  <span style={{fontWeight: 600}}>Email: washmycarorg@gmail.com</span>
                 </div>
                 <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
                   <MapPin color="var(--primary-blue)" />
-                  <span style={{fontWeight: 600}}>Headquarters: MVP Colony, Visakhapatnam</span>
+                  <span style={{fontWeight: 600}}>Headquarters: Sujatha Nagar, Vizag</span>
                 </div>
               </div>
             </div>
