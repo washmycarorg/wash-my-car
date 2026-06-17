@@ -30,11 +30,20 @@ export const getEmployees = async (req, res) => {
   try {
     const employees = await prisma.employee.findMany({
       include: {
-        bookings: true,
+        bookings: {
+          include: { service: true }
+        },
         leaves: true
       }
     });
-    res.json(employees);
+
+    const employeesWithEarnings = employees.map(emp => {
+      const completedBookings = emp.bookings.filter(b => b.status === 'COMPLETED');
+      const earnings = completedBookings.reduce((sum, b) => sum + (b.service?.price || 0) * 0.50, 0);
+      return { ...emp, earnings };
+    });
+
+    res.json(employeesWithEarnings);
   } catch (error) { res.status(500).json({ error: error.message }); }
 };
 

@@ -291,7 +291,7 @@ const EmployeeManagement = () => {
             <tr>
               <th style={{padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem', textTransform: 'uppercase'}}>Name</th>
               <th style={{padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem', textTransform: 'uppercase'}}>Contact</th>
-              <th style={{padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem', textTransform: 'uppercase'}}>Salary / Cost</th>
+              <th style={{padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem', textTransform: 'uppercase'}}>Earnings</th>
               <th style={{padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem', textTransform: 'uppercase'}}>Status</th>
               <th style={{padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem', textTransform: 'uppercase'}}>Actions</th>
             </tr>
@@ -308,8 +308,8 @@ const EmployeeManagement = () => {
                   <div style={{color: 'var(--text-muted)', fontSize: '0.85rem'}}>{emp.email}</div>
                 </td>
                 <td style={{padding: '1rem 1.5rem'}}>
-                  <div style={{fontWeight: 600}}>₹{emp.salary || 0}</div>
-                  <div style={{fontSize: '0.8rem', color: 'var(--text-muted)'}}>per month</div>
+                  <div style={{fontWeight: 600}}>₹{emp.earnings || 0}</div>
+                  <div style={{fontSize: '0.8rem', color: 'var(--text-muted)'}}>from completed jobs</div>
                 </td>
                 <td style={{padding: '1rem 1.5rem'}}>
                   <span className={`badge ${emp.status === 'ACTIVE' ? 'badge-success' : 'badge-danger'}`}>
