@@ -1,11 +1,17 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { getServices } from '../api';
 
 const Services = () => {
-  const services = [
-    { id: '1', name: 'Basic Wash', description: 'Exterior wash & dry', price: 25 },
-    { id: '2', name: 'Premium Wash', description: 'Exterior + interior vacuum + tyre shine', price: 45 },
-    { id: '3', name: 'Full Detailing', description: 'Full interior & exterior detailing, polish & wax', price: 120 }
-  ];
+  const [services, setServices] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getServices()
+      .then(res => { setServices(res); setLoading(false); })
+      .catch(err => { console.error(err); setLoading(false); });
+  }, []);
+
+  if (loading) return <div>Loading services...</div>;
 
   return (
     <div style={{maxWidth: '600px', margin: '0 auto'}}>

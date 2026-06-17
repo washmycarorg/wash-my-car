@@ -74,3 +74,9 @@ export const updateProfile = async (data) => {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 };
+
+export const getServices = async () => {
+  const res = await fetch(`${API_URL}/users/services`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};

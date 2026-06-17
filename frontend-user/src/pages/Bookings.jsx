@@ -57,7 +57,7 @@ const Bookings = () => {
                   )}
                   
                   <span style={{fontWeight: 700, color: 'var(--primary-navy)', fontSize: '1.1rem', marginLeft: 'auto'}}>
-                    ₹{booking.amount}
+                    ₹{booking.service?.price}
                   </span>
 
                   {booking.status !== 'COMPLETED' && booking.status !== 'CANCELLED' && (

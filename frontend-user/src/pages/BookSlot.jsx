@@ -1,27 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { createBooking } from '../api';
+import { createBooking, getServices } from '../api';
 
 const BookSlot = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    serviceId: '2', // Default Premium Wash
+    serviceId: '',
     date: '',
     timeSlot: '',
     address: '12 Marine Drive, Mumbai',
     offerCode: ''
   });
   const [loading, setLoading] = useState(false);
+  const [services, setServices] = useState([]);
 
-  const services = [
-    { id: '1', name: 'Basic Wash', description: 'Exterior wash & dry', price: 25 },
-    { id: '2', name: 'Premium Wash', description: 'Exterior + interior vacuum + tyre shine', price: 45 },
-    { id: '3', name: 'Full Detailing', description: 'Full interior & exterior detailing, polish & wax', price: 120 }
-  ];
+  useEffect(() => {
+    getServices().then(res => {
+      setServices(res);
+      if (res.length > 0) {
+        setFormData(prev => ({ ...prev, serviceId: res[0].id }));
+      }
+    }).catch(err => console.error(err));
+  }, []);
 
   const handleBook = async () => {
     if (!formData.date || !formData.address) return alert('Please fill in date and address');
+    if (!formData.serviceId) return alert('Please select a service');
     setLoading(true);
     try {
       await createBooking({
@@ -32,7 +37,7 @@ const BookSlot = () => {
         amount: services.find(s => s.id === formData.serviceId)?.price || 45
       });
       alert('Booking Confirmed! (Mock Payment)');
-      navigate('/history');
+      navigate('/bookings');
     } catch (err) {
       console.error(err);
       alert('Failed to book. Please try again.');

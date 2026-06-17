@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Droplets, Mail, Lock, User as UserIcon, Phone } from 'lucide-react';
+import { User as UserIcon, Phone } from 'lucide-react';
 import { registerUser } from '../api';
+import logo from '../assets/wash my car.png';
 
 const Register = ({ setAuth }) => {
   const [formData, setFormData] = useState({ name: '', phone: '' });
@@ -26,8 +27,7 @@ const Register = ({ setAuth }) => {
       {/* Left side branding */}
       <div className="hidden md:flex flex-col items-center justify-center p-10" style={{flex: 1, background: 'linear-gradient(135deg, var(--primary-navy), var(--primary-blue))', color: 'white', position: 'relative', overflow: 'hidden'}}>
         <div style={{position: 'relative', zIndex: 2, textAlign: 'center'}}>
-          <Droplets size={80} color="var(--accent-teal)" style={{margin: '0 auto 1.5rem'}} />
-          <h1>Wash My Car</h1>
+          <img src={logo} alt="Wash My Car Logo" style={{height: '100px', objectFit: 'contain', marginBottom: '1.5rem', filter: 'brightness(0) invert(1)'}} />
           <p style={{fontSize: '1.25rem', marginTop: '1rem', opacity: 0.9}}>Professional Car Wash at Your Doorstep</p>
         </div>
       </div>
@@ -35,9 +35,8 @@ const Register = ({ setAuth }) => {
       {/* Right side form */}
       <div className="flex flex-col justify-center p-8 md:p-16" style={{flex: 1, background: 'white'}}>
         <div style={{maxWidth: '450px', width: '100%', margin: '0 auto'}}>
-          <div className="md:hidden flex items-center gap-2 mb-8">
-             <Droplets size={32} color="var(--primary-blue)"/>
-             <h2 style={{fontSize: '1.5rem', color: 'var(--primary-navy)'}}>Wash My Car</h2>
+          <div className="md:hidden flex justify-center mb-8">
+             <img src={logo} alt="Wash My Car Logo" style={{height: '50px', objectFit: 'contain'}} />
           </div>
           
           <h2 style={{marginBottom: '0.5rem'}}>Create Your Account</h2>
@@ -72,7 +71,7 @@ const Register = ({ setAuth }) => {
           </form>
 
           <p className="text-center mt-6" style={{fontSize: '0.95rem'}}>
-            Already have an account? <Link to="/" className="text-blue" style={{fontWeight: 600}}>Login</Link>
+            Already have an account? <Link to="/login" className="text-blue" style={{fontWeight: 600}}>Login</Link>
           </p>
         </div>
       </div>

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Droplets, Mail, Lock } from 'lucide-react';
+import { Mail, Lock } from 'lucide-react';
 import { loginUser } from '../api';
+import logo from '../assets/wash my car.png';
 
 const Login = ({ setAuth }) => {
   const [phone, setPhone] = useState('');
@@ -26,8 +27,7 @@ const Login = ({ setAuth }) => {
       {/* Left side branding */}
       <div className="hidden md:flex flex-col items-center justify-center p-10" style={{flex: 1, background: 'linear-gradient(135deg, var(--primary-navy), var(--primary-blue))', color: 'white', position: 'relative', overflow: 'hidden'}}>
         <div style={{position: 'relative', zIndex: 2, textAlign: 'center'}}>
-          <Droplets size={80} color="var(--accent-teal)" style={{margin: '0 auto 1.5rem'}} />
-          <h1>Wash My Car</h1>
+          <img src={logo} alt="Wash My Car Logo" style={{height: '100px', objectFit: 'contain', marginBottom: '1.5rem', filter: 'brightness(0) invert(1)'}} />
           <p style={{fontSize: '1.25rem', marginTop: '1rem', opacity: 0.9}}>Your Car, Cleaned At Your Door.</p>
         </div>
         {/* Decorative elements */}
@@ -38,9 +38,8 @@ const Login = ({ setAuth }) => {
       {/* Right side form */}
       <div className="flex flex-col justify-center p-8 md:p-16" style={{flex: 1, background: 'white'}}>
         <div style={{maxWidth: '400px', width: '100%', margin: '0 auto'}}>
-          <div className="md:hidden flex items-center gap-2 mb-8">
-             <Droplets size={32} color="var(--primary-blue)"/>
-             <h2 style={{fontSize: '1.5rem', color: 'var(--primary-navy)'}}>Wash My Car</h2>
+          <div className="md:hidden flex justify-center mb-8">
+             <img src={logo} alt="Wash My Car Logo" style={{height: '50px', objectFit: 'contain'}} />
           </div>
           
           <h2 style={{marginBottom: '0.5rem'}}>Welcome Back!</h2>

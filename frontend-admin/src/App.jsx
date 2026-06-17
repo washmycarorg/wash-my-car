@@ -8,6 +8,7 @@ import Financials from './pages/Financials';
 import LeaveApprovals from './pages/LeaveApprovals';
 import Services from './pages/Services';
 import Offers from './pages/Offers'; // We need to create this
+import logo from './assets/wash my car.png';
 
 const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
   const location = useLocation();
@@ -25,9 +26,14 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
       
       <aside className={`sidebar ${isMobileOpen ? 'mobile-open' : ''}`} style={{zIndex: 50}}>
         <div className="flex items-center justify-between" style={{marginBottom: '2rem'}}>
-          <Link to="/" className="nav-brand flex items-center gap-2">
-            <div style={{color: 'var(--accent-teal)', fontWeight: 'bold', fontSize: '1.25rem'}}>ADMIN</div>
-            <span style={{color: 'white', fontWeight: 'bold', fontSize: '1.25rem'}}>PANEL</span>
+          <Link to="/" className="nav-brand flex items-center gap-3">
+            <div style={{background: 'white', padding: '0.2rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '45px', height: '45px'}}>
+              <img src={logo} alt="Logo" style={{width: '100%', height: '100%', objectFit: 'contain', transform: 'scale(1.2)'}} />
+            </div>
+            <div>
+              <div style={{color: 'white', fontWeight: 'bold', fontSize: '1.25rem', lineHeight: 1.2}}>ADMIN</div>
+              <div style={{color: 'var(--accent-teal)', fontSize: '0.75rem', fontWeight: 600}}>WASH MY CAR</div>
+            </div>
           </Link>
           <button className="md-hidden text-white btn-close" onClick={() => setIsMobileOpen(false)}>
             <X size={24} />
@@ -148,6 +154,9 @@ const AdminLogin = ({ setAuth }) => {
   return (
     <div className="min-h-screen flex items-center justify-center animate-fade-in" style={{background: 'var(--bg-main)'}}>
       <div className="card" style={{width: '100%', maxWidth: '400px', background: 'var(--bg-glass)', backdropFilter: 'blur(10px)'}}>
+        <div style={{display: 'flex', justifyContent: 'center', marginBottom: '1rem'}}>
+          <img src={logo} alt="Logo" style={{height: '60px'}} />
+        </div>
         <h2 className="text-center" style={{marginBottom: '0.5rem'}}>Admin Portal</h2>
         <p className="text-center text-muted" style={{marginBottom: '2rem'}}>Sign in to manage Wash My Car</p>
         

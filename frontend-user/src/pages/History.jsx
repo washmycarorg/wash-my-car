@@ -41,7 +41,7 @@ const History = () => {
                 <td style={{padding: '1rem', color: 'var(--primary-navy)'}}>{new Date(item.date).toISOString().split('T')[0]}</td>
                 <td style={{padding: '1rem', color: 'var(--primary-navy)'}}>{item.employee?.name || '-'}</td>
                 <td style={{padding: '1rem', color: 'var(--primary-navy)'}}>{item.status === 'COMPLETED' ? 'Completed' : 'Cancelled'}</td>
-                <td style={{padding: '1rem', color: 'var(--primary-navy)'}}>₹{item.amount}</td>
+                <td style={{padding: '1rem', color: 'var(--primary-navy)'}}>₹{item.service?.price}</td>
               </tr>
             ))}
             {history.length === 0 && (

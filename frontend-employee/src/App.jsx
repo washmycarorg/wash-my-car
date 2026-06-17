@@ -9,6 +9,7 @@ import Schedule from './pages/Schedule';
 import Earnings from './pages/Earnings';
 import Leaves from './pages/Leaves';
 import Profile from './pages/Profile';
+import logo from './assets/wash my car.png';
 
 const EmployeeLogin = ({ setAuth }) => {
   const [phone, setPhone] = useState('');
@@ -28,6 +29,9 @@ const EmployeeLogin = ({ setAuth }) => {
   return (
     <div style={{minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-main)'}}>
       <div className="card" style={{width: '100%', maxWidth: '400px', padding: '2rem'}}>
+        <div style={{display: 'flex', justifyContent: 'center', marginBottom: '1rem'}}>
+          <img src={logo} alt="Logo" style={{height: '60px'}} />
+        </div>
         <h2 style={{color: 'var(--primary-navy)', textAlign: 'center', marginBottom: '0.5rem'}}>Employee Portal</h2>
         <p style={{color: 'var(--text-muted)', textAlign: 'center', marginBottom: '2rem'}}>Login to your account</p>
         {error && <div style={{background: '#FEF2F2', color: '#991B1B', padding: '0.75rem', borderRadius: 'var(--radius-md)', marginBottom: '1rem', textAlign: 'center'}}>{error}</div>}
@@ -76,6 +80,9 @@ const EmployeeRegister = () => {
   return (
     <div style={{minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-main)'}}>
       <div className="card" style={{width: '100%', maxWidth: '400px', padding: '2rem'}}>
+        <div style={{display: 'flex', justifyContent: 'center', marginBottom: '1rem'}}>
+          <img src={logo} alt="Logo" style={{height: '60px'}} />
+        </div>
         <h2 style={{color: 'var(--primary-navy)', textAlign: 'center', marginBottom: '0.5rem'}}>Join the Team</h2>
         <p style={{color: 'var(--text-muted)', textAlign: 'center', marginBottom: '2rem'}}>Register as an employee</p>
         {error && <div style={{background: '#FEF2F2', color: '#991B1B', padding: '0.75rem', borderRadius: 'var(--radius-md)', marginBottom: '1rem', textAlign: 'center'}}>{error}</div>}

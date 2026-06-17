@@ -2,6 +2,8 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, CalendarCheck, Wallet, FileText, User, LogOut, X, Droplets } from 'lucide-react';
 
+import logo from '../assets/wash my car.png';
+
 const Sidebar = ({ isOpen, closeSidebar }) => {
   const location = useLocation();
   const path = location.pathname;
@@ -42,8 +44,8 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
       }}>
         <div style={{padding: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.1)'}}>
            <div className="flex items-center gap-3">
-             <div style={{background: 'white', padding: '0.25rem', borderRadius: '0.5rem'}}>
-               <Droplets size={24} color="#025EBA" />
+             <div style={{background: 'white', padding: '0.2rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '45px', height: '45px'}}>
+               <img src={logo} alt="Wash My Car Logo" style={{width: '100%', height: '100%', objectFit: 'contain', transform: 'scale(1.2)'}} />
              </div>
              <div>
                <h2 style={{color: 'white', fontSize: '1.1rem', margin: 0, fontWeight: 700, letterSpacing: '1px'}}>PRO <span style={{color: 'var(--accent-teal)'}}>WASH</span></h2>

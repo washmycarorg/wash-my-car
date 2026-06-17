@@ -86,12 +86,24 @@ h3 { font-size: 1.25rem; font-weight: 600; color: var(--text-dark); }
 .grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
 .grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
 
+/* Responsive Utilities */
+.hidden { display: none !important; }
+
+@media (min-width: 768px) {
+  .md\:flex { display: flex !important; }
+  .md\:hidden { display: none !important; }
+  .md\:p-16 { padding: 4rem; }
+}
+
 /* Spacing Utilities */
 .mb-2 { margin-bottom: 0.5rem; }
 .mb-4 { margin-bottom: 1rem; }
 .mb-6 { margin-bottom: 1.5rem; }
+.mb-8 { margin-bottom: 2rem; }
 .p-4 { padding: 1rem; }
 .p-6 { padding: 1.5rem; }
+.p-8 { padding: 2rem; }
+.p-10 { padding: 2.5rem; }
 
 /* Border Utilities */
 .border-b { border-bottom-width: 1px; border-bottom-style: solid; }
