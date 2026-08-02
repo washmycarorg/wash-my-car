@@ -39,13 +39,17 @@ export const employeeLogin = async (req, res) => {
   let employee = await prisma.employee.findUnique({ where: { phone } });
   if (!employee) return res.status(404).json({ error: 'Employee not found' });
 
+  if (employee.status === 'PENDING') {
+    return res.status(403).json({ error: 'Your account is pending admin approval. You will receive access once approved.' });
+  }
+
   const token = generateToken({ id: employee.id, role: 'EMPLOYEE' });
   res.json({ message: 'Login successful', token, employee });
 };
 
 export const employeeRegister = async (req, res) => {
   try {
-    const { name, phone, email, photo } = req.body;
+    const { name, phone, email, photo, aadhaarNumber, address, idProofFile, serviceAreaIds } = req.body;
     
     // Check if employee already exists
     let existingEmployee = await prisma.employee.findFirst({
@@ -61,13 +65,26 @@ export const employeeRegister = async (req, res) => {
       return res.status(400).json({ error: 'Employee with this phone or email already exists' });
     }
 
+    const data = {
+      name,
+      phone,
+      email,
+      photo,
+      aadhaarNumber,
+      address,
+      idProofFile,
+      status: 'PENDING'
+    };
+
+    if (serviceAreaIds && serviceAreaIds.length > 0) {
+      data.serviceAreas = {
+        connect: serviceAreaIds.map(id => ({ id: Number(id) }))
+      };
+    }
+
     const newEmployee = await prisma.employee.create({
-      data: {
-        name,
-        phone,
-        email,
-        photo
-      }
+      data,
+      include: { serviceAreas: true }
     });
 
     res.json({ message: 'Employee registered successfully', employeeId: newEmployee.id });

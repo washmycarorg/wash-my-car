@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getBookings, assignSlot, autoAssignSlot, getEmployees } from '../api';
+import { getBookings, assignSlot, autoAssignSlot, getEmployees, getEmployeesWorkload } from '../api';
 import { Calendar, User, Car, MapPin, Compass, Image, Eye, RefreshCw, CheckCircle, Navigation, AlertCircle } from 'lucide-react';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
@@ -7,7 +7,19 @@ const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 const Bookings = () => {
   const [bookings, setBookings] = useState([]);
   const [employees, setEmployees] = useState([]);
+  const [workloads, setWorkloads] = useState({});
   const [loading, setLoading] = useState(true);
+
+  const fetchWorkload = async (date, timeSlot) => {
+    const key = `${date}_${timeSlot}`;
+    if (workloads[key]) return;
+    try {
+      const res = await getEmployeesWorkload(date, timeSlot);
+      setWorkloads(prev => ({ ...prev, [key]: res }));
+    } catch (err) {
+      console.error('Error loading workloads:', err);
+    }
+  };
 
   // Verification Modal State
   const [selectedBooking, setSelectedBooking] = useState(null);
@@ -232,12 +244,21 @@ const Bookings = () => {
                         className="form-input" 
                         style={{ padding: '0.35rem', fontSize: '0.85rem', marginBottom: 0 }}
                         onChange={(e) => handleManualAssign(b.id, e.target.value)}
+                        onFocus={() => fetchWorkload(b.date, b.timeSlot)}
                         defaultValue=""
                       >
                         <option value="" disabled>Manual Assign</option>
-                        {eligibleEmployees.map(emp => (
-                          <option key={emp.id} value={emp.id}>{emp.name} (Duty: Yes)</option>
-                        ))}
+                        {eligibleEmployees.map(emp => {
+                          const key = `${b.date}_${b.timeSlot}`;
+                          const slotWorkload = workloads[key];
+                          const workloadInfo = slotWorkload?.find(w => w.id === emp.id);
+                          const label = workloadInfo 
+                            ? `${emp.name} (${workloadInfo.dailyCount} today, ${workloadInfo.slotCount} this slot)`
+                            : `${emp.name} (Duty: Yes)`;
+                          return (
+                            <option key={emp.id} value={emp.id}>{label}</option>
+                          );
+                        })}
                       </select>
                       
                       <button 

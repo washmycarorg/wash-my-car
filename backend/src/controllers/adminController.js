@@ -437,7 +437,7 @@ export const autoAssignSlot = async (req, res) => {
     }
 
     // Find active, on-duty employees serving this service area
-    const activeEmployees = await prisma.employee.findMany({
+    const candidates = await prisma.employee.findMany({
       where: {
         status: 'ACTIVE',
         onDuty: true,
@@ -458,13 +458,18 @@ export const autoAssignSlot = async (req, res) => {
       }
     });
 
-    if (activeEmployees.length === 0) {
-      return res.status(400).json({ error: 'No on-duty employees available in this service area' });
+    const eligible = candidates.filter(emp => {
+      const slotBookingsCount = emp.bookings.filter(b => b.timeSlot === booking.timeSlot).length;
+      return slotBookingsCount < 2; // Cap: Max 2 bookings per slot per day
+    });
+
+    if (eligible.length === 0) {
+      return res.status(400).json({ error: 'No available employees under slot booking limit (max 2 per slot) in this area.' });
     }
 
     // Sort by workload (least bookings today first)
-    activeEmployees.sort((a, b) => a.bookings.length - b.bookings.length);
-    const chosenEmployee = activeEmployees[0];
+    eligible.sort((a, b) => a.bookings.length - b.bookings.length);
+    const chosenEmployee = eligible[0];
 
     const updatedBooking = await prisma.booking.update({
       where: { id: Number(id) },
@@ -478,5 +483,51 @@ export const autoAssignSlot = async (req, res) => {
     res.json({ message: 'Auto-assigned successfully', booking: updatedBooking });
   } catch (error) { 
     res.status(500).json({ error: error.message }); 
+  }
+};
+
+export const getEmployeesWorkload = async (req, res) => {
+  try {
+    const { date, timeSlot } = req.query;
+    if (!date || !timeSlot) {
+      return res.status(400).json({ error: 'Date and timeSlot are required query parameters' });
+    }
+
+    const startOfDay = new Date(new Date(date).setHours(0, 0, 0, 0));
+    const endOfDay = new Date(new Date(date).setHours(23, 59, 59, 999));
+
+    const employees = await prisma.employee.findMany({
+      where: { status: 'ACTIVE' },
+      include: {
+        serviceAreas: true,
+        bookings: {
+          where: {
+            date: {
+              gte: startOfDay,
+              lte: endOfDay
+            },
+            status: { in: ['ASSIGNED', 'STARTED'] }
+          }
+        }
+      }
+    });
+
+    const workloadList = employees.map(emp => {
+      const dailyCount = emp.bookings.length;
+      const slotCount = emp.bookings.filter(b => b.timeSlot === timeSlot).length;
+      
+      return {
+        id: emp.id,
+        name: emp.name,
+        onDuty: emp.onDuty,
+        serviceAreas: emp.serviceAreas,
+        dailyCount,
+        slotCount
+      };
+    });
+
+    res.json(workloadList);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 };

@@ -2,11 +2,11 @@ const API_URL = window.location.hostname === 'localhost' || window.location.host
   ? 'http://localhost:5001/api'
   : 'https://wash-my-car.onrender.com/api';
 
-export const registerEmployee = async (name, phone, email, photo) => {
+export const registerEmployee = async (name, phone, email, photo, aadhaarNumber, address, idProofFile, serviceAreaIds) => {
   const res = await fetch(`${API_URL}/auth/employee/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, phone, email, photo })
+    body: JSON.stringify({ name, phone, email, photo, aadhaarNumber, address, idProofFile, serviceAreaIds })
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();

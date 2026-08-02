@@ -6,7 +6,7 @@ const Dashboard = ({ profile, setProfile }) => {
 
   const handleToggle = async () => {
     try {
-      const updated = await toggleDuty();
+      const updated = await toggleDuty(!onDuty);
       setProfile({...profile, onDuty: updated.onDuty});
     } catch (err) {
       console.error(err);

@@ -9,6 +9,7 @@ router.use(verifyToken, requireAdmin);
 router.get('/stats', adminController.getDashboardStats);
 
 router.get('/employees', adminController.getEmployees);
+router.get('/employees/workload', adminController.getEmployeesWorkload);
 router.put('/employees/:id', adminController.updateEmployee);
 router.put('/employees/:id/status', adminController.toggleEmployeeStatus);
 

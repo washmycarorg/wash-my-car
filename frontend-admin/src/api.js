@@ -277,3 +277,11 @@ export const saveWashPrice = async (data) => {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 };
+
+export const getEmployeesWorkload = async (date, timeSlot) => {
+  const res = await fetch(`${API_URL}/admin/employees/workload?date=${encodeURIComponent(date)}&timeSlot=${encodeURIComponent(timeSlot)}`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};

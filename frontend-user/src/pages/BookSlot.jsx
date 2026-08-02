@@ -13,6 +13,108 @@ import {
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
+const CustomSelect = ({ options, value, onChange, placeholder = 'Select option' }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find(opt => opt.value === value) || null;
+
+  return (
+    <div ref={dropdownRef} style={{ position: 'relative', width: '100%' }}>
+      <div 
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          padding: '0.75rem 1rem',
+          border: '1px solid #CBD5E1',
+          borderRadius: 'var(--radius-md)',
+          background: 'white',
+          cursor: 'pointer',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          fontSize: '0.95rem',
+          color: selectedOption ? 'var(--primary-navy)' : 'var(--text-muted)',
+          fontWeight: 500,
+          boxShadow: 'var(--shadow-sm)',
+          userSelect: 'none'
+        }}
+      >
+        <span>{selectedOption ? selectedOption.label : placeholder}</span>
+        <span style={{
+          transform: isOpen ? 'rotate(180deg)' : 'rotate(0)',
+          transition: 'transform 0.2s',
+          fontSize: '0.8rem',
+          color: 'var(--text-muted)'
+        }}>▼</span>
+      </div>
+
+      {isOpen && (
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          right: 0,
+          marginTop: '0.5rem',
+          background: 'white',
+          border: '1px solid #E2E8F0',
+          borderRadius: 'var(--radius-md)',
+          boxShadow: 'var(--shadow-lg)',
+          zIndex: 100,
+          maxHeight: '220px',
+          overflowY: 'auto',
+          padding: '0.5rem 0'
+        }}>
+          {options.map(opt => (
+            <div 
+              key={opt.value}
+              onClick={() => {
+                onChange(opt.value);
+                setIsOpen(false);
+              }}
+              style={{
+                padding: '0.75rem 1rem',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                color: opt.value === value ? 'white' : 'var(--text-main)',
+                background: opt.value === value ? 'var(--primary-blue)' : 'transparent',
+                fontWeight: opt.value === value ? 600 : 400,
+                transition: 'background 0.15s, color 0.15s'
+              }}
+              onMouseEnter={e => {
+                if (opt.value !== value) {
+                  e.target.style.background = '#F1F5F9';
+                  e.target.style.color = 'var(--primary-navy)';
+                }
+              }}
+              onMouseLeave={e => {
+                if (opt.value !== value) {
+                  e.target.style.background = 'transparent';
+                  e.target.style.color = 'var(--text-main)';
+                }
+              }}
+            >
+              {opt.label}
+            </div>
+          ))}
+          {options.length === 0 && (
+            <div style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>No options available</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const BookSlot = () => {
   const navigate = useNavigate();
   const mapRef = useRef(null);
@@ -347,11 +449,12 @@ const BookSlot = () => {
         {selectedCarSource === 'saved' && savedCars.length > 0 ? (
           <div className="form-group">
             <label className="form-label">Select Saved Car</label>
-            <select className="form-input" value={selectedCarId} onChange={handleSavedCarChange}>
-              {savedCars.map(c => (
-                <option key={c.id} value={c.id}>{c.make} {c.model} ({c.carType?.name})</option>
-              ))}
-            </select>
+            <CustomSelect 
+              options={savedCars.map(c => ({ value: c.id.toString(), label: `${c.make} ${c.model} (${c.carType?.name})` }))}
+              value={selectedCarId}
+              onChange={(val) => handleSavedCarChange({ target: { value: val } })}
+              placeholder="Choose saved car"
+            />
           </div>
         ) : (
           <div className="flex-col gap-3" style={{ display: 'flex' }}>
@@ -380,11 +483,12 @@ const BookSlot = () => {
             
             <div className="form-group">
               <label className="form-label">Car Type</label>
-              <select className="form-input" value={selectedCarType} onChange={e => setSelectedCarType(e.target.value)}>
-                {carTypes.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+              <CustomSelect 
+                options={carTypes.map(c => ({ value: c.id.toString(), label: c.name }))}
+                value={selectedCarType}
+                onChange={setSelectedCarType}
+                placeholder="Select car type"
+              />
             </div>
 
             <label className="flex items-center gap-2 cursor-pointer text-sm text-muted">
@@ -468,11 +572,12 @@ const BookSlot = () => {
           <div className="flex-col gap-3" style={{ display: 'flex' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label">Select Saved Address</label>
-              <select className="form-input" value={selectedAddressId} onChange={handleSavedAddressChange}>
-                {savedAddresses.map(a => (
-                  <option key={a.id} value={a.id}>{a.name} - {a.address}</option>
-                ))}
-              </select>
+              <CustomSelect 
+                options={savedAddresses.map(a => ({ value: a.id.toString(), label: `${a.name} - ${a.address}` }))}
+                value={selectedAddressId}
+                onChange={(val) => handleSavedAddressChange({ target: { value: val } })}
+                placeholder="Choose saved address"
+              />
             </div>
             <div style={{ background: '#F8FAFC', padding: '0.75rem', borderRadius: 'var(--radius-sm)', borderLeft: '3px solid var(--accent-teal)', fontSize: '0.85rem' }}>
               <strong>Area:</strong> {savedAddresses.find(a => a.id.toString() === selectedAddressId)?.serviceArea?.name || 'Selected'}
@@ -533,12 +638,12 @@ const BookSlot = () => {
 
             <div className="form-group">
               <label className="form-label">Choose Near-by Area</label>
-              <select className="form-input" value={selectedArea} onChange={e => setSelectedArea(e.target.value)}>
-                <option value="" disabled>Select nearest region</option>
-                {serviceAreas.map(sa => (
-                  <option key={sa.id} value={sa.id}>{sa.name}</option>
-                ))}
-              </select>
+              <CustomSelect 
+                options={serviceAreas.map(sa => ({ value: sa.id.toString(), label: sa.name }))}
+                value={selectedArea}
+                onChange={setSelectedArea}
+                placeholder="Select nearest region"
+              />
             </div>
 
             <div className="form-group" style={{ marginTop: '0.5rem' }}>
@@ -580,13 +685,18 @@ const BookSlot = () => {
           </div>
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label">Time Slot</label>
-            <select className="form-input" value={timeSlot} onChange={e => setTimeSlot(e.target.value)}>
-              <option value="08:00 AM">08:00 AM - 10:00 AM</option>
-              <option value="10:00 AM">10:00 AM - 12:00 PM</option>
-              <option value="12:00 PM">12:00 PM - 02:00 PM</option>
-              <option value="02:00 PM">02:00 PM - 04:00 PM</option>
-              <option value="04:00 PM">04:00 PM - 06:00 PM</option>
-            </select>
+            <CustomSelect 
+              options={[
+                { value: "08:00 AM", label: "08:00 AM - 10:00 AM" },
+                { value: "10:00 AM", label: "10:00 AM - 12:00 PM" },
+                { value: "12:00 PM", label: "12:00 PM - 02:00 PM" },
+                { value: "02:00 PM", label: "02:00 PM - 04:00 PM" },
+                { value: "04:00 PM", label: "04:00 PM - 06:00 PM" }
+              ]}
+              value={timeSlot}
+              onChange={setTimeSlot}
+              placeholder="Choose time slot"
+            />
           </div>
         </div>
       </div>

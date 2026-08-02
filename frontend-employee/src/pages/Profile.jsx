@@ -1,9 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { updateProfile, getServiceAreas } from '../api';
-import { MapPin, User as UserIcon } from 'lucide-react';
+import { MapPin, User as UserIcon, Shield, CreditCard, FileText } from 'lucide-react';
 
 const Profile = ({ profile, setProfile }) => {
-  const [formData, setFormData] = useState({ name: '', email: '', phone: '', photo: '' });
+  const [formData, setFormData] = useState({ 
+    name: '', 
+    email: '', 
+    phone: '', 
+    photo: '',
+    aadhaarNumber: '',
+    address: '',
+    idProofFile: ''
+  });
   const [areas, setAreas] = useState([]);
   const [selectedAreaIds, setSelectedAreaIds] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -20,7 +28,10 @@ const Profile = ({ profile, setProfile }) => {
         name: profile.name || '',
         email: profile.email || '',
         phone: profile.phone || '',
-        photo: profile.photo || ''
+        photo: profile.photo || '',
+        aadhaarNumber: profile.aadhaarNumber || '',
+        address: profile.address || '',
+        idProofFile: profile.idProofFile || ''
       });
       setSelectedAreaIds((profile.serviceAreas || []).map(a => a.id));
     }
@@ -32,6 +43,17 @@ const Profile = ({ profile, setProfile }) => {
       const reader = new FileReader();
       reader.onloadend = () => {
         setFormData(prev => ({ ...prev, photo: reader.result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleIdProofChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({ ...prev, idProofFile: reader.result }));
       };
       reader.readAsDataURL(file);
     }
@@ -62,6 +84,9 @@ const Profile = ({ profile, setProfile }) => {
     }
   };
 
+  // Helper to determine format of base64 document
+  const isPdf = formData.idProofFile && formData.idProofFile.startsWith('data:application/pdf');
+
   return (
     <div style={{ maxWidth: '600px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -89,7 +114,7 @@ const Profile = ({ profile, setProfile }) => {
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--primary-blue)', cursor: 'pointer', background: '#F0F9FF', padding: '0.5rem 1rem', borderRadius: '4px', border: '1px dashed var(--primary-blue)' }}>
-                Upload Profile/ID Image
+                Upload Profile Photo
                 <input type="file" accept="image/*" onChange={handlePhotoChange} style={{ display: 'none' }} />
               </label>
               <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>JPG, PNG. Max 2MB.</p>
@@ -97,24 +122,28 @@ const Profile = ({ profile, setProfile }) => {
           </div>
 
           {/* Core Info */}
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Full Name</label>
-            <input 
-              type="text" 
-              className="form-input" 
-              value={formData.name}
-              onChange={e => setFormData({ ...formData, name: e.target.value })}
-            />
-          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Full Name</label>
+              <input 
+                type="text" 
+                className="form-input" 
+                value={formData.name}
+                onChange={e => setFormData({ ...formData, name: e.target.value })}
+              />
+            </div>
 
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Phone Number</label>
-            <input 
-              type="text" 
-              className="form-input" 
-              value={formData.phone}
-              onChange={e => setFormData({ ...formData, phone: e.target.value })}
-            />
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Phone Number</label>
+              <input 
+                type="text" 
+                className="form-input" 
+                value={formData.phone}
+                onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                disabled
+                style={{ background: '#F1F5F9', cursor: 'not-allowed' }}
+              />
+            </div>
           </div>
 
           <div className="form-group" style={{ marginBottom: 0 }}>
@@ -127,8 +156,69 @@ const Profile = ({ profile, setProfile }) => {
             />
           </div>
 
+          {/* Verification credentials */}
+          <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '1.25rem' }}>
+            <h4 style={{ margin: '0 0 1rem 0', color: 'var(--primary-navy)', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.95rem' }}>
+              <Shield size={16} /> ID & Verification Details
+            </h4>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Aadhaar Number</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  value={formData.aadhaarNumber}
+                  onChange={e => setFormData({ ...formData, aadhaarNumber: e.target.value })}
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Residential Address</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  value={formData.address}
+                  onChange={e => setFormData({ ...formData, address: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Update ID Proof (PDF/Image)</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', cursor: 'pointer', background: '#F1F5F9', padding: '0.5rem 1rem', borderRadius: '4px', border: '1px solid #CBD5E1' }}>
+                  Choose Document File
+                  <input type="file" accept="image/*,application/pdf" onChange={handleIdProofChange} style={{ display: 'none' }} />
+                </label>
+                {formData.idProofFile && (
+                  <div>
+                    {isPdf ? (
+                      <a 
+                        href={formData.idProofFile} 
+                        download="id-proof.pdf"
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem', color: 'var(--primary-blue)', fontWeight: 600 }}
+                      >
+                        <FileText size={16} /> Download current PDF Proof
+                      </a>
+                    ) : (
+                      <a 
+                        href={formData.idProofFile} 
+                        download="id-proof.png"
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem', color: 'var(--primary-blue)', fontWeight: 600 }}
+                      >
+                        <img src={formData.idProofFile} alt="ID proof" style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '4px', border: '1px solid #CBD5E1' }} />
+                        Download current Image Proof
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
           {/* Service Areas */}
-          <div style={{ marginTop: '0.5rem' }}>
+          <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '1.25rem' }}>
             <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginBottom: '0.75rem' }}>
               <MapPin size={16} /> Choose Serviced Regions
             </label>

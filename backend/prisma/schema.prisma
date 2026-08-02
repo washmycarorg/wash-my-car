@@ -19,18 +19,21 @@ model User {
 }
 
 model Employee {
-  id           Int           @id @default(autoincrement())
-  phone        String        @unique
-  email        String        @unique
-  name         String
-  status       String        @default("ACTIVE") // ACTIVE, SUSPENDED
-  onDuty       Boolean       @default(false)
-  salary       Float         @default(0) // Monthly salary or hourly wage
-  photo        String?       // Base64 profile/verification photo
-  bookings     Booking[]
-  leaves       Leave[]
-  serviceAreas ServiceArea[] @relation("EmployeeAreas")
-  createdAt    DateTime      @default(now())
+  id            Int           @id @default(autoincrement())
+  phone         String        @unique
+  email         String        @unique
+  name          String
+  status        String        @default("PENDING") // PENDING, ACTIVE, SUSPENDED
+  onDuty        Boolean       @default(false)
+  salary        Float         @default(0) // Monthly salary or hourly wage
+  photo         String?       // Base64 profile/verification photo
+  aadhaarNumber String?
+  address       String?
+  idProofFile   String?       // Base64 ID proof (pdf or image)
+  bookings      Booking[]
+  leaves        Leave[]
+  serviceAreas  ServiceArea[] @relation("EmployeeAreas")
+  createdAt     DateTime      @default(now())
 }
 
 model Admin {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
 import DashboardLayout from './components/DashboardLayout';
-import { loginEmployee, registerEmployee } from './api';
+import { loginEmployee, registerEmployee, getServiceAreas } from './api';
 
 // Pages
 import Dashboard from './pages/Dashboard';
@@ -61,9 +61,20 @@ const EmployeeRegister = () => {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [photo, setPhoto] = useState('');
+  const [aadhaarNumber, setAadhaarNumber] = useState('');
+  const [address, setAddress] = useState('');
+  const [idProofFile, setIdProofFile] = useState('');
+  const [serviceAreas, setServiceAreas] = useState([]);
+  const [selectedAreaIds, setSelectedAreaIds] = useState([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const navigate = useNavigate();
+
+  React.useEffect(() => {
+    getServiceAreas()
+      .then(setServiceAreas)
+      .catch(err => console.error(err));
+  }, []);
 
   const handlePhotoChange = (e) => {
     const file = e.target.files[0];
@@ -76,14 +87,34 @@ const EmployeeRegister = () => {
     }
   };
 
+  const handleIdProofChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setIdProofFile(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAreaToggle = (id) => {
+    setSelectedAreaIds(prev => 
+      prev.includes(id) ? prev.filter(areaId => areaId !== id) : [...prev, id]
+    );
+  };
+
   const handleRegister = async (e) => {
     e.preventDefault();
     if (!photo) return setError('Please upload a profile photo.');
+    if (!idProofFile) return setError('Please upload an ID proof document.');
+    if (selectedAreaIds.length === 0) return setError('Please select at least one region you cover.');
+    
     try {
-      await registerEmployee(name, phone, email, photo);
-      setSuccess('Registration successful! You can now log in.');
+      await registerEmployee(name, phone, email, photo, aadhaarNumber, address, idProofFile, selectedAreaIds);
+      setSuccess('Your registration has been submitted. An admin will review and approve your account shortly.');
       setError('');
-      setTimeout(() => navigate('/'), 2000);
+      setTimeout(() => navigate('/'), 5000);
     } catch (err) {
       setError(err.message || 'Registration failed');
       setSuccess('');
@@ -91,8 +122,8 @@ const EmployeeRegister = () => {
   };
 
   return (
-    <div style={{minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-main)'}}>
-      <div className="card" style={{width: '100%', maxWidth: '400px', padding: '2rem'}}>
+    <div style={{minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-main)', padding: '2rem 1rem'}}>
+      <div className="card" style={{width: '100%', maxWidth: '500px', padding: '2rem'}}>
         <div style={{display: 'flex', justifyContent: 'center', marginBottom: '1rem'}}>
           <img src={logo} alt="Logo" style={{height: '60px'}} />
         </div>
@@ -101,31 +132,77 @@ const EmployeeRegister = () => {
         {error && <div style={{background: '#FEF2F2', color: '#991B1B', padding: '0.75rem', borderRadius: 'var(--radius-md)', marginBottom: '1rem', textAlign: 'center'}}>{error}</div>}
         {success && <div style={{background: '#D1FAE5', color: '#065F46', padding: '0.75rem', borderRadius: 'var(--radius-md)', marginBottom: '1rem', textAlign: 'center'}}>{success}</div>}
         
-        <form style={{display: 'flex', flexDirection: 'column', gap: '1rem'}} onSubmit={handleRegister}>
+        <form style={{display: 'flex', flexDirection: 'column', gap: '1.25rem'}} onSubmit={handleRegister}>
+          
           <div>
-            <label style={{display: 'block', marginBottom: '0.5rem', color: 'var(--primary-navy)', fontSize: '0.9rem'}}>Full Name</label>
+            <label style={{display: 'block', marginBottom: '0.5rem', color: 'var(--primary-navy)', fontSize: '0.9rem', fontWeight: 600}}>Full Name</label>
             <input type="text" value={name} onChange={e=>setName(e.target.value)} className="form-input" placeholder="John Doe" required />
           </div>
-          <div>
-            <label style={{display: 'block', marginBottom: '0.5rem', color: 'var(--primary-navy)', fontSize: '0.9rem'}}>Email</label>
-            <input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="form-input" placeholder="john@example.com" required />
+
+          <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
+            <div>
+              <label style={{display: 'block', marginBottom: '0.5rem', color: 'var(--primary-navy)', fontSize: '0.9rem', fontWeight: 600}}>Email</label>
+              <input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="form-input" placeholder="john@example.com" required />
+            </div>
+            <div>
+              <label style={{display: 'block', marginBottom: '0.5rem', color: 'var(--primary-navy)', fontSize: '0.9rem', fontWeight: 600}}>Phone Number</label>
+              <input type="text" value={phone} onChange={e=>setPhone(e.target.value)} className="form-input" placeholder="+91 98765 43210" required />
+            </div>
           </div>
-          <div>
-            <label style={{display: 'block', marginBottom: '0.5rem', color: 'var(--primary-navy)', fontSize: '0.9rem'}}>Phone Number</label>
-            <input type="text" value={phone} onChange={e=>setPhone(e.target.value)} className="form-input" placeholder="+91 98765 43210" required />
+
+          <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
+            <div>
+              <label style={{display: 'block', marginBottom: '0.5rem', color: 'var(--primary-navy)', fontSize: '0.9rem', fontWeight: 600}}>Aadhaar Number</label>
+              <input type="text" value={aadhaarNumber} onChange={e=>setAadhaarNumber(e.target.value)} className="form-input" placeholder="12-digit UID" required />
+            </div>
+            <div>
+              <label style={{display: 'block', marginBottom: '0.5rem', color: 'var(--primary-navy)', fontSize: '0.9rem', fontWeight: 600}}>Residential Address</label>
+              <input type="text" value={address} onChange={e=>setAddress(e.target.value)} className="form-input" placeholder="Street name, City" required />
+            </div>
           </div>
+
+          {/* Service Areas */}
           <div>
-            <label style={{display: 'block', marginBottom: '0.5rem', color: 'var(--primary-navy)', fontSize: '0.9rem'}}>Profile/ID Photo</label>
-            <input type="file" accept="image/*" onChange={handlePhotoChange} className="form-input" required />
-            {photo && (
-              <div style={{ marginTop: '0.5rem', display: 'flex', justifyContent: 'center' }}>
-                <img src={photo} alt="Preview" style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary-blue)' }} />
-              </div>
-            )}
+            <label style={{display: 'block', marginBottom: '0.5rem', color: 'var(--primary-navy)', fontSize: '0.9rem', fontWeight: 600}}>Choose Serviced Regions</label>
+            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', padding: '0.75rem', background: '#F8FAFC', borderRadius: '4px', border: '1px solid #CBD5E1', maxHeight: '120px', overflowY: 'auto'}}>
+              {serviceAreas.map(sa => {
+                const checked = selectedAreaIds.includes(sa.id);
+                return (
+                  <label key={sa.id} style={{display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', cursor: 'pointer'}}>
+                    <input type="checkbox" checked={checked} onChange={() => handleAreaToggle(sa.id)} />
+                    {sa.name}
+                  </label>
+                );
+              })}
+              {serviceAreas.length === 0 && <span style={{fontSize: '0.8rem', color: 'var(--text-muted)'}}>No service areas configured yet.</span>}
+            </div>
           </div>
+
+          <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
+            <div>
+              <label style={{display: 'block', marginBottom: '0.5rem', color: 'var(--primary-navy)', fontSize: '0.9rem', fontWeight: 600}}>Profile Photo</label>
+              <input type="file" accept="image/*" onChange={handlePhotoChange} className="form-input" required style={{fontSize: '0.8rem'}} />
+              {photo && (
+                <div style={{ marginTop: '0.5rem', display: 'flex', justifyContent: 'center' }}>
+                  <img src={photo} alt="Preview" style={{ width: '60px', height: '60px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary-blue)' }} />
+                </div>
+              )}
+            </div>
+            
+            <div>
+              <label style={{display: 'block', marginBottom: '0.5rem', color: 'var(--primary-navy)', fontSize: '0.9rem', fontWeight: 600}}>ID Proof (PDF/Image)</label>
+              <input type="file" accept="image/*,application/pdf" onChange={handleIdProofChange} className="form-input" required style={{fontSize: '0.8rem'}} />
+              {idProofFile && (
+                <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: 'var(--success)', textAlign: 'center', fontWeight: 600 }}>
+                  ✓ ID Document Loaded
+                </div>
+              )}
+            </div>
+          </div>
+
           <button type="submit" style={{
             background: 'var(--primary-blue)', color: 'white', border: 'none', padding: '0.875rem', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: '1rem', cursor: 'pointer', marginTop: '0.5rem'
-          }}>Register</button>
+          }}>Submit Application</button>
         </form>
         <div style={{textAlign: 'center', marginTop: '1.5rem'}}>
           <p style={{color: 'var(--text-muted)', fontSize: '0.9rem'}}>Already have an account? <Link to="/" style={{color: 'var(--primary-blue)', fontWeight: 600}}>Login</Link></p>

@@ -167,7 +167,7 @@ export const createBooking = async (req, res) => {
     });
 
     // Auto assignment algorithm
-    const activeEmployees = await prisma.employee.findMany({
+    const candidates = await prisma.employee.findMany({
       where: {
         status: 'ACTIVE',
         onDuty: true,
@@ -188,9 +188,14 @@ export const createBooking = async (req, res) => {
       }
     });
 
-    if (activeEmployees.length > 0) {
-      activeEmployees.sort((a, b) => a.bookings.length - b.bookings.length);
-      const chosenEmployee = activeEmployees[0];
+    const eligible = candidates.filter(emp => {
+      const slotBookingsCount = emp.bookings.filter(b => b.timeSlot === timeSlot).length;
+      return slotBookingsCount < 2; // Cap: Max 2 bookings per slot per day
+    });
+
+    if (eligible.length > 0) {
+      eligible.sort((a, b) => a.bookings.length - b.bookings.length);
+      const chosenEmployee = eligible[0];
       
       const updatedBooking = await prisma.booking.update({
         where: { id: booking.id },

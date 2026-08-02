@@ -71,7 +71,7 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
           </Link>
           
           <div style={{marginTop: 'auto', paddingTop: '2rem'}}>
-            <button className="btn btn-outline btn-block text-white" style={{borderColor: 'rgba(255,255,255,0.2)'}} onClick={() => { localStorage.removeItem('adminToken'); window.location.href='/'; }}>
+            <button className="btn btn-outline btn-block" style={{borderColor: 'rgba(255,255,255,0.2)', color: 'white'}} onClick={() => { localStorage.removeItem('adminToken'); window.location.href='/'; }}>
               Log Out
             </button>
           </div>
@@ -271,6 +271,7 @@ const Dashboard = () => {
 
 const EmployeeManagement = () => {
   const [employees, setEmployees] = useState([]);
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
   
   const fetchEmployees = () => getEmployees().then(setEmployees).catch(console.error);
   useEffect(() => { fetchEmployees(); }, []);
@@ -280,6 +281,9 @@ const EmployeeManagement = () => {
     try {
       await toggleEmployeeStatus(id, newStatus);
       fetchEmployees();
+      if (selectedEmployee && selectedEmployee.id === id) {
+        setSelectedEmployee(prev => ({ ...prev, status: newStatus }));
+      }
     } catch (err) { console.error(err); }
   };
 
@@ -330,11 +334,12 @@ const EmployeeManagement = () => {
                   <div style={{fontSize: '0.8rem', color: 'var(--text-muted)'}}>from completed jobs</div>
                 </td>
                 <td style={{padding: '1rem 1.5rem'}}>
-                  <span className={`badge ${emp.status === 'ACTIVE' ? 'badge-success' : 'badge-danger'}`}>
+                  <span className={`badge ${emp.status === 'ACTIVE' ? 'badge-success' : emp.status === 'PENDING' ? 'badge-warning' : 'badge-danger'}`}>
                     {emp.status}
                   </span>
                 </td>
                 <td style={{padding: '1rem 1.5rem'}} className="flex gap-2">
+                  <button onClick={() => setSelectedEmployee(emp)} className="btn btn-outline" style={{padding: '0.4rem 0.8rem', fontSize: '0.85rem'}}>Details</button>
                   {emp.status === 'ACTIVE' ? 
                     <button onClick={() => handleToggle(emp.id, emp.status)} className="btn btn-outline" style={{padding: '0.4rem 0.8rem', fontSize: '0.85rem', borderColor: 'var(--danger)', color: 'var(--danger)'}}>Suspend</button> :
                     <button onClick={() => handleToggle(emp.id, emp.status)} className="btn btn-teal" style={{padding: '0.4rem 0.8rem', fontSize: '0.85rem'}}>Approve</button>
@@ -352,6 +357,116 @@ const EmployeeManagement = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Details Modal */}
+      {selectedEmployee && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(13, 38, 80, 0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '1rem'
+        }}>
+          <div className="card animate-fade-in" style={{ width: '100%', maxWidth: '500px', background: 'white', padding: '2.5rem', borderRadius: 'var(--radius-lg)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid #F1F5F9', paddingBottom: '0.75rem' }}>
+              <h3 style={{ margin: 0, color: 'var(--primary-navy)' }}>Employee Application & Details</h3>
+              <button onClick={() => setSelectedEmployee(null)} className="btn btn-outline" style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem' }}>Close</button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              
+              {/* Photo & Basic info */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                {selectedEmployee.photo ? (
+                  <img src={selectedEmployee.photo} alt="Avatar" style={{ width: '70px', height: '70px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary-blue)' }} />
+                ) : (
+                  <div style={{ width: '70px', height: '70px', borderRadius: '50%', background: 'var(--accent-teal-light)', color: 'var(--primary-navy)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '1.5rem' }}>
+                    {(selectedEmployee.name[0] || 'E').toUpperCase()}
+                  </div>
+                )}
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '1.15rem', color: 'var(--primary-navy)' }}>{selectedEmployee.name}</h4>
+                  <span className={`badge ${selectedEmployee.status === 'ACTIVE' ? 'badge-success' : selectedEmployee.status === 'PENDING' ? 'badge-warning' : 'badge-danger'}`} style={{ marginTop: '0.25rem', display: 'inline-block' }}>
+                    {selectedEmployee.status}
+                  </span>
+                </div>
+              </div>
+
+              {/* Grid details */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.9rem', color: 'var(--text-main)' }}>
+                <div><strong>Phone:</strong> {selectedEmployee.phone}</div>
+                <div><strong>Email:</strong> {selectedEmployee.email}</div>
+                <div><strong>Aadhaar Number:</strong> {selectedEmployee.aadhaarNumber || 'Not provided'}</div>
+                <div><strong>Address:</strong> {selectedEmployee.address || 'Not provided'}</div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <strong>Regions Served:</strong> {selectedEmployee.serviceAreas && selectedEmployee.serviceAreas.length > 0 ? selectedEmployee.serviceAreas.map(a => a.name).join(', ') : 'None'}
+                </div>
+              </div>
+
+              {/* ID Proof File */}
+              <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '1rem' }}>
+                <h5 style={{ margin: '0 0 0.5rem 0', color: 'var(--primary-navy)' }}>Uploaded ID Proof Document</h5>
+                {selectedEmployee.idProofFile ? (
+                  <div>
+                    {selectedEmployee.idProofFile.startsWith('data:application/pdf') ? (
+                      <a 
+                        href={selectedEmployee.idProofFile} 
+                        download={`id-proof-${selectedEmployee.name}.pdf`}
+                        className="btn btn-outline"
+                        style={{ display: 'inline-block', fontSize: '0.85rem' }}
+                      >
+                        Download PDF Document
+                      </a>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <img 
+                          src={selectedEmployee.idProofFile} 
+                          alt="ID Proof Document" 
+                          style={{ width: '100%', maxHeight: '180px', objectFit: 'contain', borderRadius: '4px', border: '1px solid #CBD5E1' }} 
+                        />
+                        <a 
+                          href={selectedEmployee.idProofFile} 
+                          download={`id-proof-${selectedEmployee.name}.png`}
+                          style={{ fontSize: '0.85rem', color: 'var(--primary-blue)', fontWeight: 600, textDecoration: 'underline' }}
+                        >
+                          Download Image Document
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No ID proof document uploaded.</span>
+                )}
+              </div>
+
+              {/* Approve/Suspend action */}
+              <div style={{ display: 'flex', gap: '0.75rem', borderTop: '1px solid #F1F5F9', paddingTop: '1rem' }}>
+                {selectedEmployee.status === 'ACTIVE' ? (
+                  <button 
+                    onClick={() => handleToggle(selectedEmployee.id, selectedEmployee.status)} 
+                    className="btn btn-outline btn-block" 
+                    style={{ borderColor: 'var(--danger)', color: 'var(--danger)' }}
+                  >
+                    Suspend Employee Account
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => handleToggle(selectedEmployee.id, selectedEmployee.status)} 
+                    className="btn btn-teal btn-block"
+                  >
+                    Approve Application & Make Active
+                  </button>
+                )}
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Require basic Tailwind-like hover classes for table rows */}
       <style>{`

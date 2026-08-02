@@ -52,12 +52,15 @@ export const getProfile = async (req, res) => {
 
 export const updateProfile = async (req, res) => {
   try {
-    const { name, phone, email, photo, serviceAreaIds } = req.body;
+    const { name, phone, email, photo, serviceAreaIds, aadhaarNumber, address, idProofFile } = req.body;
     const data = {};
     if (name) data.name = name;
     if (phone) data.phone = phone;
     if (email) data.email = email;
     if (photo !== undefined) data.photo = photo;
+    if (aadhaarNumber !== undefined) data.aadhaarNumber = aadhaarNumber;
+    if (address !== undefined) data.address = address;
+    if (idProofFile !== undefined) data.idProofFile = idProofFile;
     
     if (serviceAreaIds) {
       data.serviceAreas = {
@@ -78,7 +81,11 @@ export const updateProfile = async (req, res) => {
 
 export const toggleDuty = async (req, res) => {
   try {
-    const { onDuty } = req.body;
+    let { onDuty } = req.body;
+    if (onDuty === undefined) {
+      const current = await prisma.employee.findUnique({ where: { id: req.user.id } });
+      onDuty = !current.onDuty;
+    }
     const employee = await prisma.employee.update({
       where: { id: req.user.id },
       data: { onDuty }
