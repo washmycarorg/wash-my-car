@@ -60,14 +60,27 @@ const EmployeeRegister = () => {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [photo, setPhoto] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const navigate = useNavigate();
 
+  const handlePhotoChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhoto(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleRegister = async (e) => {
     e.preventDefault();
+    if (!photo) return setError('Please upload a profile photo.');
     try {
-      await registerEmployee(name, phone, email);
+      await registerEmployee(name, phone, email, photo);
       setSuccess('Registration successful! You can now log in.');
       setError('');
       setTimeout(() => navigate('/'), 2000);
@@ -87,6 +100,7 @@ const EmployeeRegister = () => {
         <p style={{color: 'var(--text-muted)', textAlign: 'center', marginBottom: '2rem'}}>Register as an employee</p>
         {error && <div style={{background: '#FEF2F2', color: '#991B1B', padding: '0.75rem', borderRadius: 'var(--radius-md)', marginBottom: '1rem', textAlign: 'center'}}>{error}</div>}
         {success && <div style={{background: '#D1FAE5', color: '#065F46', padding: '0.75rem', borderRadius: 'var(--radius-md)', marginBottom: '1rem', textAlign: 'center'}}>{success}</div>}
+        
         <form style={{display: 'flex', flexDirection: 'column', gap: '1rem'}} onSubmit={handleRegister}>
           <div>
             <label style={{display: 'block', marginBottom: '0.5rem', color: 'var(--primary-navy)', fontSize: '0.9rem'}}>Full Name</label>
@@ -99,6 +113,15 @@ const EmployeeRegister = () => {
           <div>
             <label style={{display: 'block', marginBottom: '0.5rem', color: 'var(--primary-navy)', fontSize: '0.9rem'}}>Phone Number</label>
             <input type="text" value={phone} onChange={e=>setPhone(e.target.value)} className="form-input" placeholder="+91 98765 43210" required />
+          </div>
+          <div>
+            <label style={{display: 'block', marginBottom: '0.5rem', color: 'var(--primary-navy)', fontSize: '0.9rem'}}>Profile/ID Photo</label>
+            <input type="file" accept="image/*" onChange={handlePhotoChange} className="form-input" required />
+            {photo && (
+              <div style={{ marginTop: '0.5rem', display: 'flex', justifyContent: 'center' }}>
+                <img src={photo} alt="Preview" style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary-blue)' }} />
+              </div>
+            )}
           </div>
           <button type="submit" style={{
             background: 'var(--primary-blue)', color: 'white', border: 'none', padding: '0.875rem', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: '1rem', cursor: 'pointer', marginTop: '0.5rem'

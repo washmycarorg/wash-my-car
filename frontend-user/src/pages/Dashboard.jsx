@@ -90,7 +90,7 @@ const Dashboard = () => {
         <div className="p-4">
           {nextBooking ? (
             <div>
-              <h3 style={{fontSize: '1.2rem', marginBottom: '0.5rem', color: 'var(--primary-navy)'}}>{nextBooking.service?.name || 'Wash Service'}</h3>
+              <h3 style={{fontSize: '1.2rem', marginBottom: '0.5rem', color: 'var(--primary-navy)'}}>{nextBooking.washType?.name || 'Wash Service'}</h3>
               <p className="text-muted text-sm mb-2">
                 {new Date(nextBooking.date).toISOString().split('T')[0]} at {nextBooking.timeSlot}
               </p>

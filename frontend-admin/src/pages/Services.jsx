@@ -1,104 +1,447 @@
 import React, { useState, useEffect } from 'react';
-import { getServices, createService, deleteService, updateService } from '../api';
+import { 
+  getCarTypes, createCarType, deleteCarType,
+  getWashTypes, createWashType, deleteWashType,
+  getWashPrices, saveWashPrice
+} from '../api';
+import { Settings, Car, Sparkles, DollarSign, Plus, Trash2, Edit3, Check, X } from 'lucide-react';
 
 const Services = () => {
-  const [services, setServices] = useState([]);
+  const [activeTab, setActiveTab] = useState('matrix'); // 'matrix', 'cartypes', 'washtypes'
+  
+  // Lists
+  const [carTypes, setCarTypes] = useState([]);
+  const [washTypes, setWashTypes] = useState([]);
+  const [prices, setPrices] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [formData, setFormData] = useState({ name: '', description: '', price: '', type: 'Basic' });
 
-  const fetchServices = async () => {
+  // Form states
+  const [newCarType, setNewCarType] = useState('');
+  const [newWashType, setNewWashType] = useState({ name: '', description: '' });
+
+  // Inline editing state for matrix cell
+  const [editingCell, setEditingCell] = useState(null); // { carTypeId, washTypeId, price, payoutType, payoutValue }
+
+  const fetchData = async () => {
     try {
-      const res = await getServices();
-      setServices(res);
-    } catch (err) { console.error(err); } finally { setLoading(false); }
+      const [cars, washes, matrixPrices] = await Promise.all([
+        getCarTypes(),
+        getWashTypes(),
+        getWashPrices()
+      ]);
+      setCarTypes(cars);
+      setWashTypes(washes);
+      setPrices(matrixPrices);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { fetchServices(); }, []);
+  useEffect(() => {
+    fetchData();
+  }, []);
 
-  const handleSubmit = async (e) => {
+  // Car Types CRUD
+  const handleAddCarType = async (e) => {
     e.preventDefault();
+    if (!newCarType.trim()) return;
     try {
-      await createService(formData);
-      setFormData({ name: '', description: '', price: '', type: 'Basic' });
-      fetchServices();
-    } catch (err) { console.error(err); }
+      await createCarType(newCarType);
+      setNewCarType('');
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to add car type. Check if it already exists.');
+    }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Delete this package?")) return;
+  const handleDeleteCarType = async (id) => {
+    if (!confirm('Are you sure you want to delete this car type? This will also delete any associated pricing settings.')) return;
     try {
-      await deleteService(id);
-      fetchServices();
-    } catch (err) { console.error(err); }
+      await deleteCarType(id);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  if (loading) return <div>Loading...</div>;
+  // Wash Types CRUD
+  const handleAddWashType = async (e) => {
+    e.preventDefault();
+    if (!newWashType.name.trim()) return;
+    try {
+      await createWashType(newWashType.name, newWashType.description);
+      setNewWashType({ name: '', description: '' });
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to add wash type. Check if it already exists.');
+    }
+  };
+
+  const handleDeleteWashType = async (id) => {
+    if (!confirm('Are you sure you want to delete this wash type? This will also delete any associated pricing settings.')) return;
+    try {
+      await deleteWashType(id);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Save Pricing Matrix
+  const handleSavePriceCell = async () => {
+    if (!editingCell) return;
+    try {
+      await saveWashPrice({
+        carTypeId: editingCell.carTypeId,
+        washTypeId: editingCell.washTypeId,
+        price: Number(editingCell.price),
+        payoutType: editingCell.payoutType,
+        payoutValue: Number(editingCell.payoutValue)
+      });
+      setEditingCell(null);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save pricing cell settings.');
+    }
+  };
+
+  const getPriceInfo = (carTypeId, washTypeId) => {
+    return prices.find(p => p.carTypeId === carTypeId && p.washTypeId === washTypeId) || {
+      price: 0,
+      payoutType: 'PERCENTAGE',
+      payoutValue: 50.0
+    };
+  };
+
+  if (loading) return <div>Loading plans & pricing configurations...</div>;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div className="lg:col-span-1">
-        <div className="card">
-          <h3 style={{marginBottom: '1rem'}}>Add Package / Plan</h3>
-          <form className="flex-col gap-4" onSubmit={handleSubmit} style={{display: 'flex'}}>
-            <div className="form-group" style={{margin: 0}}>
-              <label className="form-label">Package Name</label>
-              <input required type="text" className="form-input" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="e.g. Premium Wash" />
-            </div>
-            <div className="form-group" style={{margin: 0}}>
-              <label className="form-label">Type</label>
-              <select className="form-input" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})}>
-                <option value="Basic">Basic</option>
-                <option value="Premium">Premium</option>
-                <option value="Full">Full Detailing</option>
-                <option value="Subscription">Subscription Plan</option>
-              </select>
-            </div>
-            <div className="form-group" style={{margin: 0}}>
-              <label className="form-label">Price (₹)</label>
-              <input required type="number" min="0" step="0.01" className="form-input" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} placeholder="e.g. 49.99" />
-            </div>
-            <div className="form-group" style={{margin: 0}}>
-              <label className="form-label">Description</label>
-              <textarea required className="form-input" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="What's included..." rows={3} />
-            </div>
-            <button type="submit" className="btn btn-primary">Save Package</button>
-          </form>
-        </div>
+    <div className="animate-fade-in">
+      {/* Navigation tabs */}
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '2px solid #E2E8F0', paddingBottom: '0.5rem' }}>
+        <button 
+          onClick={() => setActiveTab('matrix')}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            fontSize: '1rem',
+            fontWeight: 600,
+            color: activeTab === 'matrix' ? 'var(--primary-blue)' : 'var(--text-muted)',
+            borderBottom: activeTab === 'matrix' ? '3px solid var(--primary-blue)' : 'none',
+            padding: '0.5rem 1rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.25rem'
+          }}
+        >
+          <DollarSign size={18} /> Pricing & Commission Matrix
+        </button>
+
+        <button 
+          onClick={() => setActiveTab('cartypes')}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            fontSize: '1rem',
+            fontWeight: 600,
+            color: activeTab === 'cartypes' ? 'var(--primary-blue)' : 'var(--text-muted)',
+            borderBottom: activeTab === 'cartypes' ? '3px solid var(--primary-blue)' : 'none',
+            padding: '0.5rem 1rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.25rem'
+          }}
+        >
+          <Car size={18} /> Car Types
+        </button>
+
+        <button 
+          onClick={() => setActiveTab('washtypes')}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            fontSize: '1rem',
+            fontWeight: 600,
+            color: activeTab === 'washtypes' ? 'var(--primary-blue)' : 'var(--text-muted)',
+            borderBottom: activeTab === 'washtypes' ? '3px solid var(--primary-blue)' : 'none',
+            padding: '0.5rem 1rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.25rem'
+          }}
+        >
+          <Sparkles size={18} /> Wash Types
+        </button>
       </div>
-      
-      <div className="lg:col-span-2">
-        <div className="card" style={{padding: 0, overflowX: 'auto'}}>
-          <div className="p-6 border-b border-gray-200"><h3 style={{margin: 0}}>Existing Packages</h3></div>
-          <table style={{width: '100%', borderCollapse: 'collapse', textAlign: 'left'}}>
-            <thead style={{background: '#F8FAFC'}}>
-              <tr>
-                <th style={{padding: '1rem 1.5rem', color: 'var(--text-muted)'}}>Package</th>
-                <th style={{padding: '1rem 1.5rem', color: 'var(--text-muted)'}}>Type</th>
-                <th style={{padding: '1rem 1.5rem', color: 'var(--text-muted)'}}>Price</th>
-                <th style={{padding: '1rem 1.5rem', color: 'var(--text-muted)'}}>Actions</th>
+
+      {/* Tab Contents */}
+      {activeTab === 'matrix' && (
+        <div className="card" style={{ padding: '1.5rem', overflowX: 'auto' }}>
+          <h3 style={{ marginBottom: '1.25rem', color: 'var(--primary-navy)' }}>Service Pricing & Commission Matrix</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
+            Click on any cell to edit the service price and configure the employee payout (percentage or fixed amount) for that specific vehicle and plan.
+          </p>
+
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '700px' }}>
+            <thead>
+              <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #E2E8F0' }}>
+                <th style={{ padding: '1rem', color: 'var(--primary-navy)', fontWeight: 700 }}>Car / Vehicle Type</th>
+                {washTypes.map(wt => (
+                  <th key={wt.id} style={{ padding: '1rem', color: 'var(--primary-navy)', fontWeight: 700, textAlign: 'center' }}>
+                    {wt.name}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {services.map(s => (
-                <tr key={s.id} style={{borderBottom: '1px solid #F1F5F9'}}>
-                  <td style={{padding: '1rem 1.5rem'}}>
-                    <div style={{fontWeight: 600}}>{s.name}</div>
-                    <div className="text-sm text-muted">{s.description.substring(0, 40)}...</div>
-                  </td>
-                  <td style={{padding: '1rem 1.5rem'}}>
-                    <span className="badge" style={{background: '#E0E7FF', color: '#4F46E5'}}>{s.type}</span>
-                  </td>
-                  <td style={{padding: '1rem 1.5rem', fontWeight: 'bold'}}>₹{s.price}</td>
-                  <td style={{padding: '1rem 1.5rem'}} className="flex gap-2">
-                    <button className="btn btn-danger text-xs" style={{padding: '0.25rem 0.5rem'}} onClick={() => handleDelete(s.id)}>Delete</button>
-                  </td>
+              {carTypes.map(ct => (
+                <tr key={ct.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                  <td style={{ padding: '1.25rem 1rem', fontWeight: 600, color: 'var(--primary-navy)' }}>{ct.name}</td>
+                  
+                  {washTypes.map(wt => {
+                    const priceInfo = getPriceInfo(ct.id, wt.id);
+                    const isEditing = editingCell?.carTypeId === ct.id && editingCell?.washTypeId === wt.id;
+
+                    return (
+                      <td key={wt.id} style={{ padding: '1rem', textAlign: 'center' }}>
+                        {isEditing ? (
+                          <div style={{
+                            background: '#F8FAFC',
+                            padding: '0.75rem',
+                            borderRadius: '8px',
+                            border: '1px solid var(--primary-blue)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.5rem',
+                            maxWidth: '180px',
+                            margin: '0 auto'
+                          }}>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, textAlign: 'left' }}>Price (₹)</label>
+                              <input 
+                                type="number" 
+                                className="form-input" 
+                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.85rem', marginBottom: 0 }}
+                                value={editingCell.price}
+                                onChange={e => setEditingCell({ ...editingCell, price: e.target.value })}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, textAlign: 'left' }}>Commission Type</label>
+                              <select 
+                                className="form-input" 
+                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.85rem', marginBottom: 0 }}
+                                value={editingCell.payoutType}
+                                onChange={e => setEditingCell({ ...editingCell, payoutType: e.target.value })}
+                              >
+                                <option value="PERCENTAGE">Percentage (%)</option>
+                                <option value="AMOUNT">Fixed (₹)</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, textAlign: 'left' }}>Payout Value</label>
+                              <input 
+                                type="number" 
+                                className="form-input" 
+                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.85rem', marginBottom: 0 }}
+                                value={editingCell.payoutValue}
+                                onChange={e => setEditingCell({ ...editingCell, payoutValue: e.target.value })}
+                              />
+                            </div>
+                            <div style={{ display: 'flex', gap: '0.25rem', marginTop: '0.25rem' }}>
+                              <button onClick={handleSavePriceCell} className="btn btn-teal" style={{ padding: '0.25rem', flex: 1, borderRadius: '4px' }}>
+                                <Check size={14} />
+                              </button>
+                              <button onClick={() => setEditingCell(null)} className="btn btn-outline" style={{ padding: '0.25rem', flex: 1, borderRadius: '4px', borderColor: 'var(--danger)', color: 'var(--danger)' }}>
+                                <X size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div 
+                            onClick={() => setEditingCell({
+                              carTypeId: ct.id,
+                              washTypeId: wt.id,
+                              price: priceInfo.price,
+                              payoutType: priceInfo.payoutType,
+                              payoutValue: priceInfo.payoutValue
+                            })}
+                            style={{
+                              padding: '0.75rem',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              border: '1px dashed #CBD5E1',
+                              background: priceInfo.price > 0 ? '#F0FDF4' : '#FFF7ED',
+                              transition: 'all 0.2s',
+                              display: 'inline-block',
+                              minWidth: '110px'
+                            }}
+                            className="hover:border-primary-blue"
+                          >
+                            <div style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--primary-navy)' }}>
+                              ₹{priceInfo.price}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                              Emp: {priceInfo.payoutType === 'PERCENTAGE' ? `${priceInfo.payoutValue}%` : `₹${priceInfo.payoutValue}`}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.1rem', fontSize: '0.65rem', color: 'var(--primary-blue)', marginTop: '0.25rem', opacity: 0.8 }}>
+                              <Edit3 size={10} /> Edit Settings
+                            </div>
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
                 </tr>
               ))}
-              {services.length === 0 && <tr><td colSpan="4" style={{padding: '2rem', textAlign: 'center'}}>No packages found</td></tr>}
+              {carTypes.length === 0 || washTypes.length === 0 ? (
+                <tr>
+                  <td colSpan={washTypes.length + 1} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                    Add Car Types and Wash Plans to populate the matrix!
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </div>
-      </div>
+      )}
+
+      {activeTab === 'cartypes' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-1">
+            <div className="card">
+              <h3 style={{ marginBottom: '1.25rem' }}>Add Car Type</h3>
+              <form onSubmit={handleAddCarType} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Vehicle Type Name</label>
+                  <input 
+                    required 
+                    type="text" 
+                    className="form-input" 
+                    placeholder="e.g. Sedan, SUV, Hatchback, Luxury"
+                    value={newCarType}
+                    onChange={e => setNewCarType(e.target.value)}
+                  />
+                </div>
+                <button type="submit" className="btn btn-primary">Add Car Type</button>
+              </form>
+            </div>
+          </div>
+          <div className="lg:col-span-2">
+            <div className="card" style={{ padding: 0 }}>
+              <div className="p-6 border-b border-gray-200"><h3 style={{ margin: 0 }}>Active Car Categories</h3></div>
+              <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {carTypes.map(c => (
+                  <div 
+                    key={c.id} 
+                    style={{
+                      padding: '1rem',
+                      border: '1px solid #E2E8F0',
+                      borderRadius: 'var(--radius-md)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      background: 'white'
+                    }}
+                  >
+                    <span style={{ fontWeight: 600, color: 'var(--primary-navy)' }}>{c.name}</span>
+                    <button 
+                      onClick={() => handleDeleteCarType(c.id)}
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.25rem' }}
+                    >
+                      <Trash2 size={18} color="var(--danger)" />
+                    </button>
+                  </div>
+                ))}
+                {carTypes.length === 0 && <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No car types created yet.</p>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'washtypes' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-1">
+            <div className="card">
+              <h3 style={{ marginBottom: '1.25rem' }}>Add Wash Plan</h3>
+              <form onSubmit={handleAddWashType} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Plan Name</label>
+                  <input 
+                    required 
+                    type="text" 
+                    className="form-input" 
+                    placeholder="e.g. Basic Wash, Full Detail"
+                    value={newWashType.name}
+                    onChange={e => setNewWashType({ ...newWashType, name: e.target.value })}
+                  />
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Description</label>
+                  <textarea 
+                    className="form-input" 
+                    placeholder="Included services..."
+                    value={newWashType.description}
+                    onChange={e => setNewWashType({ ...newWashType, description: e.target.value })}
+                    rows={3}
+                  />
+                </div>
+                <button type="submit" className="btn btn-primary">Add Wash Type</button>
+              </form>
+            </div>
+          </div>
+          <div className="lg:col-span-2">
+            <div className="card" style={{ padding: 0 }}>
+              <div className="p-6 border-b border-gray-200"><h3 style={{ margin: 0 }}>Available Wash Plans</h3></div>
+              <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {washTypes.map(w => (
+                  <div 
+                    key={w.id} 
+                    style={{
+                      padding: '1rem',
+                      border: '1px solid #E2E8F0',
+                      borderRadius: 'var(--radius-md)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      background: 'white'
+                    }}
+                  >
+                    <div>
+                      <h4 style={{ margin: '0 0 0.25rem 0', color: 'var(--primary-navy)', fontWeight: 600 }}>{w.name}</h4>
+                      <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.85rem' }}>{w.description}</p>
+                    </div>
+                    <button 
+                      onClick={() => handleDeleteWashType(w.id)}
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.25rem' }}
+                    >
+                      <Trash2 size={18} color="var(--danger)" />
+                    </button>
+                  </div>
+                ))}
+                {washTypes.length === 0 && <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No wash types created yet.</p>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Inject custom cell editing style overrides */}
+      <style>{`
+        .hover\\:border-primary-blue:hover {
+          border-color: var(--primary-blue) !important;
+          background: #F0F9FF !important;
+        }
+      `}</style>
     </div>
   );
 };

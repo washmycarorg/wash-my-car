@@ -1,4 +1,6 @@
-const API_URL = 'http://localhost:5001/api';
+const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:5001/api'
+  : 'https://wash-my-car.onrender.com/api';
 
 export const loginAdmin = async (email, password) => {
   const res = await fetch(`${API_URL}/auth/admin/login`, {
@@ -65,6 +67,15 @@ export const assignSlot = async (id, employeeId) => {
   return res.json();
 };
 
+export const autoAssignSlot = async (id) => {
+  const res = await fetch(`${API_URL}/admin/bookings/${id}/auto-assign`, {
+    method: 'PUT',
+    headers: getHeaders()
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
 export const getLeaves = async () => {
   const res = await fetch(`${API_URL}/admin/leaves`, { headers: getHeaders() });
   if (!res.ok) throw new Error(await res.text());
@@ -116,6 +127,7 @@ export const deleteOffer = async (id) => {
   return res.json();
 };
 
+// Legacy Services (Plans)
 export const getServices = async () => {
   const res = await fetch(`${API_URL}/admin/services`, { headers: getHeaders() });
   if (!res.ok) throw new Error(await res.text());
@@ -146,6 +158,121 @@ export const deleteService = async (id) => {
   const res = await fetch(`${API_URL}/admin/services/${id}`, {
     method: 'DELETE',
     headers: getHeaders()
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+// Service Areas
+export const getServiceAreas = async () => {
+  const res = await fetch(`${API_URL}/admin/service-areas`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const createServiceArea = async (name) => {
+  const res = await fetch(`${API_URL}/admin/service-areas`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ name })
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const deleteServiceArea = async (id) => {
+  const res = await fetch(`${API_URL}/admin/service-areas/${id}`, {
+    method: 'DELETE',
+    headers: getHeaders()
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+// Car Types
+export const getCarTypes = async () => {
+  const res = await fetch(`${API_URL}/admin/car-types`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const createCarType = async (name) => {
+  const res = await fetch(`${API_URL}/admin/car-types`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ name })
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const updateCarType = async (id, name) => {
+  const res = await fetch(`${API_URL}/admin/car-types/${id}`, {
+    method: 'PUT',
+    headers: getHeaders(),
+    body: JSON.stringify({ name })
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const deleteCarType = async (id) => {
+  const res = await fetch(`${API_URL}/admin/car-types/${id}`, {
+    method: 'DELETE',
+    headers: getHeaders()
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+// Wash Types
+export const getWashTypes = async () => {
+  const res = await fetch(`${API_URL}/admin/wash-types`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const createWashType = async (name, description) => {
+  const res = await fetch(`${API_URL}/admin/wash-types`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ name, description })
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const updateWashType = async (id, name, description) => {
+  const res = await fetch(`${API_URL}/admin/wash-types/${id}`, {
+    method: 'PUT',
+    headers: getHeaders(),
+    body: JSON.stringify({ name, description })
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const deleteWashType = async (id) => {
+  const res = await fetch(`${API_URL}/admin/wash-types/${id}`, {
+    method: 'DELETE',
+    headers: getHeaders()
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+// Wash Prices Matrix
+export const getWashPrices = async () => {
+  const res = await fetch(`${API_URL}/admin/wash-prices`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const saveWashPrice = async (data) => {
+  const res = await fetch(`${API_URL}/admin/wash-prices`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data)
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();

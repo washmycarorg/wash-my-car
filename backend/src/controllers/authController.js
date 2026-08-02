@@ -45,7 +45,7 @@ export const employeeLogin = async (req, res) => {
 
 export const employeeRegister = async (req, res) => {
   try {
-    const { name, phone, email } = req.body;
+    const { name, phone, email, photo } = req.body;
     
     // Check if employee already exists
     let existingEmployee = await prisma.employee.findFirst({
@@ -65,7 +65,8 @@ export const employeeRegister = async (req, res) => {
       data: {
         name,
         phone,
-        email
+        email,
+        photo
       }
     });
 

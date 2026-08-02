@@ -1,4 +1,6 @@
-const API_URL = 'http://localhost:5001/api';
+const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:5001/api'
+  : 'https://wash-my-car.onrender.com/api';
 
 export const loginUser = async (phone, otp) => {
   const res = await fetch(`${API_URL}/auth/user/login`, {
@@ -65,6 +67,15 @@ export const addCar = async (data) => {
   return res.json();
 };
 
+export const deleteCar = async (id) => {
+  const res = await fetch(`${API_URL}/users/cars/${id}`, {
+    method: 'DELETE',
+    headers: getHeaders()
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
 export const updateProfile = async (data) => {
   const res = await fetch(`${API_URL}/users/profile`, {
     method: 'PUT',
@@ -77,6 +88,56 @@ export const updateProfile = async (data) => {
 
 export const getServices = async () => {
   const res = await fetch(`${API_URL}/users/services`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+// New API endpoints for advanced booking details
+export const getCarTypes = async () => {
+  const res = await fetch(`${API_URL}/users/car-types`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const getWashTypes = async () => {
+  const res = await fetch(`${API_URL}/users/wash-types`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const getServiceAreas = async () => {
+  const res = await fetch(`${API_URL}/users/service-areas`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const getWashPrice = async (carTypeId, washTypeId) => {
+  const res = await fetch(`${API_URL}/users/price?carTypeId=${carTypeId}&washTypeId=${washTypeId}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const getSavedAddresses = async () => {
+  const res = await fetch(`${API_URL}/users/addresses`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const addSavedAddress = async (data) => {
+  const res = await fetch(`${API_URL}/users/addresses`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const deleteSavedAddress = async (id) => {
+  const res = await fetch(`${API_URL}/users/addresses/${id}`, {
+    method: 'DELETE',
+    headers: getHeaders()
+  });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 };

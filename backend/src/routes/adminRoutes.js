@@ -20,12 +20,36 @@ router.post('/offers', adminController.createOffer);
 router.put('/offers/:id', adminController.updateOffer);
 router.delete('/offers/:id', adminController.deleteOffer);
 
+// Keep Services for fallback
 router.get('/services', adminController.getServices);
 router.post('/services', adminController.createService);
 router.put('/services/:id', adminController.updateService);
 router.delete('/services/:id', adminController.deleteService);
 
+// Service Areas
+router.get('/service-areas', adminController.getServiceAreas);
+router.post('/service-areas', adminController.createServiceArea);
+router.delete('/service-areas/:id', adminController.deleteServiceArea);
+
+// Car Types
+router.get('/car-types', adminController.getCarTypes);
+router.post('/car-types', adminController.createCarType);
+router.put('/car-types/:id', adminController.updateCarType);
+router.delete('/car-types/:id', adminController.deleteCarType);
+
+// Wash Types
+router.get('/wash-types', adminController.getWashTypes);
+router.post('/wash-types', adminController.createWashType);
+router.put('/wash-types/:id', adminController.updateWashType);
+router.delete('/wash-types/:id', adminController.deleteWashType);
+
+// Wash Prices Matrix
+router.get('/wash-prices', adminController.getWashPrices);
+router.post('/wash-prices', adminController.saveWashPrice);
+
+// Bookings
 router.get('/bookings', adminController.getBookings);
 router.put('/bookings/:id/assign', adminController.assignSlot);
+router.put('/bookings/:id/auto-assign', adminController.autoAssignSlot);
 
 export default router;

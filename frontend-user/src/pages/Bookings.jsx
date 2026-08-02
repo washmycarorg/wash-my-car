@@ -35,7 +35,7 @@ const Bookings = () => {
                 background: 'white'
               }}>
                 <h4 style={{margin: '0 0 0.5rem 0', color: 'var(--primary-navy)', fontSize: '1.05rem'}}>
-                  {booking.service?.name || 'Wash Service'}
+                  {booking.washType?.name || 'Wash Service'} — <span style={{fontSize: '0.9rem', opacity: 0.8}}>{booking.carType?.name || 'Car'}</span>
                 </h4>
                 
                 <p style={{margin: '0 0 0.25rem 0', color: 'var(--text-muted)', fontSize: '0.85rem'}}>
@@ -57,7 +57,7 @@ const Bookings = () => {
                   )}
                   
                   <span style={{fontWeight: 700, color: 'var(--primary-navy)', fontSize: '1.1rem', marginLeft: 'auto'}}>
-                    ₹{booking.service?.price}
+                    ₹{booking.price}
                   </span>
 
                   {booking.status !== 'COMPLETED' && booking.status !== 'CANCELLED' && (

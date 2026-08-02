@@ -8,33 +8,68 @@ datasource db {
 }
 
 model User {
-  id        Int       @id @default(autoincrement())
-  phone     String    @unique
-  name      String?
-  points    Int       @default(0)
-  cars      Car[]
-  bookings  Booking[]
-  createdAt DateTime  @default(now())
+  id             Int             @id @default(autoincrement())
+  phone          String          @unique
+  name           String?
+  points         Int             @default(0)
+  cars           Car[]
+  bookings       Booking[]
+  savedAddresses SavedAddress[]
+  createdAt      DateTime        @default(now())
 }
 
 model Employee {
-  id        Int       @id @default(autoincrement())
-  phone     String    @unique
-  email     String    @unique
-  name      String
-  status    String    @default("ACTIVE") // ACTIVE, SUSPENDED
-  onDuty    Boolean   @default(false)
-  salary    Float     @default(0) // Monthly salary or hourly wage
-  bookings  Booking[]
-  leaves    Leave[]
-  createdAt DateTime  @default(now())
+  id           Int           @id @default(autoincrement())
+  phone        String        @unique
+  email        String        @unique
+  name         String
+  status       String        @default("ACTIVE") // ACTIVE, SUSPENDED
+  onDuty       Boolean       @default(false)
+  salary       Float         @default(0) // Monthly salary or hourly wage
+  photo        String?       // Base64 profile/verification photo
+  bookings     Booking[]
+  leaves       Leave[]
+  serviceAreas ServiceArea[] @relation("EmployeeAreas")
+  createdAt    DateTime      @default(now())
 }
 
 model Admin {
-  id        Int       @id @default(autoincrement())
-  email     String    @unique
-  password  String    // Hashed
-  createdAt DateTime  @default(now())
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String   // Hashed
+  createdAt DateTime @default(now())
+}
+
+model CarType {
+  id        Int         @id @default(autoincrement())
+  name      String      @unique // e.g. Sedan, SUV, Hatchback, etc.
+  cars      Car[]
+  bookings  Booking[]
+  prices    WashPrice[]
+  createdAt DateTime    @default(now())
+}
+
+model WashType {
+  id          Int         @id @default(autoincrement())
+  name        String      @unique // e.g. Basic, Premium, Full
+  description String?
+  bookings    Booking[]
+  prices      WashPrice[]
+  createdAt   DateTime    @default(now())
+}
+
+model WashPrice {
+  id         Int      @id @default(autoincrement())
+  carTypeId  Int
+  carType    CarType  @relation(fields: [carTypeId], references: [id], onDelete: Cascade)
+  washTypeId Int
+  washType   WashType @relation(fields: [washTypeId], references: [id], onDelete: Cascade)
+  price      Float
+  payoutType String   @default("PERCENTAGE") // PERCENTAGE or AMOUNT
+  payoutValue Float   @default(50.0)         // 50% or flat price
+  createdAt  DateTime @default(now())
+
+  @@unique([carTypeId, washTypeId])
 }
 
 model Car {
@@ -43,7 +78,8 @@ model Car {
   user      User      @relation(fields: [userId], references: [id])
   make      String
   model     String
-  type      String    // Sedan, SUV, etc.
+  carTypeId Int
+  carType   CarType   @relation(fields: [carTypeId], references: [id])
   bookings  Booking[]
 }
 
@@ -56,23 +92,66 @@ model Service {
   bookings    Booking[]
 }
 
+model ServiceArea {
+  id             Int            @id @default(autoincrement())
+  name           String         @unique // e.g. Bandra, Hitech City
+  employees      Employee[]     @relation("EmployeeAreas")
+  bookings       Booking[]
+  savedAddresses SavedAddress[]
+  createdAt      DateTime       @default(now())
+}
+
+model SavedAddress {
+  id            Int          @id @default(autoincrement())
+  userId        Int
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String       // e.g. Home, Work
+  address       String
+  latitude      Float
+  longitude     Float
+  serviceAreaId Int
+  serviceArea   ServiceArea  @relation(fields: [serviceAreaId], references: [id])
+  createdAt     DateTime     @default(now())
+}
+
 model Booking {
-  id          Int       @id @default(autoincrement())
-  userId      Int
-  user        User      @relation(fields: [userId], references: [id])
-  employeeId  Int?
-  employee    Employee? @relation(fields: [employeeId], references: [id])
-  carId       Int
-  car         Car       @relation(fields: [carId], references: [id])
-  serviceId   Int
-  service     Service   @relation(fields: [serviceId], references: [id])
-  date        DateTime
-  timeSlot    String
-  status      String    @default("PENDING") // PENDING, ASSIGNED, COMPLETED, CANCELLED
-  latitude    Float?
-  longitude   Float?
-  address     String?
-  paymentStatus String  @default("PENDING")
+  id            Int          @id @default(autoincrement())
+  userId        Int
+  user          User         @relation(fields: [userId], references: [id])
+  employeeId    Int?
+  employee      Employee?    @relation(fields: [employeeId], references: [id])
+  carId         Int?
+  car           Car?         @relation(fields: [carId], references: [id])
+  carTypeId     Int
+  carType       CarType      @relation(fields: [carTypeId], references: [id])
+  washTypeId    Int
+  washType      WashType     @relation(fields: [washTypeId], references: [id])
+  serviceId     Int?         // Optional for fallback/compatibility
+  service       Service?     @relation(fields: [serviceId], references: [id])
+  date          DateTime
+  timeSlot      String
+  status        String       @default("PENDING") // PENDING, ASSIGNED, STARTED, COMPLETED, CANCELLED
+  latitude      Float
+  longitude     Float
+  address       String
+  serviceAreaId Int
+  serviceArea   ServiceArea  @relation(fields: [serviceAreaId], references: [id])
+  price         Float
+  employeePayout Float       @default(0.0)
+  paymentStatus String       @default("PENDING")
+  paymentMethod String       @default("ONLINE")
+  
+  // Service pictures and locations
+  startImage     String?
+  startLatitude  Float?
+  startLongitude Float?
+  startAt        DateTime?
+  
+  endImage       String?
+  endLatitude    Float?
+  endLongitude   Float?
+  endAt          DateTime?
+
   createdAt   DateTime  @default(now())
 }
 

@@ -1,25 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { Trash2 } from 'lucide-react';
-import { getCars, addCar } from '../api';
+import { Trash2, Car as CarIcon } from 'lucide-react';
+import { getCars, addCar, deleteCar, getCarTypes } from '../api';
 
 const Cars = () => {
   const [cars, setCars] = useState([]);
+  const [carTypes, setCarTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
     make: '',
     model: '',
-    licensePlate: '',
-    type: 'Sedan'
+    carTypeId: ''
   });
 
   useEffect(() => {
-    fetchCars();
+    fetchData();
   }, []);
 
-  const fetchCars = async () => {
+  const fetchData = async () => {
     try {
-      const data = await getCars();
-      setCars(data);
+      const carsList = await getCars();
+      const typesList = await getCarTypes();
+      setCars(carsList);
+      setCarTypes(typesList);
+      if (typesList.length > 0) {
+        setFormData(prev => ({ ...prev, carTypeId: typesList[0].id.toString() }));
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -28,27 +33,51 @@ const Cars = () => {
   };
 
   const handleAdd = async () => {
-    if (!formData.make || !formData.model || !formData.licensePlate) return alert('Please fill all fields');
+    if (!formData.make || !formData.model || !formData.carTypeId) {
+      return alert('Please fill in all fields');
+    }
     try {
-      await addCar(formData);
-      setFormData({ make: '', model: '', licensePlate: '', type: 'Sedan' });
-      fetchCars();
+      await addCar({
+        make: formData.make,
+        model: formData.model,
+        carTypeId: Number(formData.carTypeId)
+      });
+      setFormData(prev => ({
+        make: '',
+        model: '',
+        carTypeId: carTypes.length > 0 ? carTypes[0].id.toString() : ''
+      }));
+      fetchData();
     } catch (err) {
       console.error(err);
       alert('Failed to add car');
     }
   };
 
-  if (loading) return <div>Loading...</div>;
+  const handleDelete = async (id) => {
+    if (!confirm('Are you sure you want to delete this car?')) return;
+    try {
+      await deleteCar(id);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to delete car');
+    }
+  };
+
+  if (loading) return <div style={{ textAlign: 'center', padding: '3rem' }}>Loading cars...</div>;
 
   return (
-    <div style={{maxWidth: '600px', margin: '0 auto'}}>
+    <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+      
       {/* Saved Cars */}
-      <div className="card" style={{padding: 0, marginBottom: '1.5rem', overflow: 'hidden'}}>
-        <div style={{padding: '1.25rem', borderBottom: '1px solid #E2E8F0'}}>
-          <h3 style={{margin: 0, fontSize: '1.1rem', color: 'var(--primary-navy)'}}>Saved cars</h3>
+      <div className="card" style={{ padding: 0, marginBottom: '1.5rem', overflow: 'hidden' }}>
+        <div style={{ padding: '1.25rem', borderBottom: '1px solid #E2E8F0' }}>
+          <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--primary-navy)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <CarIcon size={20} color="var(--primary-blue)" /> Saved Cars
+          </h3>
         </div>
-        <div style={{padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem'}}>
+        <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {cars.map(car => (
             <div 
               key={car.id} 
@@ -63,68 +92,73 @@ const Cars = () => {
               }}
             >
               <div>
-                <h4 style={{margin: '0 0 0.25rem 0', color: 'var(--primary-navy)', fontSize: '1.05rem'}}>{car.make} {car.model}</h4>
-                <p style={{margin: 0, color: 'var(--text-muted)', fontSize: '0.85rem'}}>
-                  {car.licensePlate} · {car.type}
+                <h4 style={{ margin: '0 0 0.25rem 0', color: 'var(--primary-navy)', fontSize: '1.05rem', fontWeight: 600 }}>
+                  {car.make} {car.model}
+                </h4>
+                <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                  Type: {car.carType?.name || 'Standard'}
                 </p>
               </div>
-              <button style={{background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.25rem'}}>
-                <Trash2 size={18} color="var(--primary-navy)" />
+              <button 
+                onClick={() => handleDelete(car.id)}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.25rem' }}
+                title="Delete Car"
+              >
+                <Trash2 size={18} color="var(--danger)" />
               </button>
             </div>
           ))}
           {cars.length === 0 && (
-            <p style={{textAlign: 'center', color: 'var(--text-muted)'}}>No saved cars.</p>
+            <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '1.5rem 0' }}>No saved cars yet. Add one below!</p>
           )}
         </div>
       </div>
 
       {/* Add Car Form */}
-      <div className="card" style={{padding: 0, marginBottom: '1.5rem', overflow: 'hidden'}}>
-        <div style={{padding: '1.25rem', borderBottom: '1px solid #E2E8F0'}}>
-          <h3 style={{margin: 0, fontSize: '1.1rem', color: 'var(--primary-navy)'}}>Add car</h3>
+      <div className="card" style={{ padding: 0, marginBottom: '1.5rem', overflow: 'hidden' }}>
+        <div style={{ padding: '1.25rem', borderBottom: '1px solid #E2E8F0' }}>
+          <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--primary-navy)' }}>Add New Car</h3>
         </div>
-        <div style={{padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem'}}>
-          <input 
-            type="text" 
-            className="form-input" 
-            placeholder="Make"
-            value={formData.make}
-            onChange={e => setFormData({...formData, make: e.target.value})}
-            style={{borderColor: '#E2E8F0'}}
-          />
-          <input 
-            type="text" 
-            className="form-input" 
-            placeholder="Model"
-            value={formData.model}
-            onChange={e => setFormData({...formData, model: e.target.value})}
-            style={{borderColor: '#E2E8F0'}}
-          />
-          <input 
-            type="text" 
-            className="form-input" 
-            placeholder="License plate"
-            value={formData.licensePlate}
-            onChange={e => setFormData({...formData, licensePlate: e.target.value})}
-            style={{borderColor: '#E2E8F0'}}
-          />
-          <select 
-            className="form-input"
-            value={formData.type}
-            onChange={e => setFormData({...formData, type: e.target.value})}
-            style={{borderColor: '#E2E8F0'}}
-          >
-            <option value="Sedan">Sedan</option>
-            <option value="SUV">SUV</option>
-            <option value="Hatchback">Hatchback</option>
-          </select>
+        <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">Brand / Make</label>
+            <input 
+              type="text" 
+              className="form-input" 
+              placeholder="e.g. Maruti, Toyota"
+              value={formData.make}
+              onChange={e => setFormData({ ...formData, make: e.target.value })}
+            />
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">Model Name</label>
+            <input 
+              type="text" 
+              className="form-input" 
+              placeholder="e.g. Swift, Fortuner"
+              value={formData.model}
+              onChange={e => setFormData({ ...formData, model: e.target.value })}
+            />
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">Vehicle Body Type</label>
+            <select 
+              className="form-input"
+              value={formData.carTypeId}
+              onChange={e => setFormData({ ...formData, carTypeId: e.target.value })}
+            >
+              {carTypes.map(ct => (
+                <option key={ct.id} value={ct.id}>{ct.name}</option>
+              ))}
+            </select>
+          </div>
+          
           <button 
             onClick={handleAdd}
             style={{
               width: '100%', 
               padding: '0.875rem', 
-              background: 'var(--accent-teal)', 
+              background: 'var(--primary-blue)', 
               color: 'white', 
               border: 'none', 
               borderRadius: 'var(--radius-md)',
@@ -134,7 +168,7 @@ const Cars = () => {
               marginTop: '0.5rem'
             }}
           >
-            Add car
+            Save Car
           </button>
         </div>
       </div>

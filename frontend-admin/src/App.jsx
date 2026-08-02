@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Calendar, Settings, Bell, Search, DollarSign, Briefcase, FileText, Tag, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Settings, Bell, Search, DollarSign, Briefcase, FileText, Tag, Menu, X, MapPin } from 'lucide-react';
 import { loginAdmin, getStats, getEmployees, toggleEmployeeStatus } from './api';
 
 import Bookings from './pages/Bookings';
 import Financials from './pages/Financials';
 import LeaveApprovals from './pages/LeaveApprovals';
 import Services from './pages/Services';
-import Offers from './pages/Offers'; // We need to create this
+import Offers from './pages/Offers';
+import Areas from './pages/Areas';
 import logo from './assets/wash my car.png';
 
 const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
@@ -61,6 +62,9 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
           </Link>
           <Link to="/offers" className={`sidebar-link ${isActive('/offers')}`}>
             <Tag size={20} /> Offers
+          </Link>
+          <Link to="/areas" className={`sidebar-link ${isActive('/areas')}`}>
+            <MapPin size={20} /> Service Areas
           </Link>
           <Link to="/settings" className={`sidebar-link ${isActive('/settings')}`}>
             <Settings size={20} /> Settings
@@ -300,12 +304,26 @@ const EmployeeManagement = () => {
             {employees.map((emp) => (
               <tr key={emp.id} style={{borderBottom: '1px solid #F1F5F9', transition: 'background 0.2s'}} className="hover:bg-gray-50">
                 <td style={{padding: '1rem 1.5rem'}}>
-                  <div style={{fontWeight: 600, color: 'var(--primary-navy)'}}>{emp.name}</div>
-                  <div style={{fontSize: '0.8rem'}} className={emp.onDuty ? 'text-success' : 'text-muted'}>{emp.onDuty ? '● On Duty' : '○ Off Duty'}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    {emp.photo ? (
+                      <img src={emp.photo} alt="Avatar" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', border: '1px solid #E2E8F0' }} />
+                    ) : (
+                      <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--accent-teal-light)', color: 'var(--primary-navy)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                        {(emp.name[0] || 'E').toUpperCase()}
+                      </div>
+                    )}
+                    <div>
+                      <div style={{fontWeight: 600, color: 'var(--primary-navy)'}}>{emp.name}</div>
+                      <div style={{fontSize: '0.8rem'}} className={emp.onDuty ? 'text-success' : 'text-muted'}>{emp.onDuty ? '● On Duty' : '○ Off Duty'}</div>
+                    </div>
+                  </div>
                 </td>
                 <td style={{padding: '1rem 1.5rem'}}>
                   <div style={{color: 'var(--text-main)', fontSize: '0.9rem'}}>{emp.phone}</div>
-                  <div style={{color: 'var(--text-muted)', fontSize: '0.85rem'}}>{emp.email}</div>
+                  <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.25rem'}}>{emp.email}</div>
+                  <div style={{fontSize: '0.75rem', color: 'var(--primary-blue)', fontWeight: 600}}>
+                    Areas: {emp.serviceAreas && emp.serviceAreas.length > 0 ? emp.serviceAreas.map(a => a.name).join(', ') : 'None'}
+                  </div>
                 </td>
                 <td style={{padding: '1rem 1.5rem'}}>
                   <div style={{fontWeight: 600}}>₹{emp.earnings || 0}</div>
@@ -357,6 +375,7 @@ const App = () => {
         <Route path="/leaves" element={auth ? <AdminLayout title="Leave Approval"><LeaveApprovals /></AdminLayout> : <Navigate to="/"/>} />
         <Route path="/services" element={auth ? <AdminLayout title="Packages & Plans"><Services /></AdminLayout> : <Navigate to="/"/>} />
         <Route path="/offers" element={auth ? <AdminLayout title="Execute Offers"><Offers /></AdminLayout> : <Navigate to="/"/>} />
+        <Route path="/areas" element={auth ? <AdminLayout title="Service Areas Management"><Areas /></AdminLayout> : <Navigate to="/"/>} />
         <Route path="/settings" element={auth ? <AdminLayout title="System Settings"><div className="card p-8">Settings (In Development)</div></AdminLayout> : <Navigate to="/"/>} />
       </Routes>
     </Router>
