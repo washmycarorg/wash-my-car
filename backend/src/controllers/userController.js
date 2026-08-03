@@ -128,6 +128,21 @@ export const createBooking = async (req, res) => {
         return res.status(400).json({ error: 'Invalid or expired coupon code' });
       }
 
+      // Check category eligibility
+      if (offer.applicableCarTypeIds) {
+        const allowedCarTypes = offer.applicableCarTypeIds.split(',').filter(Boolean).map(Number);
+        if (allowedCarTypes.length > 0 && !allowedCarTypes.includes(Number(carTypeId))) {
+          return res.status(400).json({ error: 'This coupon is not applicable for your car type' });
+        }
+      }
+
+      if (offer.applicableWashTypeIds) {
+        const allowedWashTypes = offer.applicableWashTypeIds.split(',').filter(Boolean).map(Number);
+        if (allowedWashTypes.length > 0 && !allowedWashTypes.includes(Number(washTypeId))) {
+          return res.status(400).json({ error: 'This coupon is not applicable for your wash type' });
+        }
+      }
+
       // Check eligibility
       const userBookings = await prisma.booking.findMany({ where: { userId: req.user.id } });
       const completedCount = userBookings.filter(b => b.status === 'COMPLETED').length;
@@ -171,7 +186,16 @@ export const createBooking = async (req, res) => {
         }
       }
 
-      const discount = (originalPrice * offer.discountPct) / 100;
+      let discount = 0;
+      if (offer.discountType === 'FLAT') {
+        discount = offer.discountAmount;
+      } else {
+        discount = (originalPrice * offer.discountPct) / 100;
+        if (offer.limitOption === 'UP_TO' && offer.maxDiscountAmount) {
+          discount = Math.min(discount, offer.maxDiscountAmount);
+        }
+      }
+
       finalPrice = Math.max(0, originalPrice - discount);
       appliedCode = offer.code;
     }
@@ -460,6 +484,7 @@ export const deleteSavedAddress = async (req, res) => {
 export const getEligibleCoupons = async (req, res) => {
   try {
     const userId = req.user.id;
+    const { carTypeId, washTypeId } = req.query;
     const now = new Date();
 
     const offers = await prisma.offer.findMany({
@@ -483,6 +508,22 @@ export const getEligibleCoupons = async (req, res) => {
     const completedBookingsCount = userBookings.filter(b => b.status === 'COMPLETED').length;
 
     for (const offer of offers) {
+      // Check Car Type Eligibility
+      if (carTypeId && offer.applicableCarTypeIds) {
+        const allowedCarTypes = offer.applicableCarTypeIds.split(',').filter(Boolean).map(Number);
+        if (allowedCarTypes.length > 0 && !allowedCarTypes.includes(Number(carTypeId))) {
+          continue;
+        }
+      }
+
+      // Check Wash Type Eligibility
+      if (washTypeId && offer.applicableWashTypeIds) {
+        const allowedWashTypes = offer.applicableWashTypeIds.split(',').filter(Boolean).map(Number);
+        if (allowedWashTypes.length > 0 && !allowedWashTypes.includes(Number(washTypeId))) {
+          continue;
+        }
+      }
+
       if (offer.userType === 'NEW' && completedBookingsCount > 0) {
         continue;
       }

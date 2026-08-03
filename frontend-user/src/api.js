@@ -140,8 +140,14 @@ export const deleteSavedAddress = async (id) => {
   return res.json();
 };
 
-export const getEligibleCoupons = async () => {
-  const res = await fetch(`${API_URL}/users/eligible-coupons`, { headers: getHeaders() });
+export const getEligibleCoupons = async (carTypeId, washTypeId) => {
+  let url = `${API_URL}/users/eligible-coupons`;
+  const params = [];
+  if (carTypeId) params.push(`carTypeId=${carTypeId}`);
+  if (washTypeId) params.push(`washTypeId=${washTypeId}`);
+  if (params.length > 0) url += `?${params.join('&')}`;
+
+  const res = await fetch(url, { headers: getHeaders() });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 };

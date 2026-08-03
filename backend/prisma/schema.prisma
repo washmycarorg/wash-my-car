@@ -177,18 +177,24 @@ model Leave {
 }
 
 model Offer {
-  id             Int             @id @default(autoincrement())
-  code           String          @unique
-  title          String
-  description    String
-  discountPct    Float
-  userType       String          @default("ALL") // ALL, NEW, SELECTED
-  usageLimit     Int             @default(0)     // count limit (0 = unlimited)
-  rotation       String          @default("UNLIMITED") // UNLIMITED, OVERALL, MONTHLY, YEARLY
-  eligibleUsers  User[]          @relation("UserEligibleOffers")
-  validUntil     DateTime
-  active         Boolean         @default(true)
-  createdAt      DateTime        @default(now())
+  id                   Int             @id @default(autoincrement())
+  code                 String          @unique
+  title                String
+  description          String
+  discountType         String          @default("PERCENTAGE") // PERCENTAGE, FLAT
+  discountPct          Float           @default(0.0)          // used if PERCENTAGE
+  discountAmount       Float           @default(0.0)          // used if FLAT
+  limitOption          String          @default("UNLIMITED")  // UNLIMITED, UP_TO
+  maxDiscountAmount    Float?                                 // used if UP_TO
+  applicableCarTypeIds String          @default("")           // comma-separated ids, empty = ALL
+  applicableWashTypeIds String         @default("")           // comma-separated ids, empty = ALL
+  userType             String          @default("ALL")        // ALL, NEW, SELECTED
+  usageLimit           Int             @default(0)            // count limit (0 = unlimited)
+  rotation             String          @default("UNLIMITED")  // UNLIMITED, OVERALL, MONTHLY, YEARLY
+  eligibleUsers        User[]          @relation("UserEligibleOffers")
+  validUntil           DateTime
+  active               Boolean         @default(true)
+  createdAt            DateTime        @default(now())
 }
 
 model InventoryItem {

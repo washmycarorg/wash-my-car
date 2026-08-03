@@ -185,16 +185,14 @@ const BookSlot = () => {
       getServiceAreas(),
       getCars(),
       getSavedAddresses(),
-      getEligibleCoupons().catch(() => []),
       getSettings().catch(() => null),
       getProfile().catch(() => null)
-    ]).then(([carsT, washT, areas, cars, addrs, coupons, settingsRes, profileRes]) => {
+    ]).then(([carsT, washT, areas, cars, addrs, settingsRes, profileRes]) => {
       setCarTypes(carsT);
       setWashTypes(washT);
       setServiceAreas(areas);
       setSavedCars(cars);
       setSavedAddresses(addrs);
-      setEligibleCoupons(coupons);
       setSystemSettings(settingsRes);
       if (profileRes) {
         setUserPoints(profileRes.points || 0);
@@ -220,6 +218,24 @@ const BookSlot = () => {
       }
     }).catch(err => console.error('Error fetching dynamic lists:', err));
   }, []);
+
+  // Fetch Eligible Coupons dynamically based on selected Car Type and Wash Type
+  useEffect(() => {
+    if (selectedCarType && selectedWashType) {
+      getEligibleCoupons(selectedCarType, selectedWashType)
+        .then((coupons) => {
+          setEligibleCoupons(coupons);
+          // If the previously selected coupon code is no longer eligible, clear it
+          if (selectedCouponCode && !coupons.some(c => c.code === selectedCouponCode)) {
+            setSelectedCouponCode('');
+          }
+        })
+        .catch(err => console.error('Error fetching eligible coupons:', err));
+    } else {
+      setEligibleCoupons([]);
+      setSelectedCouponCode('');
+    }
+  }, [selectedCarType, selectedWashType]);
 
   // Fetch Pricing based on Car Type & Wash Type selection
   useEffect(() => {
@@ -429,7 +445,18 @@ const BookSlot = () => {
 
   const basePrice = price || 0;
   const appliedCoupon = eligibleCoupons.find(c => c.code === selectedCouponCode);
-  const discountVal = appliedCoupon ? (basePrice * (appliedCoupon.discountPct || 0)) / 100 : 0;
+  
+  let discountVal = 0;
+  if (appliedCoupon) {
+    if (appliedCoupon.discountType === 'FLAT') {
+      discountVal = appliedCoupon.discountAmount || 0;
+    } else {
+      discountVal = (basePrice * (appliedCoupon.discountPct || 0)) / 100;
+      if (appliedCoupon.limitOption === 'UP_TO' && appliedCoupon.maxDiscountAmount) {
+        discountVal = Math.min(discountVal, appliedCoupon.maxDiscountAmount);
+      }
+    }
+  }
   const subtotal = Math.max(0, basePrice - discountVal);
   
   const pointsEnabled = systemSettings?.royaltyPointsEnabled;

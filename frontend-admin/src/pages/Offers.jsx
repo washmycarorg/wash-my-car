@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { getOffers, createOffer, updateOffer, deleteOffer, getUsers } from '../api';
+import { getOffers, createOffer, updateOffer, deleteOffer, getUsers, getCarTypes, getWashTypes } from '../api';
 
 const Offers = () => {
   const [offers, setOffers] = useState([]);
   const [users, setUsers] = useState([]);
+  const [carTypes, setCarTypes] = useState([]);
+  const [washTypes, setWashTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
   
@@ -11,7 +13,13 @@ const Offers = () => {
     code: '',
     title: '',
     description: '',
+    discountType: 'PERCENTAGE', // PERCENTAGE or FLAT
     discountPct: '',
+    discountAmount: '',
+    limitOption: 'UNLIMITED', // UNLIMITED or UP_TO
+    maxDiscountAmount: '',
+    applicableCarTypeIds: [], // array of ids
+    applicableWashTypeIds: [], // array of ids
     validUntil: '',
     userType: 'ALL',
     usageLimit: 0,
@@ -24,9 +32,16 @@ const Offers = () => {
 
   const fetchData = async () => {
     try {
-      const [offersRes, usersRes] = await Promise.all([getOffers(), getUsers()]);
+      const [offersRes, usersRes, ctRes, wtRes] = await Promise.all([
+        getOffers(),
+        getUsers(),
+        getCarTypes().catch(() => []),
+        getWashTypes().catch(() => [])
+      ]);
       setOffers(offersRes);
       setUsers(usersRes);
+      setCarTypes(ctRes);
+      setWashTypes(wtRes);
     } catch (err) {
       console.error(err);
     } finally {
@@ -43,7 +58,11 @@ const Offers = () => {
     try {
       const payload = {
         ...formData,
-        discountPct: Number(formData.discountPct),
+        discountPct: formData.discountType === 'PERCENTAGE' ? Number(formData.discountPct || 0) : 0,
+        discountAmount: formData.discountType === 'FLAT' ? Number(formData.discountAmount || 0) : 0,
+        maxDiscountAmount: (formData.discountType === 'PERCENTAGE' && formData.limitOption === 'UP_TO') ? Number(formData.maxDiscountAmount || 0) : null,
+        applicableCarTypeIds: formData.applicableCarTypeIds.join(','),
+        applicableWashTypeIds: formData.applicableWashTypeIds.join(','),
         usageLimit: formData.rotation === 'UNLIMITED' ? 0 : Number(formData.usageLimit),
         eligibleUserIds: formData.userType === 'SELECTED' ? formData.eligibleUserIds.map(Number) : []
       };
@@ -71,7 +90,13 @@ const Offers = () => {
       code: offer.code,
       title: offer.title,
       description: offer.description,
-      discountPct: offer.discountPct,
+      discountType: offer.discountType || 'PERCENTAGE',
+      discountPct: offer.discountPct || '',
+      discountAmount: offer.discountAmount || '',
+      limitOption: offer.limitOption || 'UNLIMITED',
+      maxDiscountAmount: offer.maxDiscountAmount || '',
+      applicableCarTypeIds: offer.applicableCarTypeIds ? offer.applicableCarTypeIds.split(',').filter(Boolean).map(Number) : [],
+      applicableWashTypeIds: offer.applicableWashTypeIds ? offer.applicableWashTypeIds.split(',').filter(Boolean).map(Number) : [],
       validUntil: offer.validUntil.split('T')[0],
       userType: offer.userType,
       usageLimit: offer.usageLimit,
@@ -106,6 +131,22 @@ const Offers = () => {
       ? formData.eligibleUserIds.filter(id => id !== userId)
       : [...formData.eligibleUserIds, userId];
     setFormData({ ...formData, eligibleUserIds: updatedUserIds });
+  };
+
+  const getApplicableCarTypesStr = (idsStr) => {
+    if (!idsStr) return 'All Car Types';
+    const ids = idsStr.split(',').filter(Boolean).map(Number);
+    if (ids.length === 0) return 'All Car Types';
+    const names = ids.map(id => carTypes.find(c => c.id === id)?.name).filter(Boolean);
+    return names.join(', ');
+  };
+
+  const getApplicableWashTypesStr = (idsStr) => {
+    if (!idsStr) return 'All Wash Types';
+    const ids = idsStr.split(',').filter(Boolean).map(Number);
+    if (ids.length === 0) return 'All Wash Types';
+    const names = ids.map(id => washTypes.find(w => w.id === id)?.name).filter(Boolean);
+    return names.join(', ');
   };
 
   if (loading) return <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Loading Offers...</div>;
@@ -156,18 +197,160 @@ const Offers = () => {
               />
             </div>
 
+            {/* Discount Type Selector */}
             <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Discount Percentage (%)</label>
-              <input 
-                required 
-                type="number" 
-                min="1" 
-                max="100" 
-                className="form-input" 
-                value={formData.discountPct} 
-                onChange={e => setFormData({ ...formData, discountPct: e.target.value })} 
-                placeholder="e.g. 20" 
-              />
+              <label className="form-label">Discount Type</label>
+              <select
+                className="form-input"
+                value={formData.discountType}
+                onChange={e => setFormData({ 
+                  ...formData, 
+                  discountType: e.target.value,
+                  discountPct: e.target.value === 'PERCENTAGE' ? formData.discountPct : '',
+                  discountAmount: e.target.value === 'FLAT' ? formData.discountAmount : ''
+                })}
+              >
+                <option value="PERCENTAGE">Percentage (%)</option>
+                <option value="FLAT">Flat Amount (₹)</option>
+              </select>
+            </div>
+
+            {/* Discount Settings Inputs */}
+            {formData.discountType === 'PERCENTAGE' ? (
+              <>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Discount Percentage (%)</label>
+                  <input 
+                    required 
+                    type="number" 
+                    min="1" 
+                    max="100" 
+                    className="form-input" 
+                    value={formData.discountPct} 
+                    onChange={e => setFormData({ ...formData, discountPct: e.target.value })} 
+                    placeholder="e.g. 20" 
+                  />
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Discount Upper Limit</label>
+                  <select
+                    className="form-input"
+                    value={formData.limitOption}
+                    onChange={e => setFormData({ 
+                      ...formData, 
+                      limitOption: e.target.value,
+                      maxDiscountAmount: e.target.value === 'UNLIMITED' ? '' : formData.maxDiscountAmount
+                    })}
+                  >
+                    <option value="UNLIMITED">Unlimited Discount</option>
+                    <option value="UP_TO">Up to Amount (₹ Cap)</option>
+                  </select>
+                </div>
+
+                {formData.limitOption === 'UP_TO' && (
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Max Discount Cap Amount (₹)</label>
+                    <input 
+                      required 
+                      type="number" 
+                      min="1" 
+                      className="form-input" 
+                      value={formData.maxDiscountAmount} 
+                      onChange={e => setFormData({ ...formData, maxDiscountAmount: e.target.value })} 
+                      placeholder="e.g. 150" 
+                    />
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Flat Discount Amount (₹)</label>
+                <input 
+                  required 
+                  type="number" 
+                  min="1" 
+                  className="form-input" 
+                  value={formData.discountAmount} 
+                  onChange={e => setFormData({ ...formData, discountAmount: e.target.value })} 
+                  placeholder="e.g. 100" 
+                />
+              </div>
+            )}
+
+            {/* Applicable Category Restrictions */}
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label" style={{ fontWeight: 600 }}>Limit to Specific Car Types</label>
+              <div style={{
+                maxHeight: '110px',
+                overflowY: 'auto',
+                border: '1px solid #CBD5E1',
+                borderRadius: '6px',
+                padding: '0.5rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.4rem',
+                background: '#F8FAFC',
+                marginTop: '0.25rem'
+              }}>
+                {carTypes.map(c => {
+                  const isChecked = formData.applicableCarTypeIds.includes(c.id);
+                  return (
+                    <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', cursor: 'pointer', fontWeight: 500 }}>
+                      <input 
+                        type="checkbox" 
+                        checked={isChecked} 
+                        onChange={() => {
+                          const updated = isChecked
+                            ? formData.applicableCarTypeIds.filter(id => id !== c.id)
+                            : [...formData.applicableCarTypeIds, c.id];
+                          setFormData({ ...formData, applicableCarTypeIds: updated });
+                        }} 
+                      />
+                      <span>{c.name}</span>
+                    </label>
+                  );
+                })}
+                {carTypes.length === 0 && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No car types found</span>}
+              </div>
+              <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: '0.2rem', fontSize: '0.75rem' }}>Leave unchecked for no constraints.</small>
+            </div>
+
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label" style={{ fontWeight: 600 }}>Limit to Specific Wash Types</label>
+              <div style={{
+                maxHeight: '110px',
+                overflowY: 'auto',
+                border: '1px solid #CBD5E1',
+                borderRadius: '6px',
+                padding: '0.5rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.4rem',
+                background: '#F8FAFC',
+                marginTop: '0.25rem'
+              }}>
+                {washTypes.map(w => {
+                  const isChecked = formData.applicableWashTypeIds.includes(w.id);
+                  return (
+                    <label key={w.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', cursor: 'pointer', fontWeight: 500 }}>
+                      <input 
+                        type="checkbox" 
+                        checked={isChecked} 
+                        onChange={() => {
+                          const updated = isChecked
+                            ? formData.applicableWashTypeIds.filter(id => id !== w.id)
+                            : [...formData.applicableWashTypeIds, w.id];
+                          setFormData({ ...formData, applicableWashTypeIds: updated });
+                        }} 
+                      />
+                      <span>{w.name}</span>
+                    </label>
+                  );
+                })}
+                {washTypes.length === 0 && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No wash types found</span>}
+              </div>
+              <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: '0.2rem', fontSize: '0.75rem' }}>Leave unchecked for no constraints.</small>
             </div>
 
             <div className="form-group" style={{ margin: 0 }}>
@@ -200,7 +383,7 @@ const Offers = () => {
               <div className="form-group" style={{ margin: 0 }}>
                 <label className="form-label">Select Eligible Users ({formData.eligibleUserIds.length} selected)</label>
                 <div style={{
-                  maxHeight: '150px',
+                  maxHeight: '130px',
                   overflowY: 'auto',
                   border: '1px solid #CBD5E1',
                   borderRadius: '6px',
@@ -283,7 +466,7 @@ const Offers = () => {
           <div className="p-6 border-b border-gray-200">
             <h3 style={{ margin: 0, color: 'var(--primary-navy)' }}>Active & Scheduled Offers</h3>
           </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '600px' }}>
             <thead style={{ background: '#F8FAFC' }}>
               <tr>
                 <th style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)' }}>Offer details</th>
@@ -305,10 +488,19 @@ const Offers = () => {
                         {o.code}
                       </span>
                       <span style={{ fontWeight: 'bold', color: 'var(--accent-teal)', fontSize: '0.9rem' }}>
-                        {o.discountPct}% OFF
+                        {o.discountType === 'FLAT' 
+                          ? `₹${o.discountAmount} FLAT OFF` 
+                          : `${o.discountPct}% OFF${o.limitOption === 'UP_TO' ? ` (Up to ₹${o.maxDiscountAmount})` : ''}`
+                        }
                       </span>
                     </div>
-                    <div className="text-sm text-muted">{o.description}</div>
+                    <div className="text-sm text-muted" style={{ marginBottom: '0.25rem' }}>{o.description}</div>
+                    
+                    {/* Constraints details */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      <div>🚗 <strong style={{color: 'var(--text-main)'}}>Car types:</strong> {getApplicableCarTypesStr(o.applicableCarTypeIds)}</div>
+                      <div>💧 <strong style={{color: 'var(--text-main)'}}>Wash types:</strong> {getApplicableWashTypesStr(o.applicableWashTypeIds)}</div>
+                    </div>
                   </td>
 
                   <td style={{ padding: '1rem 1.5rem', fontSize: '0.9rem' }}>

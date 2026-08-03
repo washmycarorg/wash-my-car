@@ -151,7 +151,24 @@ export const getOffers = async (req, res) => {
 
 export const createOffer = async (req, res) => {
   try {
-    const { title, description, discountPct, validUntil, active, code, userType, usageLimit, rotation, eligibleUserIds } = req.body;
+    const { 
+      title, 
+      description, 
+      discountType,
+      discountPct, 
+      discountAmount,
+      limitOption,
+      maxDiscountAmount,
+      applicableCarTypeIds,
+      applicableWashTypeIds,
+      validUntil, 
+      active, 
+      code, 
+      userType, 
+      usageLimit, 
+      rotation, 
+      eligibleUserIds 
+    } = req.body;
     
     // Check if code already exists
     const existing = await prisma.offer.findUnique({ where: { code } });
@@ -163,7 +180,13 @@ export const createOffer = async (req, res) => {
       data: {
         title,
         description,
-        discountPct: Number(discountPct),
+        discountType: discountType || 'PERCENTAGE',
+        discountPct: discountPct !== undefined ? Number(discountPct) : 0.0,
+        discountAmount: discountAmount !== undefined ? Number(discountAmount) : 0.0,
+        limitOption: limitOption || 'UNLIMITED',
+        maxDiscountAmount: maxDiscountAmount !== undefined && maxDiscountAmount !== null ? Number(maxDiscountAmount) : null,
+        applicableCarTypeIds: applicableCarTypeIds || '',
+        applicableWashTypeIds: applicableWashTypeIds || '',
         validUntil: new Date(validUntil),
         active: active ?? true,
         code,
@@ -189,7 +212,24 @@ export const createOffer = async (req, res) => {
 export const updateOffer = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, discountPct, validUntil, active, code, userType, usageLimit, rotation, eligibleUserIds } = req.body;
+    const { 
+      title, 
+      description, 
+      discountType,
+      discountPct, 
+      discountAmount,
+      limitOption,
+      maxDiscountAmount,
+      applicableCarTypeIds,
+      applicableWashTypeIds,
+      validUntil, 
+      active, 
+      code, 
+      userType, 
+      usageLimit, 
+      rotation, 
+      eligibleUserIds 
+    } = req.body;
     
     if (code) {
       const existing = await prisma.offer.findUnique({ where: { code } });
@@ -203,7 +243,13 @@ export const updateOffer = async (req, res) => {
       data: {
         ...(title && { title }),
         ...(description && { description }),
+        ...(discountType && { discountType }),
         ...(discountPct !== undefined && { discountPct: Number(discountPct) }),
+        ...(discountAmount !== undefined && { discountAmount: Number(discountAmount) }),
+        ...(limitOption && { limitOption }),
+        ...(maxDiscountAmount !== undefined && { maxDiscountAmount: maxDiscountAmount !== null ? Number(maxDiscountAmount) : null }),
+        ...(applicableCarTypeIds !== undefined && { applicableCarTypeIds: applicableCarTypeIds }),
+        ...(applicableWashTypeIds !== undefined && { applicableWashTypeIds: applicableWashTypeIds }),
         ...(validUntil && { validUntil: new Date(validUntil) }),
         ...(active !== undefined && { active }),
         ...(code && { code }),

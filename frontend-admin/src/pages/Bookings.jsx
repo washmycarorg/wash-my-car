@@ -1,14 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getBookings, assignSlot, autoAssignSlot, getEmployees, getEmployeesWorkload } from '../api';
-import { Calendar, User, Car, MapPin, Compass, Image, Eye, RefreshCw, CheckCircle, Navigation, AlertCircle } from 'lucide-react';
+import { getBookings, assignSlot, autoAssignSlot, getEmployees, getEmployeesWorkload, getCarTypes, getWashTypes } from '../api';
+import { Calendar, User, Car, MapPin, Compass, Image, Eye, RefreshCw, CheckCircle, Navigation, AlertCircle, Search, X } from 'lucide-react';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
 const Bookings = () => {
   const [bookings, setBookings] = useState([]);
   const [employees, setEmployees] = useState([]);
+  const [carTypes, setCarTypes] = useState([]);
+  const [washTypes, setWashTypes] = useState([]);
   const [workloads, setWorkloads] = useState({});
   const [loading, setLoading] = useState(true);
+
+  // Search & Filter States
+  const [searchPhone, setSearchPhone] = useState('');
+  const [filterDate, setFilterDate] = useState('');
+  const [filterWashTypeId, setFilterWashTypeId] = useState('');
+  const [filterCarTypeId, setFilterCarTypeId] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
 
   const fetchWorkload = async (date, timeSlot) => {
     const key = `${date}_${timeSlot}`;
@@ -28,10 +37,16 @@ const Bookings = () => {
 
   const fetchData = async () => {
     try {
-      const bRes = await getBookings();
-      const eRes = await getEmployees();
+      const [bRes, eRes, ctRes, wtRes] = await Promise.all([
+        getBookings(),
+        getEmployees(),
+        getCarTypes().catch(() => []),
+        getWashTypes().catch(() => [])
+      ]);
       setBookings(bRes);
       setEmployees(eRes);
+      setCarTypes(ctRes);
+      setWashTypes(wtRes);
     } catch (err) {
       console.error(err);
     } finally {
@@ -142,22 +157,151 @@ const Bookings = () => {
     }
   };
 
+  const filteredBookings = bookings.filter((b) => {
+    if (searchPhone) {
+      const userPhone = b.user?.phone || '';
+      if (!userPhone.includes(searchPhone)) return false;
+    }
+    if (filterDate) {
+      const bookingDate = new Date(b.date).toISOString().split('T')[0];
+      if (bookingDate !== filterDate) return false;
+    }
+    if (filterWashTypeId) {
+      if (b.washTypeId?.toString() !== filterWashTypeId) return false;
+    }
+    if (filterCarTypeId) {
+      if (b.carTypeId?.toString() !== filterCarTypeId) return false;
+    }
+    if (filterStatus) {
+      if (b.status !== filterStatus) return false;
+    }
+    return true;
+  });
+
+  const handleResetFilters = () => {
+    setSearchPhone('');
+    setFilterDate('');
+    setFilterWashTypeId('');
+    setFilterCarTypeId('');
+    setFilterStatus('');
+  };
+
   if (loading) return <div style={{ textAlign: 'center', padding: '3rem' }}>Loading bookings...</div>;
 
   return (
-    <div className="card animate-fade-in" style={{ padding: 0, overflowX: 'auto', borderRadius: 'var(--radius-lg)' }}>
-      <div className="flex justify-between items-center p-6 border-b border-gray-200">
-        <h3 style={{ margin: 0 }}>Slots Details & Assignment</h3>
-        <button onClick={fetchData} className="btn btn-outline" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-          <RefreshCw size={14} /> Refresh Data
-        </button>
-      </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       
-      <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '1000px' }}>
-        <thead style={{ background: '#F8FAFC' }}>
-          <tr>
-            <th style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem', textTransform: 'uppercase' }}>Booking ID</th>
-            <th style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem', textTransform: 'uppercase' }}>Customer & Car</th>
+      {/* Search & Filters Controls */}
+      <div className="card" style={{ padding: '1.5rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', alignItems: 'end' }}>
+          
+          {/* Phone Search */}
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>Search Phone Number</label>
+            <div style={{ position: 'relative', marginTop: '0.25rem' }}>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g. 9876543210"
+                value={searchPhone}
+                onChange={e => setSearchPhone(e.target.value.replace(/\D/g, ''))}
+                style={{ paddingLeft: '2.25rem', marginBottom: 0 }}
+              />
+              <Search size={16} style={{ position: 'absolute', left: '10px', top: '11px', color: 'var(--text-muted)' }} />
+            </div>
+          </div>
+
+          {/* Date Filter */}
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>Filter by Date</label>
+            <input
+              type="date"
+              className="form-input"
+              value={filterDate}
+              onChange={e => setFilterDate(e.target.value)}
+              style={{ marginTop: '0.25rem', marginBottom: 0 }}
+            />
+          </div>
+
+          {/* Wash Type Filter */}
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>Wash Type</label>
+            <select
+              className="form-input"
+              value={filterWashTypeId}
+              onChange={e => setFilterWashTypeId(e.target.value)}
+              style={{ marginTop: '0.25rem', marginBottom: 0 }}
+            >
+              <option value="">All Washes</option>
+              {washTypes.map(w => (
+                <option key={w.id} value={w.id}>{w.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Car Type Filter */}
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>Car Type</label>
+            <select
+              className="form-input"
+              value={filterCarTypeId}
+              onChange={e => setFilterCarTypeId(e.target.value)}
+              style={{ marginTop: '0.25rem', marginBottom: 0 }}
+            >
+              <option value="">All Car Types</option>
+              {carTypes.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Status Filter */}
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>Status</label>
+            <select
+              className="form-input"
+              value={filterStatus}
+              onChange={e => setFilterStatus(e.target.value)}
+              style={{ marginTop: '0.25rem', marginBottom: 0 }}
+            >
+              <option value="">All Statuses</option>
+              <option value="PENDING">PENDING</option>
+              <option value="ASSIGNED">ASSIGNED</option>
+              <option value="STARTED">STARTED</option>
+              <option value="COMPLETED">COMPLETED</option>
+              <option value="CANCELLED">CANCELLED</option>
+            </select>
+          </div>
+
+          {/* Reset Filters button */}
+          {(searchPhone || filterDate || filterWashTypeId || filterCarTypeId || filterStatus) && (
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="btn btn-outline"
+              style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.55rem 1rem', height: '38px', borderRadius: 'var(--radius-md)' }}
+            >
+              <X size={14} /> Clear Filters
+            </button>
+          )}
+
+        </div>
+      </div>
+
+      {/* Bookings Table Card */}
+      <div className="card" style={{ padding: 0, overflowX: 'auto', borderRadius: 'var(--radius-lg)' }}>
+        <div className="flex justify-between items-center p-6 border-b border-gray-200">
+          <h3 style={{ margin: 0 }}>Slots Details & Assignment</h3>
+          <button onClick={fetchData} className="btn btn-outline" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+            <RefreshCw size={14} /> Refresh Data
+          </button>
+        </div>
+        
+        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '1000px' }}>
+          <thead style={{ background: '#F8FAFC' }}>
+            <tr>
+              <th style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem', textTransform: 'uppercase' }}>Booking ID</th>
+              <th style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem', textTransform: 'uppercase' }}>Customer & Car</th>
             <th style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem', textTransform: 'uppercase' }}>Wash & Area</th>
             <th style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem', textTransform: 'uppercase' }}>Date & Price</th>
             <th style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem', textTransform: 'uppercase' }}>Status</th>
@@ -166,7 +310,7 @@ const Bookings = () => {
           </tr>
         </thead>
         <tbody>
-          {bookings.map((b) => {
+          {filteredBookings.map((b) => {
             // Find active, on duty employees who serve this booking's serviceAreaId
             const eligibleEmployees = employees.filter(emp => 
               emp.status === 'ACTIVE' && 
@@ -290,15 +434,16 @@ const Bookings = () => {
               </tr>
             );
           })}
-          {bookings.length === 0 && (
+          {filteredBookings.length === 0 && (
             <tr>
               <td colSpan="7" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>No wash orders found.</td>
             </tr>
           )}
         </tbody>
       </table>
+    </div>
 
-      {/* Verify Service Accuracy Modal */}
+    {/* Verify Service Accuracy Modal */}
       {showMap && selectedBooking && (
         <div style={{
           position: 'fixed',
@@ -319,10 +464,29 @@ const Bookings = () => {
               </h3>
               <button 
                 onClick={() => { setShowMap(false); setSelectedBooking(null); }}
-                className="btn btn-outline"
-                style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem' }}
+                style={{
+                  background: '#F1F5F9',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: 'var(--text-main)',
+                  transition: 'background 0.2s, color 0.2s'
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = '#FEE2E2';
+                  e.currentTarget.style.color = '#EF4444';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = '#F1F5F9';
+                  e.currentTarget.style.color = 'var(--text-main)';
+                }}
               >
-                Close
+                <X size={18} />
               </button>
             </div>
 
