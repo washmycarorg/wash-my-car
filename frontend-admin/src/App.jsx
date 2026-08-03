@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Users, Calendar, Settings, Bell, Search, DollarSign, Briefcase, FileText, Tag, Menu, X, MapPin, Package } from 'lucide-react';
-import { loginAdmin, getStats, getEmployees, toggleEmployeeStatus } from './api';
+import { loginAdmin, getStats, getEmployees, toggleEmployeeStatus, updateEmployee, getServiceAreas } from './api';
 
 import Bookings from './pages/Bookings';
 import Financials from './pages/Financials';
@@ -10,6 +10,7 @@ import Services from './pages/Services';
 import Offers from './pages/Offers';
 import Areas from './pages/Areas';
 import Inventory from './pages/Inventory';
+import SettingsPage from './pages/Settings';
 import logo from './assets/wash my car.png';
 
 const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
@@ -276,9 +277,24 @@ const Dashboard = () => {
 const EmployeeManagement = () => {
   const [employees, setEmployees] = useState([]);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [areas, setAreas] = useState([]);
+  const [editProfileUpdate, setEditProfileUpdate] = useState(false);
+  const [editAreaId, setEditAreaId] = useState('');
+  const [saving, setSaving] = useState(false);
   
   const fetchEmployees = () => getEmployees().then(setEmployees).catch(console.error);
-  useEffect(() => { fetchEmployees(); }, []);
+  
+  useEffect(() => { 
+    fetchEmployees(); 
+    getServiceAreas().then(setAreas).catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    if (selectedEmployee) {
+      setEditProfileUpdate(!!selectedEmployee.allowProfileUpdate);
+      setEditAreaId(selectedEmployee.serviceAreas?.[0]?.id || '');
+    }
+  }, [selectedEmployee]);
 
   const handleToggle = async (id, currentStatus) => {
     const newStatus = currentStatus === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
@@ -291,12 +307,30 @@ const EmployeeManagement = () => {
     } catch (err) { console.error(err); }
   };
 
+  const handleSaveChanges = async () => {
+    if (!selectedEmployee) return;
+    setSaving(true);
+    try {
+      await updateEmployee(selectedEmployee.id, {
+        allowProfileUpdate: editProfileUpdate,
+        serviceAreaIds: editAreaId ? [Number(editAreaId)] : []
+      });
+      fetchEmployees();
+      setSelectedEmployee(null);
+      alert('Employee changes saved successfully!');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save changes: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <AdminLayout title="Employee Details & Stats">
       <div className="card" style={{padding: 0, overflowX: 'auto'}}>
         <div className="flex justify-between items-center p-6 border-b border-gray-200">
           <h3 style={{margin: 0}}>All Employees</h3>
-          <button className="btn btn-primary">+ Add Employee</button>
         </div>
         <table style={{width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '600px'}}>
           <thead style={{background: '#F8FAFC'}}>
@@ -330,7 +364,7 @@ const EmployeeManagement = () => {
                   <div style={{color: 'var(--text-main)', fontSize: '0.9rem'}}>{emp.phone}</div>
                   <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.25rem'}}>{emp.email}</div>
                   <div style={{fontSize: '0.75rem', color: 'var(--primary-blue)', fontWeight: 600}}>
-                    Areas: {emp.serviceAreas && emp.serviceAreas.length > 0 ? emp.serviceAreas.map(a => a.name).join(', ') : 'None'}
+                    Area: {emp.serviceAreas && emp.serviceAreas.length > 0 ? emp.serviceAreas[0]?.name : 'None'}
                   </div>
                 </td>
                 <td style={{padding: '1rem 1.5rem'}}>
@@ -343,7 +377,7 @@ const EmployeeManagement = () => {
                   </span>
                 </td>
                 <td style={{padding: '1rem 1.5rem'}} className="flex gap-2">
-                  <button onClick={() => setSelectedEmployee(emp)} className="btn btn-outline" style={{padding: '0.4rem 0.8rem', fontSize: '0.85rem'}}>Details</button>
+                  <button onClick={() => setSelectedEmployee(emp)} className="btn btn-outline" style={{padding: '0.4rem 0.8rem', fontSize: '0.85rem'}}>Details & Edit</button>
                   {emp.status === 'ACTIVE' ? 
                     <button onClick={() => handleToggle(emp.id, emp.status)} className="btn btn-outline" style={{padding: '0.4rem 0.8rem', fontSize: '0.85rem', borderColor: 'var(--danger)', color: 'var(--danger)'}}>Suspend</button> :
                     <button onClick={() => handleToggle(emp.id, emp.status)} className="btn btn-teal" style={{padding: '0.4rem 0.8rem', fontSize: '0.85rem'}}>Approve</button>
@@ -375,9 +409,9 @@ const EmployeeManagement = () => {
           zIndex: 1000,
           padding: '1rem'
         }}>
-          <div className="card animate-fade-in" style={{ width: '100%', maxWidth: '500px', background: 'white', padding: '2.5rem', borderRadius: 'var(--radius-lg)' }}>
+          <div className="card animate-fade-in" style={{ width: '100%', maxWidth: '500px', background: 'white', padding: '2.5rem', borderRadius: 'var(--radius-lg)', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid #F1F5F9', paddingBottom: '0.75rem' }}>
-              <h3 style={{ margin: 0, color: 'var(--primary-navy)' }}>Employee Application & Details</h3>
+              <h3 style={{ margin: 0, color: 'var(--primary-navy)' }}>Employee Application & Settings</h3>
               <button onClick={() => setSelectedEmployee(null)} className="btn btn-outline" style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem' }}>Close</button>
             </div>
 
@@ -406,8 +440,40 @@ const EmployeeManagement = () => {
                 <div><strong>Email:</strong> {selectedEmployee.email}</div>
                 <div><strong>Aadhaar Number:</strong> {selectedEmployee.aadhaarNumber || 'Not provided'}</div>
                 <div><strong>Address:</strong> {selectedEmployee.address || 'Not provided'}</div>
-                <div style={{ gridColumn: 'span 2' }}>
-                  <strong>Regions Served:</strong> {selectedEmployee.serviceAreas && selectedEmployee.serviceAreas.length > 0 ? selectedEmployee.serviceAreas.map(a => a.name).join(', ') : 'None'}
+              </div>
+
+              {/* Editable Fields: Permissions and Region (Single dropdown) */}
+              <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <h5 style={{ margin: 0, color: 'var(--primary-navy)', fontSize: '0.95rem' }}>Edit Permissions & Assignment</h5>
+                
+                {/* 1. Toggle Profile Editing */}
+                <div className="flex items-center gap-2" style={{ userSelect: 'none', display: 'flex', alignItems: 'center' }}>
+                  <input 
+                    type="checkbox" 
+                    id="allowProfileUpdate" 
+                    checked={editProfileUpdate} 
+                    onChange={e => setEditProfileUpdate(e.target.checked)} 
+                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                  />
+                  <label htmlFor="allowProfileUpdate" style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-main)', cursor: 'pointer', marginLeft: '0.5rem' }}>
+                    Allow Employee to edit their profile details
+                  </label>
+                </div>
+
+                {/* 2. Select Serviced Area (Dropdown - 1 Area limit) */}
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>Assigned Service Region (Select exactly one)</label>
+                  <select 
+                    className="form-input" 
+                    value={editAreaId} 
+                    onChange={e => setEditAreaId(e.target.value)}
+                    style={{ marginTop: '0.25rem' }}
+                  >
+                    <option value="">-- No Region Assigned --</option>
+                    {areas.map(a => (
+                      <option key={a.id} value={a.id}>{a.name}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -430,7 +496,7 @@ const EmployeeManagement = () => {
                         <img 
                           src={selectedEmployee.idProofFile} 
                           alt="ID Proof Document" 
-                          style={{ width: '100%', maxHeight: '180px', objectFit: 'contain', borderRadius: '4px', border: '1px solid #CBD5E1' }} 
+                          style={{ width: '100%', maxHeight: '150px', objectFit: 'contain', borderRadius: '4px', border: '1px solid #CBD5E1' }} 
                         />
                         <a 
                           href={selectedEmployee.idProofFile} 
@@ -447,22 +513,31 @@ const EmployeeManagement = () => {
                 )}
               </div>
 
-              {/* Approve/Suspend action */}
-              <div style={{ display: 'flex', gap: '0.75rem', borderTop: '1px solid #F1F5F9', paddingTop: '1rem' }}>
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: '0.75rem', borderTop: '1px solid #F1F5F9', paddingTop: '1.25rem' }}>
+                <button 
+                  onClick={handleSaveChanges} 
+                  disabled={saving} 
+                  className="btn btn-primary" 
+                  style={{ flex: 1 }}
+                >
+                  {saving ? 'Saving...' : 'Save Settings'}
+                </button>
                 {selectedEmployee.status === 'ACTIVE' ? (
                   <button 
                     onClick={() => handleToggle(selectedEmployee.id, selectedEmployee.status)} 
-                    className="btn btn-outline btn-block" 
-                    style={{ borderColor: 'var(--danger)', color: 'var(--danger)' }}
+                    className="btn btn-outline" 
+                    style={{ borderColor: 'var(--danger)', color: 'var(--danger)', flex: 1 }}
                   >
-                    Suspend Employee Account
+                    Suspend Account
                   </button>
                 ) : (
                   <button 
                     onClick={() => handleToggle(selectedEmployee.id, selectedEmployee.status)} 
-                    className="btn btn-teal btn-block"
+                    className="btn btn-teal" 
+                    style={{ flex: 1 }}
                   >
-                    Approve Application & Make Active
+                    Approve
                   </button>
                 )}
               </div>
@@ -496,7 +571,7 @@ const App = () => {
         <Route path="/inventory" element={auth ? <AdminLayout title="Inventory & Stock Tracking"><Inventory /></AdminLayout> : <Navigate to="/"/>} />
         <Route path="/offers" element={auth ? <AdminLayout title="Execute Offers"><Offers /></AdminLayout> : <Navigate to="/"/>} />
         <Route path="/areas" element={auth ? <AdminLayout title="Service Areas Management"><Areas /></AdminLayout> : <Navigate to="/"/>} />
-        <Route path="/settings" element={auth ? <AdminLayout title="System Settings"><div className="card p-8">Settings (In Development)</div></AdminLayout> : <Navigate to="/"/>} />
+        <Route path="/settings" element={auth ? <AdminLayout title="System Settings"><SettingsPage /></AdminLayout> : <Navigate to="/"/>} />
       </Routes>
     </Router>
   );

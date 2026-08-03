@@ -15,7 +15,9 @@ import {
   getWashPrice,
   getSavedAddresses,
   addSavedAddress,
-  deleteSavedAddress
+  deleteSavedAddress,
+  getEligibleCoupons,
+  getPublicSettings
 } from '../controllers/userController.js';
 
 const router = express.Router();
@@ -43,5 +45,9 @@ router.get('/price', getWashPrice);
 router.get('/addresses', getSavedAddresses);
 router.post('/addresses', addSavedAddress);
 router.delete('/addresses/:id', deleteSavedAddress);
+
+// Coupon and Royalty settings
+router.get('/eligible-coupons', getEligibleCoupons);
+router.get('/settings', getPublicSettings);
 
 export default router;

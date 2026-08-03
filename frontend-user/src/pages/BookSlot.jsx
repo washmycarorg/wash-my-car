@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, MapPin, Car as CarIcon, CreditCard, CheckCircle, Search, Compass, AlertCircle } from 'lucide-react';
+import { Calendar, MapPin, Car as CarIcon, CreditCard, CheckCircle, Search, Compass, AlertCircle, Tag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { 
   createBooking, 
@@ -8,7 +8,10 @@ import {
   getServiceAreas, 
   getWashPrice, 
   getCars, 
-  getSavedAddresses 
+  getSavedAddresses,
+  getEligibleCoupons,
+  getSettings,
+  getProfile
 } from '../api';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
@@ -126,15 +129,22 @@ const BookSlot = () => {
   const [serviceAreas, setServiceAreas] = useState([]);
   const [savedCars, setSavedCars] = useState([]);
   const [savedAddresses, setSavedAddresses] = useState([]);
+  const [eligibleCoupons, setEligibleCoupons] = useState([]);
+  const [systemSettings, setSystemSettings] = useState(null);
+  const [userPoints, setUserPoints] = useState(0);
 
   // Selections
   const [selectedCarType, setSelectedCarType] = useState('');
   const [selectedWashType, setSelectedWashType] = useState('');
   const [selectedArea, setSelectedArea] = useState('');
-  const [selectedCarSource, setSelectedCarSource] = useState('saved'); // 'saved' or 'new'
+  const [selectedCarSource, setSelectedCarSource] = useState('saved');
   const [selectedCarId, setSelectedCarId] = useState('');
-  const [selectedAddressSource, setSelectedAddressSource] = useState('saved'); // 'saved' or 'new'
+  const [selectedAddressSource, setSelectedAddressSource] = useState('saved');
   const [selectedAddressId, setSelectedAddressId] = useState('');
+
+  // Promo and Loyalty State
+  const [selectedCouponCode, setSelectedCouponCode] = useState('');
+  const [redeemPoints, setRedeemPoints] = useState(false);
 
   // Form State
   const [date, setDate] = useState('');
@@ -174,13 +184,21 @@ const BookSlot = () => {
       getWashTypes(),
       getServiceAreas(),
       getCars(),
-      getSavedAddresses()
-    ]).then(([carsT, washT, areas, cars, addrs]) => {
+      getSavedAddresses(),
+      getEligibleCoupons().catch(() => []),
+      getSettings().catch(() => null),
+      getProfile().catch(() => null)
+    ]).then(([carsT, washT, areas, cars, addrs, coupons, settingsRes, profileRes]) => {
       setCarTypes(carsT);
       setWashTypes(washT);
       setServiceAreas(areas);
       setSavedCars(cars);
       setSavedAddresses(addrs);
+      setEligibleCoupons(coupons);
+      setSystemSettings(settingsRes);
+      if (profileRes) {
+        setUserPoints(profileRes.points || 0);
+      }
 
       if (carsT.length > 0) setSelectedCarType(carsT[0].id.toString());
       if (washT.length > 0) setSelectedWashType(washT[0].id.toString());
@@ -389,7 +407,9 @@ const BookSlot = () => {
           carMake: selectedCarSource === 'new' ? carMake : '',
           carModel: selectedCarSource === 'new' ? carModel : '',
           saveAddress: selectedAddressSource === 'new' && saveAddress,
-          addressName: selectedAddressSource === 'new' ? addressLabel : ''
+          addressName: selectedAddressSource === 'new' ? addressLabel : '',
+          couponCode: selectedCouponCode || undefined,
+          redeemPoints: redeemPoints
         };
 
         await createBooking(payload);
@@ -406,6 +426,31 @@ const BookSlot = () => {
       }
     }, 2000);
   };
+
+  const basePrice = price || 0;
+  const appliedCoupon = eligibleCoupons.find(c => c.code === selectedCouponCode);
+  const discountVal = appliedCoupon ? (basePrice * (appliedCoupon.discountPct || 0)) / 100 : 0;
+  const subtotal = Math.max(0, basePrice - discountVal);
+  
+  const pointsEnabled = systemSettings?.royaltyPointsEnabled;
+  const pointsToCashRatio = systemSettings?.pointsToCashRatio || 4;
+  const rewardPointsRatio = systemSettings?.rewardPointsRatio || 0.1;
+  const maxPointsCashValue = userPoints / pointsToCashRatio;
+  
+  let pointsCashValueUsed = 0;
+  let pointsRedeemedUsed = 0;
+  if (redeemPoints && pointsEnabled && userPoints > 0) {
+    if (maxPointsCashValue >= subtotal) {
+      pointsCashValueUsed = subtotal;
+      pointsRedeemedUsed = Math.ceil(subtotal * pointsToCashRatio);
+    } else {
+      pointsCashValueUsed = maxPointsCashValue;
+      pointsRedeemedUsed = userPoints;
+    }
+  }
+  
+  const finalPrice = Math.max(0, subtotal - pointsCashValueUsed);
+  const pointsEarned = pointsEnabled ? Math.floor(finalPrice * rewardPointsRatio) : 0;
 
   const currentCarTypeName = carTypes.find(c => c.id.toString() === selectedCarType)?.name || '';
   const currentWashTypeName = washTypes.find(w => w.id.toString() === selectedWashType)?.name || '';
@@ -701,24 +746,106 @@ const BookSlot = () => {
         </div>
       </div>
 
-      {/* 5. Pricing and Checkout Trigger */}
-      <div className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', borderTop: '4px solid var(--accent-teal)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h3 style={{ margin: 0, color: 'var(--primary-navy)' }}>Total Summary</h3>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-              {currentCarTypeName} · {currentWashTypeName}
-            </span>
+      {/* 4.5 Promotions & Loyalty Points */}
+      <div className="card" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
+        <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary-navy)', marginBottom: '1.25rem' }}>
+          <Tag size={20} color="var(--primary-blue)" /> Promotions & Loyalty
+        </h3>
+        
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          
+          {/* Coupon Selector */}
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Apply Coupon Code</label>
+            <select
+              className="form-input"
+              value={selectedCouponCode}
+              onChange={e => setSelectedCouponCode(e.target.value)}
+              style={{ marginTop: '0.25rem' }}
+            >
+              <option value="">-- No Coupon Code --</option>
+              {eligibleCoupons.map(c => (
+                <option key={c.id} value={c.code}>
+                  {c.code} ({c.discountPct}% OFF) - {c.title}
+                </option>
+              ))}
+            </select>
+            {eligibleCoupons.length === 0 && (
+              <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: '0.25rem' }}>
+                No active coupon codes eligible for your account currently.
+              </small>
+            )}
           </div>
-          <h1 style={{ margin: 0, color: 'var(--primary-blue)' }}>
-            {priceLoading ? '...' : `₹${price}`}
-          </h1>
+
+          {/* Loyalty Points redemption checkbox */}
+          {pointsEnabled && userPoints > 0 && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              background: '#F8FAFC',
+              padding: '0.75rem 1rem',
+              borderRadius: '6px',
+              border: '1px solid #E2E8F0',
+              marginTop: '0.5rem'
+            }}>
+              <input
+                type="checkbox"
+                id="redeemPoints"
+                checked={redeemPoints}
+                onChange={e => setRedeemPoints(e.target.checked)}
+                style={{ width: '18px', height: '18px', cursor: 'pointer', marginTop: '0.1rem' }}
+              />
+              <label htmlFor="redeemPoints" style={{ marginLeft: '0.5rem', fontSize: '0.85rem', color: 'var(--text-main)', cursor: 'pointer', textAlign: 'left' }}>
+                <strong>Redeem Royalty Points</strong>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                  Use points to get cashback. You have <strong>{userPoints} points</strong> worth <strong>₹{maxPointsCashValue.toFixed(2)}</strong>.
+                </div>
+              </label>
+            </div>
+          )}
+
+        </div>
+      </div>
+
+      {/* 5. Pricing and Checkout Trigger */}
+      <div className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', borderTop: '4px solid var(--accent-teal)' }}>
+        <h3 style={{ margin: 0, color: 'var(--primary-navy)' }}>Total Summary</h3>
+        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+          {currentCarTypeName} · {currentWashTypeName}
+        </span>
+        
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.9rem', color: 'var(--text-main)', textAlign: 'left' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>Plan Subtotal:</span>
+            <span>₹{basePrice}</span>
+          </div>
+          {discountVal > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--accent-teal)', fontWeight: 600 }}>
+              <span>Coupon Discount ({selectedCouponCode}):</span>
+              <span>-₹{discountVal}</span>
+            </div>
+          )}
+          {pointsCashValueUsed > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#B45309', fontWeight: 600 }}>
+              <span>Royalty Cashback ({pointsRedeemedUsed} pts):</span>
+              <span>-₹{pointsCashValueUsed.toFixed(2)}</span>
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #E2E8F0', paddingTop: '0.5rem', fontWeight: 'bold', fontSize: '1.1rem', color: 'var(--primary-navy)' }}>
+            <span>Final Amount to Pay:</span>
+            <span>₹{priceLoading ? '...' : finalPrice.toFixed(2)}</span>
+          </div>
+          {pointsEarned > 0 && (
+            <div style={{ fontSize: '0.75rem', color: 'var(--accent-teal)', fontWeight: 600, display: 'flex', gap: '0.2rem', alignItems: 'center', marginTop: '0.25rem' }}>
+              <span>✓ You will earn <strong>{pointsEarned} loyalty reward points</strong> on this wash!</span>
+            </div>
+          )}
         </div>
 
         <button 
           onClick={handleBookingSubmit}
           className="btn btn-teal"
-          style={{ width: '100%', padding: '1rem', fontSize: '1.1rem', borderRadius: 'var(--radius-md)' }}
+          style={{ width: '100%', padding: '1rem', fontSize: '1.1rem', borderRadius: 'var(--radius-md)', marginTop: '0.5rem' }}
         >
           Book Slot & Proceed to Pay (Mock Checkout)
         </button>
@@ -751,7 +878,7 @@ const BookSlot = () => {
                   <CreditCard color="var(--primary-blue)" /> Pay Online
                 </h3>
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
-                  Complete checkout for wash total <strong>₹{price}</strong>
+                  Complete checkout for wash total <strong>₹{finalPrice.toFixed(2)}</strong>
                 </p>
 
                 <form onSubmit={handleProcessPayment} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>

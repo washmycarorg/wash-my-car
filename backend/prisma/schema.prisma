@@ -15,6 +15,7 @@ model User {
   cars           Car[]
   bookings       Booking[]
   savedAddresses SavedAddress[]
+  offers         Offer[]         @relation("UserEligibleOffers")
   createdAt      DateTime        @default(now())
 }
 
@@ -34,7 +35,8 @@ model Employee {
   leaves        Leave[]
   serviceAreas  ServiceArea[] @relation("EmployeeAreas")
   inventoryAllocations InventoryAllocation[]
-  createdAt     DateTime      @default(now())
+  allowProfileUpdate   Boolean       @default(false)
+  createdAt            DateTime      @default(now())
 }
 
 model Admin {
@@ -144,6 +146,9 @@ model Booking {
   price         Float
   employeePayout Float       @default(0.0)
   companyCost   Float       @default(0.0)
+  appliedOfferCode String?
+  pointsRedeemed Int       @default(0)
+  pointsEarned   Int       @default(0)
   paymentStatus String       @default("PENDING")
   paymentMethod String       @default("ONLINE")
   
@@ -172,13 +177,18 @@ model Leave {
 }
 
 model Offer {
-  id          Int       @id @default(autoincrement())
-  title       String
-  description String
-  discountPct Float
-  validUntil  DateTime
-  active      Boolean   @default(true)
-  createdAt   DateTime  @default(now())
+  id             Int             @id @default(autoincrement())
+  code           String          @unique
+  title          String
+  description    String
+  discountPct    Float
+  userType       String          @default("ALL") // ALL, NEW, SELECTED
+  usageLimit     Int             @default(0)     // count limit (0 = unlimited)
+  rotation       String          @default("UNLIMITED") // UNLIMITED, OVERALL, MONTHLY, YEARLY
+  eligibleUsers  User[]          @relation("UserEligibleOffers")
+  validUntil     DateTime
+  active         Boolean         @default(true)
+  createdAt      DateTime        @default(now())
 }
 
 model InventoryItem {
@@ -202,4 +212,11 @@ model InventoryAllocation {
   washesUsed      Int           @default(0) // incremented when employee completes a booking
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+}
+
+model SystemSettings {
+  id                  Int     @id @default(1)
+  royaltyPointsEnabled Boolean @default(true)
+  pointsToCashRatio   Float   @default(4.0)   // 4 points = 1 Rs
+  rewardPointsRatio   Float   @default(0.1)   // 10% points reward
 }

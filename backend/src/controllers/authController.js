@@ -76,9 +76,10 @@ export const employeeRegister = async (req, res) => {
       status: 'PENDING'
     };
 
-    if (serviceAreaIds && serviceAreaIds.length > 0) {
+    const singleAreaIds = serviceAreaIds ? (Array.isArray(serviceAreaIds) ? serviceAreaIds.slice(0, 1) : [serviceAreaIds]) : [];
+    if (singleAreaIds.length > 0) {
       data.serviceAreas = {
-        connect: serviceAreaIds.map(id => ({ id: Number(id) }))
+        connect: singleAreaIds.map(id => ({ id: Number(id) }))
       };
     }
 

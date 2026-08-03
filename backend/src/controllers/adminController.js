@@ -56,6 +56,17 @@ export const getEmployees = async (req, res) => {
   }
 };
 
+export const getUsers = async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 export const toggleEmployeeStatus = async (req, res) => {
   try {
     const { id } = req.params;
@@ -73,16 +84,18 @@ export const toggleEmployeeStatus = async (req, res) => {
 export const updateEmployee = async (req, res) => {
   try {
     const { id } = req.params;
-    const { salary, name, phone, email, serviceAreaIds } = req.body;
+    const { salary, name, phone, email, serviceAreaIds, allowProfileUpdate } = req.body;
     const data = {};
     if (salary !== undefined) data.salary = Number(salary);
     if (name) data.name = name;
     if (phone) data.phone = phone;
     if (email) data.email = email;
+    if (allowProfileUpdate !== undefined) data.allowProfileUpdate = Boolean(allowProfileUpdate);
     
     if (serviceAreaIds) {
+      const singleAreaIds = Array.isArray(serviceAreaIds) ? serviceAreaIds.slice(0, 1) : [serviceAreaIds];
       data.serviceAreas = {
-        set: serviceAreaIds.map(areaId => ({ id: Number(areaId) }))
+        set: singleAreaIds.map(areaId => ({ id: Number(areaId) }))
       };
     }
     
@@ -122,7 +135,14 @@ export const updateLeaveStatus = async (req, res) => {
 
 export const getOffers = async (req, res) => {
   try {
-    const offers = await prisma.offer.findMany();
+    const offers = await prisma.offer.findMany({
+      include: {
+        eligibleUsers: {
+          select: { id: true, name: true, phone: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
     res.json(offers);
   } catch (error) { 
     res.status(500).json({ error: error.message }); 
@@ -131,14 +151,33 @@ export const getOffers = async (req, res) => {
 
 export const createOffer = async (req, res) => {
   try {
-    const { title, description, discountPct, validUntil, active } = req.body;
+    const { title, description, discountPct, validUntil, active, code, userType, usageLimit, rotation, eligibleUserIds } = req.body;
+    
+    // Check if code already exists
+    const existing = await prisma.offer.findUnique({ where: { code } });
+    if (existing) {
+      return res.status(400).json({ error: `Coupon code '${code}' already exists` });
+    }
+
     const offer = await prisma.offer.create({
       data: {
         title,
         description,
         discountPct: Number(discountPct),
         validUntil: new Date(validUntil),
-        active: active ?? true
+        active: active ?? true,
+        code,
+        userType: userType || 'ALL',
+        usageLimit: usageLimit !== undefined ? Number(usageLimit) : 0,
+        rotation: rotation || 'UNLIMITED',
+        eligibleUsers: userType === 'SELECTED' && eligibleUserIds
+          ? { connect: eligibleUserIds.map(userId => ({ id: Number(userId) })) }
+          : undefined
+      },
+      include: {
+        eligibleUsers: {
+          select: { id: true, name: true, phone: true }
+        }
       }
     });
     res.json(offer);
@@ -150,7 +189,15 @@ export const createOffer = async (req, res) => {
 export const updateOffer = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, discountPct, validUntil, active } = req.body;
+    const { title, description, discountPct, validUntil, active, code, userType, usageLimit, rotation, eligibleUserIds } = req.body;
+    
+    if (code) {
+      const existing = await prisma.offer.findUnique({ where: { code } });
+      if (existing && existing.id !== Number(id)) {
+        return res.status(400).json({ error: `Coupon code '${code}' already exists` });
+      }
+    }
+
     const offer = await prisma.offer.update({
       where: { id: Number(id) },
       data: {
@@ -158,7 +205,29 @@ export const updateOffer = async (req, res) => {
         ...(description && { description }),
         ...(discountPct !== undefined && { discountPct: Number(discountPct) }),
         ...(validUntil && { validUntil: new Date(validUntil) }),
-        ...(active !== undefined && { active })
+        ...(active !== undefined && { active }),
+        ...(code && { code }),
+        ...(userType && { userType }),
+        ...(usageLimit !== undefined && { usageLimit: Number(usageLimit) }),
+        ...(rotation && { rotation }),
+        ...(userType === 'SELECTED' && eligibleUserIds
+          ? {
+              eligibleUsers: {
+                set: eligibleUserIds.map(userId => ({ id: Number(userId) }))
+              }
+            }
+          : userType && userType !== 'SELECTED'
+          ? {
+              eligibleUsers: {
+                set: []
+              }
+            }
+          : undefined)
+      },
+      include: {
+        eligibleUsers: {
+          select: { id: true, name: true, phone: true }
+        }
       }
     });
     res.json(offer);
@@ -668,6 +737,52 @@ export const deleteAllocation = async (req, res) => {
     });
 
     res.json({ message: 'Allocation returned/deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// System Settings CRUD
+export const getSystemSettings = async (req, res) => {
+  try {
+    let settings = await prisma.systemSettings.findUnique({
+      where: { id: 1 }
+    });
+    if (!settings) {
+      settings = await prisma.systemSettings.create({
+        data: {
+          id: 1,
+          royaltyPointsEnabled: true,
+          pointsToCashRatio: 4.0,
+          rewardPointsRatio: 0.1
+        }
+      });
+    }
+    res.json(settings);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const updateSystemSettings = async (req, res) => {
+  try {
+    const { royaltyPointsEnabled, pointsToCashRatio, rewardPointsRatio } = req.body;
+    
+    const settings = await prisma.systemSettings.upsert({
+      where: { id: 1 },
+      update: {
+        ...(royaltyPointsEnabled !== undefined && { royaltyPointsEnabled: Boolean(royaltyPointsEnabled) }),
+        ...(pointsToCashRatio !== undefined && { pointsToCashRatio: Number(pointsToCashRatio) }),
+        ...(rewardPointsRatio !== undefined && { rewardPointsRatio: Number(rewardPointsRatio) })
+      },
+      create: {
+        id: 1,
+        royaltyPointsEnabled: royaltyPointsEnabled !== undefined ? Boolean(royaltyPointsEnabled) : true,
+        pointsToCashRatio: pointsToCashRatio !== undefined ? Number(pointsToCashRatio) : 4.0,
+        rewardPointsRatio: rewardPointsRatio !== undefined ? Number(rewardPointsRatio) : 0.1
+      }
+    });
+    res.json(settings);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

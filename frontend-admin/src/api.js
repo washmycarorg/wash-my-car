@@ -29,6 +29,12 @@ export const getEmployees = async () => {
   return res.json();
 };
 
+export const getUsers = async () => {
+  const res = await fetch(`${API_URL}/admin/users`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
 export const toggleEmployeeStatus = async (id, status) => {
   const res = await fetch(`${API_URL}/admin/employees/${id}/status`, {
     method: 'PUT',
@@ -324,6 +330,22 @@ export const deleteAllocation = async (id) => {
   const res = await fetch(`${API_URL}/admin/inventory/allocate/${id}`, {
     method: 'DELETE',
     headers: getHeaders()
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const getSettings = async () => {
+  const res = await fetch(`${API_URL}/admin/settings`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const updateSettings = async (data) => {
+  const res = await fetch(`${API_URL}/admin/settings`, {
+    method: 'PUT',
+    headers: getHeaders(),
+    body: JSON.stringify(data)
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();

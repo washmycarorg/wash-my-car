@@ -17,6 +17,8 @@ const Profile = ({ profile, setProfile }) => {
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  const editable = profile?.allowProfileUpdate;
+
   useEffect(() => {
     getServiceAreas()
       .then(setAreas)
@@ -43,6 +45,7 @@ const Profile = ({ profile, setProfile }) => {
   }, [profile]);
 
   const handlePhotoChange = (e) => {
+    if (!editable) return;
     const file = e.target.files[0];
     if (file) {
       const reader = new FileReader();
@@ -54,6 +57,7 @@ const Profile = ({ profile, setProfile }) => {
   };
 
   const handleIdProofChange = (e) => {
+    if (!editable) return;
     const file = e.target.files[0];
     if (file) {
       const reader = new FileReader();
@@ -64,13 +68,8 @@ const Profile = ({ profile, setProfile }) => {
     }
   };
 
-  const handleAreaToggle = (id) => {
-    setSelectedAreaIds(prev => 
-      prev.includes(id) ? prev.filter(areaId => areaId !== id) : [...prev, id]
-    );
-  };
-
   const handleSave = async () => {
+    if (!editable) return;
     if (!formData.name || !formData.phone) return alert('Name and Phone are required.');
     setLoading(true);
     try {
@@ -83,17 +82,42 @@ const Profile = ({ profile, setProfile }) => {
       alert('Profile updated successfully');
     } catch (err) {
       console.error(err);
-      alert('Failed to update profile');
+      alert('Failed to update profile: ' + (err.message || 'Unauthorized'));
     } finally {
       setLoading(false);
     }
   };
 
-  // Helper to determine format of base64 document
   const isPdf = formData.idProofFile && formData.idProofFile.startsWith('data:application/pdf');
 
   return (
     <div style={{ maxWidth: '600px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      
+      {/* Locked Profile Alert Banner */}
+      {!editable && (
+        <div style={{
+          background: '#FFFBEB',
+          border: '1px solid #FCD34D',
+          borderRadius: 'var(--radius-md)',
+          padding: '1rem',
+          color: '#B45309',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem',
+          fontSize: '0.85rem',
+          fontWeight: 500,
+          textAlign: 'left'
+        }}>
+          <Shield size={20} color="#D97706" />
+          <div>
+            <strong>Profile Editing Locked</strong>
+            <div style={{ marginTop: '0.2rem', color: '#B45309' }}>
+              Your profile information and assignment editing is disabled. Contact your administrator if you need to update any details.
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '1.25rem', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <UserIcon size={20} color="var(--primary-blue)" />
@@ -117,13 +141,15 @@ const Profile = ({ profile, setProfile }) => {
                 </div>
               )}
             </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--primary-blue)', cursor: 'pointer', background: '#F0F9FF', padding: '0.5rem 1rem', borderRadius: '4px', border: '1px dashed var(--primary-blue)' }}>
-                Upload Profile Photo
-                <input type="file" accept="image/*" onChange={handlePhotoChange} style={{ display: 'none' }} />
-              </label>
-              <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>JPG, PNG. Max 2MB.</p>
-            </div>
+            {editable && (
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--primary-blue)', cursor: 'pointer', background: '#F0F9FF', padding: '0.5rem 1rem', borderRadius: '4px', border: '1px dashed var(--primary-blue)' }}>
+                  Upload Profile Photo
+                  <input type="file" accept="image/*" onChange={handlePhotoChange} style={{ display: 'none' }} />
+                </label>
+                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>JPG, PNG. Max 2MB.</p>
+              </div>
+            )}
           </div>
 
           {/* Core Info */}
@@ -135,6 +161,8 @@ const Profile = ({ profile, setProfile }) => {
                 className="form-input" 
                 value={formData.name}
                 onChange={e => setFormData({ ...formData, name: e.target.value })}
+                disabled={!editable}
+                style={!editable ? { background: '#F1F5F9', cursor: 'not-allowed' } : undefined}
               />
             </div>
 
@@ -144,7 +172,6 @@ const Profile = ({ profile, setProfile }) => {
                 type="text" 
                 className="form-input" 
                 value={formData.phone}
-                onChange={e => setFormData({ ...formData, phone: e.target.value })}
                 disabled
                 style={{ background: '#F1F5F9', cursor: 'not-allowed' }}
               />
@@ -158,6 +185,8 @@ const Profile = ({ profile, setProfile }) => {
               className="form-input" 
               value={formData.email}
               onChange={e => setFormData({ ...formData, email: e.target.value })}
+              disabled={!editable}
+              style={!editable ? { background: '#F1F5F9', cursor: 'not-allowed' } : undefined}
             />
           </div>
 
@@ -175,6 +204,8 @@ const Profile = ({ profile, setProfile }) => {
                   className="form-input" 
                   value={formData.aadhaarNumber}
                   onChange={e => setFormData({ ...formData, aadhaarNumber: e.target.value })}
+                  disabled={!editable}
+                  style={!editable ? { background: '#F1F5F9', cursor: 'not-allowed' } : undefined}
                 />
               </div>
 
@@ -185,6 +216,8 @@ const Profile = ({ profile, setProfile }) => {
                   className="form-input" 
                   value={formData.address}
                   onChange={e => setFormData({ ...formData, address: e.target.value })}
+                  disabled={!editable}
+                  style={!editable ? { background: '#F1F5F9', cursor: 'not-allowed' } : undefined}
                 />
               </div>
             </div>
@@ -192,10 +225,12 @@ const Profile = ({ profile, setProfile }) => {
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label">Update ID Proof (PDF/Image)</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', cursor: 'pointer', background: '#F1F5F9', padding: '0.5rem 1rem', borderRadius: '4px', border: '1px solid #CBD5E1' }}>
-                  Choose Document File
-                  <input type="file" accept="image/*,application/pdf" onChange={handleIdProofChange} style={{ display: 'none' }} />
-                </label>
+                {editable && (
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', cursor: 'pointer', background: '#F1F5F9', padding: '0.5rem 1rem', borderRadius: '4px', border: '1px solid #CBD5E1' }}>
+                    Choose Document File
+                    <input type="file" accept="image/*,application/pdf" onChange={handleIdProofChange} style={{ display: 'none' }} />
+                  </label>
+                )}
                 {formData.idProofFile && (
                   <div>
                     {isPdf ? (
@@ -222,30 +257,27 @@ const Profile = ({ profile, setProfile }) => {
             </div>
           </div>
 
-          {/* Service Areas */}
+          {/* Service Areas (Dropdown select - exactly one) */}
           <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '1.25rem' }}>
             <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginBottom: '0.75rem' }}>
-              <MapPin size={16} /> Choose Serviced Regions
+              <MapPin size={16} /> Choose Serviced Region
             </label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', padding: '1rem', background: '#F8FAFC', borderRadius: 'var(--radius-md)', border: '1px solid #E2E8F0' }}>
-              {areas.map(area => {
-                const checked = selectedAreaIds.includes(area.id);
-                return (
-                  <label key={area.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', cursor: 'pointer', fontWeight: 500 }}>
-                    <input 
-                      type="checkbox" 
-                      checked={checked}
-                      onChange={() => handleAreaToggle(area.id)}
-                      style={{ cursor: 'pointer' }}
-                    />
-                    {area.name}
-                  </label>
-                );
-              })}
-              {areas.length === 0 && (
-                <p style={{ color: 'var(--text-muted)', gridColumn: 'span 2', margin: 0, fontSize: '0.85rem' }}>No service areas configured by admin.</p>
-              )}
-            </div>
+            {editable ? (
+              <select
+                className="form-input"
+                value={selectedAreaIds[0] || ''}
+                onChange={e => setSelectedAreaIds(e.target.value ? [Number(e.target.value)] : [])}
+              >
+                <option value="">-- Select Region --</option>
+                {areas.map(area => (
+                  <option key={area.id} value={area.id}>{area.name}</option>
+                ))}
+              </select>
+            ) : (
+              <div style={{ padding: '0.75rem', background: '#F8FAFC', borderRadius: '4px', border: '1px solid #E2E8F0', fontWeight: 600, fontSize: '0.9rem', color: 'var(--primary-navy)', textAlign: 'left' }}>
+                {profile?.serviceAreas?.[0]?.name || 'No Region Assigned'}
+              </div>
+            )}
           </div>
 
           {/* Allocated Inventory */}
@@ -285,24 +317,26 @@ const Profile = ({ profile, setProfile }) => {
             </div>
           </div>
 
-          <button 
-            onClick={handleSave}
-            disabled={loading}
-            style={{
-              padding: '0.75rem 1.5rem', 
-              background: 'var(--primary-blue)', 
-              color: 'white', 
-              border: 'none', 
-              borderRadius: 'var(--radius-md)',
-              fontSize: '0.95rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              marginTop: '0.5rem',
-              alignSelf: 'flex-start'
-            }}
-          >
-            {loading ? 'Saving Changes...' : 'Save Settings'}
-          </button>
+          {editable && (
+            <button 
+              onClick={handleSave}
+              disabled={loading}
+              style={{
+                padding: '0.75rem 1.5rem', 
+                background: 'var(--primary-blue)', 
+                color: 'white', 
+                border: 'none', 
+                borderRadius: 'var(--radius-md)',
+                fontSize: '0.95rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                marginTop: '0.5rem',
+                alignSelf: 'flex-start'
+              }}
+            >
+              {loading ? 'Saving Changes...' : 'Save Settings'}
+            </button>
+          )}
         </div>
       </div>
     </div>

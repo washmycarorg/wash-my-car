@@ -12,6 +12,7 @@ router.get('/employees', adminController.getEmployees);
 router.get('/employees/workload', adminController.getEmployeesWorkload);
 router.put('/employees/:id', adminController.updateEmployee);
 router.put('/employees/:id/status', adminController.toggleEmployeeStatus);
+router.get('/users', adminController.getUsers);
 
 router.get('/leaves', adminController.getLeaves);
 router.put('/leaves/:id/status', adminController.updateLeaveStatus);
@@ -59,5 +60,9 @@ router.post('/inventory', adminController.createInventoryItem);
 router.delete('/inventory/:id', adminController.deleteInventoryItem);
 router.post('/inventory/allocate', adminController.allocateInventory);
 router.delete('/inventory/allocate/:id', adminController.deleteAllocation);
+
+// System Settings
+router.get('/settings', adminController.getSystemSettings);
+router.put('/settings', adminController.updateSystemSettings);
 
 export default router;

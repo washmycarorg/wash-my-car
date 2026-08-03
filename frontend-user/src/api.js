@@ -139,3 +139,15 @@ export const deleteSavedAddress = async (id) => {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 };
+
+export const getEligibleCoupons = async () => {
+  const res = await fetch(`${API_URL}/users/eligible-coupons`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const getSettings = async () => {
+  const res = await fetch(`${API_URL}/users/settings`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};

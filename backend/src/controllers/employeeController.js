@@ -52,6 +52,16 @@ export const getProfile = async (req, res) => {
 
 export const updateProfile = async (req, res) => {
   try {
+    const existingEmp = await prisma.employee.findUnique({
+      where: { id: req.user.id }
+    });
+    if (!existingEmp) {
+      return res.status(404).json({ error: 'Employee profile not found' });
+    }
+    if (!existingEmp.allowProfileUpdate) {
+      return res.status(403).json({ error: 'Profile editing is locked by admin. Contact admin to unlock.' });
+    }
+
     const { name, phone, email, photo, serviceAreaIds, aadhaarNumber, address, idProofFile } = req.body;
     const data = {};
     if (name) data.name = name;
@@ -63,8 +73,9 @@ export const updateProfile = async (req, res) => {
     if (idProofFile !== undefined) data.idProofFile = idProofFile;
     
     if (serviceAreaIds) {
+      const singleAreaIds = Array.isArray(serviceAreaIds) ? serviceAreaIds.slice(0, 1) : [serviceAreaIds];
       data.serviceAreas = {
-        set: serviceAreaIds.map(areaId => ({ id: Number(areaId) }))
+        set: singleAreaIds.map(areaId => ({ id: Number(areaId) }))
       };
     }
     

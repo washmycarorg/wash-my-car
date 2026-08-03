@@ -93,7 +93,9 @@ export const createBooking = async (req, res) => {
       saveAddress,
       carMake,
       carModel,
-      addressName
+      addressName,
+      couponCode,
+      redeemPoints
     } = req.body;
     
     // Fetch price setting for the combination
@@ -110,11 +112,107 @@ export const createBooking = async (req, res) => {
       return res.status(400).json({ error: 'Selected service combination is not priced yet' });
     }
 
-    const price = priceSetting.price;
+    const originalPrice = priceSetting.price;
+    let finalPrice = originalPrice;
     const companyCost = priceSetting.companyCost || 0.0;
+    
+    // 1. Coupon Discount Calculation
+    let appliedCode = null;
+    if (couponCode) {
+      const offer = await prisma.offer.findUnique({
+        where: { code: couponCode, active: true },
+        include: { eligibleUsers: true }
+      });
+      
+      if (!offer || new Date(offer.validUntil) < new Date()) {
+        return res.status(400).json({ error: 'Invalid or expired coupon code' });
+      }
+
+      // Check eligibility
+      const userBookings = await prisma.booking.findMany({ where: { userId: req.user.id } });
+      const completedCount = userBookings.filter(b => b.status === 'COMPLETED').length;
+
+      if (offer.userType === 'NEW' && completedCount > 0) {
+        return res.status(400).json({ error: 'Coupon is only valid for new users' });
+      }
+      if (offer.userType === 'SELECTED') {
+        const isEligible = offer.eligibleUsers.some(u => u.id === req.user.id);
+        if (!isEligible) {
+          return res.status(400).json({ error: 'You are not eligible for this coupon' });
+        }
+      }
+
+      // Check rotation limits
+      if (offer.rotation !== 'UNLIMITED' && offer.usageLimit > 0) {
+        const bookingsWithCoupon = userBookings.filter(b => b.appliedOfferCode === offer.code);
+        if (offer.rotation === 'OVERALL' && bookingsWithCoupon.length >= offer.usageLimit) {
+          return res.status(400).json({ error: 'You have reached the overall usage limit for this coupon' });
+        } else if (offer.rotation === 'MONTHLY') {
+          const now = new Date();
+          const currentMonth = now.getMonth();
+          const currentYear = now.getFullYear();
+          const monthlyCount = bookingsWithCoupon.filter(b => {
+            const bDate = new Date(b.date);
+            return bDate.getMonth() === currentMonth && bDate.getFullYear() === currentYear;
+          }).length;
+          if (monthlyCount >= offer.usageLimit) {
+            return res.status(400).json({ error: 'You have reached the monthly usage limit for this coupon' });
+          }
+        } else if (offer.rotation === 'YEARLY') {
+          const now = new Date();
+          const currentYear = now.getFullYear();
+          const yearlyCount = bookingsWithCoupon.filter(b => {
+            const bDate = new Date(b.date);
+            return bDate.getFullYear() === currentYear;
+          }).length;
+          if (yearlyCount >= offer.usageLimit) {
+            return res.status(400).json({ error: 'You have reached the yearly usage limit for this coupon' });
+          }
+        }
+      }
+
+      const discount = (originalPrice * offer.discountPct) / 100;
+      finalPrice = Math.max(0, originalPrice - discount);
+      appliedCode = offer.code;
+    }
+
+    // 2. Royalty Points Redemption
+    let redeemedPoints = 0;
+    const settings = await prisma.systemSettings.findUnique({ where: { id: 1 } }) || {
+      royaltyPointsEnabled: true,
+      pointsToCashRatio: 4.0,
+      rewardPointsRatio: 0.1
+    };
+
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+
+    if (redeemPoints && settings.royaltyPointsEnabled && user.points > 0) {
+      const userPointsCashValue = user.points / settings.pointsToCashRatio;
+      if (userPointsCashValue >= finalPrice) {
+        redeemedPoints = Math.ceil(finalPrice * settings.pointsToCashRatio);
+        finalPrice = 0;
+      } else {
+        redeemedPoints = user.points;
+        finalPrice = finalPrice - userPointsCashValue;
+      }
+    }
+
+    // Earn points based on cash paid
+    const pointsEarned = settings.royaltyPointsEnabled
+      ? Math.floor(finalPrice * settings.rewardPointsRatio)
+      : 0;
+
+    // Deduct and add points to User
+    await prisma.user.update({
+      where: { id: req.user.id },
+      data: {
+        points: Math.max(0, user.points - redeemedPoints + pointsEarned)
+      }
+    });
+
     let employeePayout = 0;
     if (priceSetting.payoutType === 'PERCENTAGE') {
-      employeePayout = (price * priceSetting.payoutValue) / 100;
+      employeePayout = (originalPrice * priceSetting.payoutValue) / 100;
     } else {
       employeePayout = priceSetting.payoutValue;
     }
@@ -160,9 +258,12 @@ export const createBooking = async (req, res) => {
         latitude: Number(latitude),
         longitude: Number(longitude),
         address,
-        price,
+        price: finalPrice,
         employeePayout,
         companyCost,
+        appliedOfferCode: appliedCode,
+        pointsRedeemed: redeemedPoints,
+        pointsEarned: pointsEarned,
         paymentStatus: 'PAID', // payment is mock and completed online
         status: 'PENDING'
       }
@@ -352,5 +453,103 @@ export const deleteSavedAddress = async (req, res) => {
     res.json({ message: 'Address deleted' });
   } catch (error) { 
     res.status(500).json({ error: error.message }); 
+  }
+};
+
+// Get Eligible Coupons for the current User
+export const getEligibleCoupons = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const now = new Date();
+
+    const offers = await prisma.offer.findMany({
+      where: {
+        active: true,
+        validUntil: { gte: now }
+      },
+      include: {
+        eligibleUsers: {
+          select: { id: true }
+        }
+      }
+    });
+
+    const eligibleOffers = [];
+
+    const userBookings = await prisma.booking.findMany({
+      where: { userId }
+    });
+
+    const completedBookingsCount = userBookings.filter(b => b.status === 'COMPLETED').length;
+
+    for (const offer of offers) {
+      if (offer.userType === 'NEW' && completedBookingsCount > 0) {
+        continue;
+      }
+
+      if (offer.userType === 'SELECTED') {
+        const isEligible = offer.eligibleUsers.some(u => u.id === userId);
+        if (!isEligible) {
+          continue;
+        }
+      }
+
+      if (offer.rotation !== 'UNLIMITED' && offer.usageLimit > 0) {
+        const bookingsWithCoupon = userBookings.filter(b => b.appliedOfferCode === offer.code);
+
+        if (offer.rotation === 'OVERALL') {
+          if (bookingsWithCoupon.length >= offer.usageLimit) {
+            continue;
+          }
+        } else if (offer.rotation === 'MONTHLY') {
+          const currentMonth = now.getMonth();
+          const currentYear = now.getFullYear();
+          const monthlyCount = bookingsWithCoupon.filter(b => {
+            const bDate = new Date(b.date);
+            return bDate.getMonth() === currentMonth && bDate.getFullYear() === currentYear;
+          }).length;
+
+          if (monthlyCount >= offer.usageLimit) {
+            continue;
+          }
+        } else if (offer.rotation === 'YEARLY') {
+          const currentYear = now.getFullYear();
+          const yearlyCount = bookingsWithCoupon.filter(b => {
+            const bDate = new Date(b.date);
+            return bDate.getFullYear() === currentYear;
+          }).length;
+
+          if (yearlyCount >= offer.usageLimit) {
+            continue;
+          }
+        }
+      }
+
+      eligibleOffers.push(offer);
+    }
+
+    res.json(eligibleOffers);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Get Public System Settings
+export const getPublicSettings = async (req, res) => {
+  try {
+    let settings = await prisma.systemSettings.findUnique({ where: { id: 1 } });
+    if (!settings) {
+      settings = await prisma.systemSettings.create({
+        data: {
+          id: 1,
+          royaltyPointsEnabled: true,
+          pointsToCashRatio: 4.0,
+          rewardPointsRatio: 0.1
+        }
+      });
+    }
+    res.json(settings);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 };
