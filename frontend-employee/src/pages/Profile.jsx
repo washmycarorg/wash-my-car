@@ -79,6 +79,7 @@ const Profile = ({ profile, setProfile }) => {
       };
       const updated = await updateProfile(payload);
       setProfile(updated);
+      localStorage.setItem('employeeInfo', JSON.stringify(updated));
       alert('Profile updated successfully');
     } catch (err) {
       console.error(err);

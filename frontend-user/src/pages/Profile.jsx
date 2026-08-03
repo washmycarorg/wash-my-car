@@ -33,7 +33,8 @@ const Profile = () => {
     if (!profile.name || !profile.phone) return alert('Name and phone are required.');
     setProfileLoading(true);
     try {
-      await updateProfile(profile);
+      const updated = await updateProfile(profile);
+      localStorage.setItem('userInfo', JSON.stringify(updated));
       alert('Profile updated successfully');
     } catch (err) {
       console.error(err);
