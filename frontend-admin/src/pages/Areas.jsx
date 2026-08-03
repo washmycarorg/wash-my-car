@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getServiceAreas, createServiceArea, updateServiceArea, deleteServiceArea } from '../api';
-import { Trash2, MapPin, Plus, Edit3, Save, X, Compass } from 'lucide-react';
+import { Trash2, MapPin, Plus, Edit3, Save, X, Compass, Search } from 'lucide-react';
 
-const VIZAG_COORDS = [17.7042, 83.2980]; // Center on Vizag
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+const VIZAG_COORDS = { lat: 17.7042, lng: 83.2980 }; // Center on Vizag
 
 const Areas = () => {
   const [areas, setAreas] = useState([]);
@@ -11,50 +12,40 @@ const Areas = () => {
   // Form states
   const [editingId, setEditingId] = useState(null);
   const [areaName, setAreaName] = useState('');
-  const [lat, setLat] = useState(VIZAG_COORDS[0]);
-  const [lng, setLng] = useState(VIZAG_COORDS[1]);
+  const [lat, setLat] = useState(VIZAG_COORDS.lat);
+  const [lng, setLng] = useState(VIZAG_COORDS.lng);
   const [radius, setRadius] = useState(2000); // 2km default
 
   const mapRef = useRef(null);
-  const leafletMapInstance = useRef(null);
-  const markerRef = useRef(null);
-  const circleRef = useRef(null);
-  const allCirclesRef = useRef({});
+  const searchInputRef = useRef(null);
+  const googleMapInstance = useRef(null);
+  const activeMarkerRef = useRef(null);
+  const activeCircleRef = useRef(null);
+  const otherCirclesRef = useRef({});
+  const autocompleteRef = useRef(null);
 
   useEffect(() => {
     fetchAreas();
   }, []);
 
-  // Dynamically load Leaflet
+  // Dynamically load Google Maps SDK with Places library
   useEffect(() => {
-    const loadLeaflet = () => {
-      if (window.L) {
+    const loadGoogleMaps = () => {
+      if (window.google && window.google.maps && window.google.maps.places) {
         initMap();
         return;
       }
 
-      // CSS
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      document.head.appendChild(link);
-
-      // JS
       const script = document.createElement('script');
-      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places`;
+      script.async = true;
+      script.defer = true;
       script.onload = () => initMap();
-      document.body.appendChild(script);
+      document.head.appendChild(script);
     };
 
-    loadLeaflet();
-
-    return () => {
-      if (leafletMapInstance.current) {
-        leafletMapInstance.current.remove();
-        leafletMapInstance.current = null;
-      }
-    };
-  }, [areas.length]); // Re-draw markers when count changes
+    loadGoogleMaps();
+  }, [areas.length]);
 
   const fetchAreas = async () => {
     try {
@@ -68,92 +59,146 @@ const Areas = () => {
   };
 
   const initMap = () => {
-    if (!mapRef.current || leafletMapInstance.current) return;
+    if (!mapRef.current || googleMapInstance.current || !window.google) return;
 
-    const L = window.L;
-    // Map instance
-    const map = L.map(mapRef.current).setView(VIZAG_COORDS, 12);
-    leafletMapInstance.current = map;
+    const maps = window.google.maps;
+    const map = new maps.Map(mapRef.current, {
+      center: VIZAG_COORDS,
+      zoom: 12,
+      disableDefaultUI: false,
+    });
+    googleMapInstance.current = map;
 
-    // Tile layer (Clean Light Mode Map)
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-    }).addTo(map);
+    // Draggable marker for center point
+    const marker = new maps.Marker({
+      position: VIZAG_COORDS,
+      map: map,
+      draggable: true,
+      title: 'Coverage Center Point',
+    });
+    activeMarkerRef.current = marker;
 
-    // Current selection Marker & Circle
-    const marker = L.marker(VIZAG_COORDS, { draggable: true }).addTo(map);
-    markerRef.current = marker;
-
-    const circle = L.circle(VIZAG_COORDS, {
+    // Radius Circle
+    const circle = new maps.Circle({
+      map: map,
       radius: radius,
-      color: 'var(--primary-blue)',
       fillColor: '#3b82f6',
-      fillOpacity: 0.2
-    }).addTo(map);
-    circleRef.current = circle;
+      fillOpacity: 0.2,
+      strokeColor: '#2563eb',
+      strokeOpacity: 0.8,
+      strokeWeight: 2,
+    });
+    activeCircleRef.current = circle;
+    circle.bindTo('center', marker, 'position');
 
-    // Click handler to move marker
-    map.on('click', (e) => {
-      const { lat, lng } = e.latlng;
-      setLat(lat.toFixed(6));
-      setLng(lng.toFixed(6));
-      marker.setLatLng(e.latlng);
-      circle.setLatLng(e.latlng);
+    // Autocomplete search integration
+    if (searchInputRef.current) {
+      const autocomplete = new maps.places.Autocomplete(searchInputRef.current);
+      autocomplete.bindTo('bounds', map);
+      autocompleteRef.current = autocomplete;
+
+      autocomplete.addListener('place_changed', () => {
+        const place = autocomplete.getPlace();
+        if (!place.geometry || !place.geometry.location) {
+          return;
+        }
+
+        const location = place.geometry.location;
+        map.setCenter(location);
+        map.setZoom(14);
+        marker.setPosition(location);
+
+        setLat(location.lat().toFixed(6));
+        setLng(location.lng().toFixed(6));
+
+        // Attempt to auto-fill area name if available
+        if (place.name) {
+          setAreaName(place.name);
+        }
+      });
+    }
+
+    // Drag Listener
+    marker.addListener('dragend', () => {
+      const pos = marker.getPosition();
+      setLat(pos.lat().toFixed(6));
+      setLng(pos.lng().toFixed(6));
     });
 
-    // Drag handler
-    marker.on('dragend', () => {
-      const position = marker.getLatLng();
-      setLat(position.lat.toFixed(6));
-      setLng(position.lng.toFixed(6));
-      circle.setLatLng(position);
+    // Map Click Listener
+    map.addListener('click', (e) => {
+      const clickedPos = e.latLng;
+      marker.setPosition(clickedPos);
+      setLat(clickedPos.lat().toFixed(6));
+      setLng(clickedPos.lng().toFixed(6));
     });
 
-    // Render all existing areas
-    renderExistingAreasOnMap();
+    // Draw other service areas
+    renderExistingAreas();
   };
 
-  const renderExistingAreasOnMap = () => {
-    if (!leafletMapInstance.current || !window.L) return;
-    const L = window.L;
+  const renderExistingAreas = () => {
+    if (!googleMapInstance.current || !window.google) return;
+    const maps = window.google.maps;
 
     // Clear old circles
-    Object.values(allCirclesRef.current).forEach(c => c.remove());
-    allCirclesRef.current = {};
+    Object.values(otherCirclesRef.current).forEach(c => c.setMap(null));
+    otherCirclesRef.current = {};
 
     areas.forEach(area => {
       if (area.latitude && area.longitude && area.radius) {
-        const c = L.circle([area.latitude, area.longitude], {
-          radius: area.radius,
-          color: editingId === area.id ? '#F59E0B' : '#10B981',
-          fillColor: editingId === area.id ? '#F59E0B' : '#10B981',
-          fillOpacity: 0.15,
-          weight: editingId === area.id ? 3 : 1
-        }).addTo(leafletMapInstance.current);
+        const isEditingThis = editingId === area.id;
+        
+        // Don't draw editing circle twice
+        if (isEditingThis) return;
 
-        c.bindTooltip(`<strong>${area.name}</strong><br/>Radius: ${(area.radius / 1000).toFixed(1)} km`, {
-          permanent: false,
-          direction: 'top'
+        const c = new maps.Circle({
+          map: googleMapInstance.current,
+          center: { lat: area.latitude, lng: area.longitude },
+          radius: area.radius,
+          fillColor: '#10b981',
+          fillOpacity: 0.15,
+          strokeColor: '#059669',
+          strokeOpacity: 0.7,
+          strokeWeight: 1,
         });
 
-        allCirclesRef.current[area.id] = c;
+        // Add tooltips (InfoWindow) on click
+        const infoWindow = new maps.InfoWindow({
+          content: `<div style="font-family: Outfit, sans-serif; color: var(--primary-navy); padding: 2px;">
+            <strong style="font-size: 0.9rem;">${area.name}</strong><br/>
+            Radius: ${(area.radius / 1000).toFixed(1)} km
+          </div>`,
+        });
+
+        c.addListener('click', (e) => {
+          infoWindow.setPosition(e.latLng);
+          infoWindow.open(googleMapInstance.current);
+        });
+
+        otherCirclesRef.current[area.id] = c;
       }
     });
   };
 
-  // Update center circle dynamically when values change
+  // Sync radius slider changes
   useEffect(() => {
-    if (circleRef.current && markerRef.current && window.L) {
-      circleRef.current.setRadius(radius);
-      const latLng = [Number(lat), Number(lng)];
-      circleRef.current.setLatLng(latLng);
-      markerRef.current.setLatLng(latLng);
+    if (activeCircleRef.current) {
+      activeCircleRef.current.setRadius(radius);
     }
-  }, [lat, lng, radius]);
+  }, [radius]);
 
-  // Re-render when list or editing targets change
+  // Sync manual inputs or click positions
   useEffect(() => {
-    renderExistingAreasOnMap();
+    if (activeMarkerRef.current && window.google) {
+      const latLng = new window.google.maps.LatLng(Number(lat), Number(lng));
+      activeMarkerRef.current.setPosition(latLng);
+    }
+  }, [lat, lng]);
+
+  // Sync active edit selection circle color updates
+  useEffect(() => {
+    renderExistingAreas();
   }, [areas, editingId]);
 
   const handleSaveArea = async (e) => {
@@ -186,12 +231,14 @@ const Areas = () => {
   const handleEdit = (area) => {
     setEditingId(area.id);
     setAreaName(area.name);
-    setLat(area.latitude || VIZAG_COORDS[0]);
-    setLng(area.longitude || VIZAG_COORDS[1]);
+    setLat(area.latitude || VIZAG_COORDS.lat);
+    setLng(area.longitude || VIZAG_COORDS.lng);
     setRadius(area.radius || 2000);
 
-    if (leafletMapInstance.current) {
-      leafletMapInstance.current.setView([area.latitude || VIZAG_COORDS[0], area.longitude || VIZAG_COORDS[1]], 13);
+    if (googleMapInstance.current && window.google) {
+      const center = { lat: area.latitude || VIZAG_COORDS.lat, lng: area.longitude || VIZAG_COORDS.lng };
+      googleMapInstance.current.setCenter(center);
+      googleMapInstance.current.setZoom(13);
     }
   };
 
@@ -210,8 +257,8 @@ const Areas = () => {
   const resetForm = () => {
     setEditingId(null);
     setAreaName('');
-    setLat(VIZAG_COORDS[0]);
-    setLng(VIZAG_COORDS[1]);
+    setLat(VIZAG_COORDS.lat);
+    setLng(VIZAG_COORDS.lng);
     setRadius(2000);
   };
 
@@ -237,6 +284,18 @@ const Areas = () => {
               <Compass size={18} /> Point Center & Set Radius
             </h4>
             <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Click map or drag marker</span>
+          </div>
+
+          {/* Autocomplete Search input */}
+          <div style={{ position: 'relative' }}>
+            <input 
+              ref={searchInputRef}
+              type="text" 
+              className="form-input" 
+              placeholder="Search location to pinpoint center..." 
+              style={{ marginBottom: 0, paddingLeft: '2.5rem', background: '#F8FAFC' }}
+            />
+            <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           </div>
           
           <div 

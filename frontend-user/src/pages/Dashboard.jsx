@@ -3,14 +3,15 @@ import { Link } from 'react-router-dom';
 import { Calendar, Car, Sparkles, Gift, MapPin } from 'lucide-react';
 import { getProfile, getServiceAreas } from '../api';
 
-const VIZAG_COORDS = [17.7042, 83.2980];
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+const VIZAG_COORDS = { lat: 17.7042, lng: 83.2980 };
 
 const Dashboard = () => {
   const [profile, setProfile] = useState(null);
   const [areas, setAreas] = useState([]);
   const [loading, setLoading] = useState(true);
   const mapContainerRef = useRef(null);
-  const leafletMapInstance = useRef(null);
+  const googleMapInstance = useRef(null);
 
   useEffect(() => {
     Promise.all([
@@ -28,69 +29,71 @@ const Dashboard = () => {
       });
   }, []);
 
-  // Initialize Leaflet map and draw active regions
+  // Initialize Google Maps showing active regions
   useEffect(() => {
     if (loading || !mapContainerRef.current) return;
 
     const initUserMap = () => {
-      if (leafletMapInstance.current || !window.L) return;
+      if (googleMapInstance.current || !window.google) return;
 
-      const L = window.L;
+      const maps = window.google.maps;
       // Initialize map centered at Vizag or first region center
-      const center = areas.length > 0 && areas[0].latitude ? [areas[0].latitude, areas[0].longitude] : VIZAG_COORDS;
-      const map = L.map(mapContainerRef.current).setView(center, 12);
-      leafletMapInstance.current = map;
+      const center = areas.length > 0 && areas[0].latitude 
+        ? { lat: areas[0].latitude, lng: areas[0].longitude } 
+        : VIZAG_COORDS;
 
-      // Clean Light Map Layer
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; Service Areas Map'
-      }).addTo(map);
+      const map = new maps.Map(mapContainerRef.current, {
+        center: center,
+        zoom: 11,
+        disableDefaultUI: false,
+      });
+      googleMapInstance.current = map;
 
-      // Render coverage circles
+      // Draw coverage circles
       areas.forEach(area => {
         if (area.latitude && area.longitude && area.radius) {
-          const circle = L.circle([area.latitude, area.longitude], {
+          const circle = new maps.Circle({
+            map: map,
+            center: { lat: area.latitude, lng: area.longitude },
             radius: area.radius,
-            color: 'var(--primary-blue)',
             fillColor: '#3b82f6',
             fillOpacity: 0.15,
-            weight: 2
-          }).addTo(map);
+            strokeColor: '#2563eb',
+            strokeOpacity: 0.7,
+            strokeWeight: 1.5
+          });
 
-          circle.bindTooltip(`<strong>${area.name}</strong><br/>Doorstep coverage active!`, {
-            permanent: false,
-            direction: 'top'
+          const infoWindow = new maps.InfoWindow({
+            content: `<div style="font-family: Outfit, sans-serif; color: var(--primary-navy); padding: 2px;">
+              <strong style="font-size: 0.9rem;">${area.name}</strong><br/>
+              Active doorstep wash coverage zone!
+            </div>`
+          });
+
+          circle.addListener('click', (e) => {
+            infoWindow.setPosition(e.latLng);
+            infoWindow.open(map);
           });
         }
       });
     };
 
-    // Load Leaflet assets dynamically if not already loaded
-    const loadLeafletAssets = () => {
-      if (window.L) {
+    // Load Google Maps dynamically
+    const loadGoogleMaps = () => {
+      if (window.google && window.google.maps) {
         initUserMap();
         return;
       }
 
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      document.head.appendChild(link);
-
       const script = document.createElement('script');
-      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}`;
+      script.async = true;
+      script.defer = true;
       script.onload = () => initUserMap();
-      document.body.appendChild(script);
+      document.head.appendChild(script);
     };
 
-    loadLeafletAssets();
-
-    return () => {
-      if (leafletMapInstance.current) {
-        leafletMapInstance.current.remove();
-        leafletMapInstance.current = null;
-      }
-    };
+    loadGoogleMaps();
   }, [loading, areas]);
 
   if (loading) return (

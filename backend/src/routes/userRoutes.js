@@ -24,8 +24,9 @@ import {
 
 const router = express.Router();
 
-// Public homepage content endpoint
+// Public endpoints
 router.get('/home-content', getPublicHomeContent);
+router.get('/service-areas', getServiceAreas);
 
 router.use(verifyToken);
 
@@ -43,7 +44,6 @@ router.get('/services', getServices);
 // New endpoints for new booking workflow
 router.get('/car-types', getCarTypes);
 router.get('/wash-types', getWashTypes);
-router.get('/service-areas', getServiceAreas);
 router.get('/price', getWashPrice);
 router.get('/wash-prices', getAllWashPrices);
 

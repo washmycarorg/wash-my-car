@@ -1,11 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   Droplets, CheckCircle, Leaf, Car, Calendar, MapPin, Phone, 
   Mail, Award, Clock, Menu, X, Sparkles, Star, ChevronRight, Check, Compass, Shield, Tag
 } from 'lucide-react';
-import { getHomeContent } from '../api';
+import { getHomeContent, getServiceAreas } from '../api';
 import logo from '../assets/wash my car.png';
+
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+const VIZAG_COORDS = { lat: 17.7042, lng: 83.2980 };
 
 const Home = () => {
   const navigate = useNavigate();
@@ -23,17 +26,89 @@ const Home = () => {
     promoText: "Claim Offer"
   });
 
+  const [areas, setAreas] = useState([]);
+  const mapContainerRef = useRef(null);
+  const googleMapInstance = useRef(null);
+
   useEffect(() => {
     getHomeContent()
       .then(res => {
-        if (res) {
-          setCms(res);
-        }
+        if (res) setCms(res);
       })
       .catch(err => {
         console.warn("Could not load dynamic CMS contents, using premium defaults:", err);
       });
+
+    getServiceAreas()
+      .then(setAreas)
+      .catch(err => console.warn("Could not load service areas:", err));
   }, []);
+
+  // Initialize public Google Map showing all coverage circles
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
+
+    const initMap = () => {
+      if (googleMapInstance.current || !window.google) return;
+      const maps = window.google.maps;
+
+      // Center Vizag
+      const center = areas.length > 0 && areas[0].latitude 
+        ? { lat: areas[0].latitude, lng: areas[0].longitude } 
+        : VIZAG_COORDS;
+
+      const map = new maps.Map(mapContainerRef.current, {
+        center: center,
+        zoom: 11,
+        disableDefaultUI: false,
+      });
+      googleMapInstance.current = map;
+
+      areas.forEach(area => {
+        if (area.latitude && area.longitude && area.radius) {
+          const circle = new maps.Circle({
+            map: map,
+            center: { lat: area.latitude, lng: area.longitude },
+            radius: area.radius,
+            fillColor: '#3b82f6',
+            fillOpacity: 0.15,
+            strokeColor: '#2563eb',
+            strokeOpacity: 0.7,
+            strokeWeight: 1.5
+          });
+
+          const infoWindow = new maps.InfoWindow({
+            content: `<div style="font-family: Outfit, sans-serif; color: var(--primary-navy); padding: 2px;">
+              <strong style="font-size: 0.9rem;">${area.name}</strong><br/>
+              Active Doorstep Spa Service Area!
+            </div>`
+          });
+
+          circle.addListener('click', (e) => {
+            infoWindow.setPosition(e.latLng);
+            infoWindow.open(map);
+          });
+        }
+      });
+    };
+
+    // Load Google Maps dynamically
+    const loadGoogleMaps = () => {
+      if (window.google && window.google.maps) {
+        initMap();
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}`;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => initMap();
+      document.head.appendChild(script);
+    };
+
+    loadGoogleMaps();
+  }, [areas]);
 
   return (
     <div style={{ fontFamily: 'Outfit, sans-serif', color: '#1E293B', background: '#F8FAFC', scrollBehavior: 'smooth' }}>
@@ -260,189 +335,17 @@ const Home = () => {
                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-8px)'; e.currentTarget.style.boxShadow = '0 20px 25px -5px rgba(0,0,0,0.1)'; }}
                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; }}>
             <div style={{ position: 'relative' }}>
-              <img src="/images/full_detailing.png" alt="Detailing" style={{ width: '100%', height: '220px', objectFit: 'cover' }} />
-              <span style={{ position: 'absolute', bottom: '1rem', right: '1rem', background: '#0F172A', color: 'white', padding: '0.4rem 1rem', borderRadius: '20px', fontWeight: 800, fontSize: '0.85rem' }}>Detailing</span>
+              <img src="/images/full_detail.png" alt="Ultra Detail" style={{ width: '100%', height: '220px', objectFit: 'cover' }} />
+              <span style={{ position: 'absolute', bottom: '1rem', right: '1rem', background: '#0F172A', color: 'white', padding: '0.4rem 1rem', borderRadius: '20px', fontWeight: 800, fontSize: '0.85rem' }}>Full Detail</span>
             </div>
             <div style={{ padding: '1.5rem 1.75rem', textAlign: 'left', flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-              <h3 style={{ fontSize: '1.35rem', color: '#0F172A', fontWeight: 800, marginBottom: '0.5rem' }}>Ultra Shine Detailing</h3>
+              <h3 style={{ fontSize: '1.35rem', color: '#0F172A', fontWeight: 800, marginBottom: '0.5rem' }}>Complete Internal Spa</h3>
               <p style={{ color: '#64748B', fontSize: '0.9rem', lineHeight: 1.5, marginBottom: '1.25rem' }}>
-                Professional paint correction. Clay bar treatment, machine rubbing & compounding, premium wax seal, interior sanitization.
+                Showroom finish. Deep upholstery shampoo, seat stain removal, dashboard dressing, AC duct sanitization & engine clean.
               </p>
               <div style={{ marginTop: 'auto', borderTop: '1px solid #F1F5F9', paddingTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0284C7' }}>From ₹2499</span>
-                <span style={{ color: '#94A3B8', fontSize: '0.8rem', fontWeight: 600 }}>180 Mins</span>
-              </div>
-            </div>
-          </div>
-
-        </div>
-        <div style={{ marginTop: '4rem' }}>
-          <button onClick={() => navigate('/login')} className="btn btn-teal" style={{ padding: '0.9rem 2.5rem', borderRadius: '25px', fontWeight: 'bold' }}>Book a Detail Session</button>
-        </div>
-      </section>
-
-      {/* About CMS section / Serving vizag */}
-      <section id="about" style={{ padding: '6rem 8%', background: '#F1F5F9' }}>
-        <div className="grid md:grid-cols-2 gap-12" style={{ maxWidth: '1200px', margin: '0 auto', alignItems: 'center' }}>
-          <div>
-            <span style={{ color: '#0284C7', fontWeight: 800, fontSize: '0.9rem', letterSpacing: '1px', textTransform: 'uppercase' }}>Doorstep Experts</span>
-            <h2 style={{ fontSize: '2.4rem', fontWeight: 800, color: '#0F172A', marginTop: '0.5rem', marginBottom: '1.5rem' }}>
-              {cms.aboutTitle}
-            </h2>
-            <p style={{ color: '#475569', fontSize: '1.1rem', lineHeight: 1.7, marginBottom: '2rem' }}>
-              {cms.aboutText}
-            </p>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
-                <div style={{ background: '#DFF0FA', padding: '0.3rem', borderRadius: '50%', color: '#0284C7' }}>
-                  <Check size={16} strokeWidth={3} />
-                </div>
-                <div>
-                  <h4 style={{ margin: 0, fontWeight: 700 }}>RO Pure Water Only</h4>
-                  <small style={{ color: '#64748B' }}>Prevents hard-water spotting on your vehicle's paintwork.</small>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
-                <div style={{ background: '#DFF0FA', padding: '0.3rem', borderRadius: '50%', color: '#0284C7' }}>
-                  <Check size={16} strokeWidth={3} />
-                </div>
-                <div>
-                  <h4 style={{ margin: 0, fontWeight: 700 }}>Suspenion Foam Technology</h4>
-                  <small style={{ color: '#64748B' }}>Lifts dirt safely off paint with pH-neutral active foam shampoo.</small>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
-                <div style={{ background: '#DFF0FA', padding: '0.3rem', borderRadius: '50%', color: '#0284C7' }}>
-                  <Check size={16} strokeWidth={3} />
-                </div>
-                <div>
-                  <h4 style={{ margin: 0, fontWeight: 700 }}>100% Doorstep Self-Sufficient</h4>
-                  <small style={{ color: '#64748B' }}>We carry our own electricity generators and water supply tanks!</small>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div style={{ position: 'relative' }}>
-            <div style={{ position: 'absolute', top: '-1rem', left: '-1rem', right: '1rem', bottom: '1rem', background: 'linear-gradient(135deg, #0EA5E9, #0284C7)', borderRadius: '16px', zIndex: 1 }}></div>
-            <img 
-              src="/images/premium_wash.png" 
-              alt="Doorstep Detailing" 
-              style={{ width: '100%', height: '400px', objectFit: 'cover', borderRadius: '16px', position: 'relative', zIndex: 2, boxShadow: '0 20px 25px -5px rgba(0,0,0,0.15)' }} 
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* How it Works / Step cards */}
-      <section style={{ padding: '6rem 8%', textAlign: 'center' }}>
-        <span style={{ color: '#0284C7', fontWeight: 800, fontSize: '0.9rem', letterSpacing: '1px', textTransform: 'uppercase' }}>Four Simple Steps</span>
-        <h2 style={{ fontSize: '2.5rem', fontWeight: 800, color: '#0F172A', marginTop: '0.5rem', marginBottom: '4rem' }}>How It Works</h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8" style={{ maxWidth: '1200px', margin: '0 auto' }}>
-          
-          <div style={{ position: 'relative', background: 'white', padding: '2.5rem 1.5rem 1.75rem', borderRadius: '16px', border: '1px solid #E2E8F0', boxShadow: 'var(--shadow-sm)' }}>
-            <div style={{ width: '40px', height: '40px', background: '#0EA5E9', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, position: 'absolute', top: '-20px', left: 'calc(50% - 20px)', boxShadow: '0 4px 10px rgba(14,165,233,0.3)' }}>1</div>
-            <Compass size={40} color="#0EA5E9" style={{ margin: '0 auto 1.25rem' }} />
-            <h4 style={{ fontWeight: 800, fontSize: '1.1rem', marginBottom: '0.5rem' }}>Select Service</h4>
-            <p style={{ fontSize: '0.85rem', color: '#64748B', lineHeight: 1.4 }}>Pick Basic Wash, Premium Foam Spa, or Intensive Compound Polish.</p>
-          </div>
-
-          <div style={{ position: 'relative', background: 'white', padding: '2.5rem 1.5rem 1.75rem', borderRadius: '16px', border: '1px solid #E2E8F0', boxShadow: 'var(--shadow-sm)' }}>
-            <div style={{ width: '40px', height: '40px', background: '#0EA5E9', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, position: 'absolute', top: '-20px', left: 'calc(50% - 20px)', boxShadow: '0 4px 10px rgba(14,165,233,0.3)' }}>2</div>
-            <Calendar size={40} color="#0EA5E9" style={{ margin: '0 auto 1.25rem' }} />
-            <h4 style={{ fontWeight: 800, fontSize: '1.1rem', marginBottom: '0.5rem' }}>Schedule Slot</h4>
-            <p style={{ fontSize: '0.85rem', color: '#64748B', lineHeight: 1.4 }}>Choose an available date and morning/afternoon slot that fits your schedule.</p>
-          </div>
-
-          <div style={{ position: 'relative', background: 'white', padding: '2.5rem 1.5rem 1.75rem', borderRadius: '16px', border: '1px solid #E2E8F0', boxShadow: 'var(--shadow-sm)' }}>
-            <div style={{ width: '40px', height: '40px', background: '#0EA5E9', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, position: 'absolute', top: '-20px', left: 'calc(50% - 20px)', boxShadow: '0 4px 10px rgba(14,165,233,0.3)' }}>3</div>
-            <MapPin size={40} color="#0EA5E9" style={{ margin: '0 auto 1.25rem' }} />
-            <h4 style={{ fontWeight: 800, fontSize: '1.1rem', marginBottom: '0.5rem' }}>Spa Team Arrives</h4>
-            <p style={{ fontSize: '0.85rem', color: '#64748B', lineHeight: 1.4 }}>Our fully-equipped service van arrives right to your parking lot or home.</p>
-          </div>
-
-          <div style={{ position: 'relative', background: 'white', padding: '2.5rem 1.5rem 1.75rem', borderRadius: '16px', border: '1px solid #E2E8F0', boxShadow: 'var(--shadow-sm)' }}>
-            <div style={{ width: '40px', height: '40px', background: '#0EA5E9', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, position: 'absolute', top: '-20px', left: 'calc(50% - 20px)', boxShadow: '0 4px 10px rgba(14,165,233,0.3)' }}>4</div>
-            <CheckCircle size={40} color="#0EA5E9" style={{ margin: '0 auto 1.25rem' }} />
-            <h4 style={{ fontWeight: 800, fontSize: '1.1rem', marginBottom: '0.5rem' }}>Rate & Pay</h4>
-            <p style={{ fontSize: '0.85rem', color: '#64748B', lineHeight: 1.4 }}>Inspect the sparkling details, verify completed work, and pay securely.</p>
-          </div>
-
-        </div>
-      </section>
-
-      {/* Customer Testimonial Reviews */}
-      <section style={{ padding: '6rem 8%', background: '#F1F5F9', textAlign: 'center' }}>
-        <span style={{ color: '#0284C7', fontWeight: 800, fontSize: '0.9rem', letterSpacing: '1px', textTransform: 'uppercase' }}>5-Star Ratings</span>
-        <h2 style={{ fontSize: '2.5rem', fontWeight: 800, color: '#0F172A', marginTop: '0.5rem', marginBottom: '4rem' }}>
-          What Vizag Car Owners Say
-        </h2>
-
-        <div className="grid md:grid-cols-3 gap-8" style={{ maxWidth: '1200px', margin: '0 auto' }}>
-          
-          {/* Review 1 */}
-          <div style={{ background: 'white', padding: '2rem', borderRadius: '16px', border: '1px solid #E2E8F0', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: 'var(--shadow-sm)' }}>
-            <div style={{ display: 'flex', color: '#F59E0B', gap: '0.15rem' }}>
-              <Star size={16} fill="#F59E0B" />
-              <Star size={16} fill="#F59E0B" />
-              <Star size={16} fill="#F59E0B" />
-              <Star size={16} fill="#F59E0B" />
-              <Star size={16} fill="#F59E0B" />
-            </div>
-            <p style={{ fontStyle: 'italic', fontSize: '0.95rem', color: '#475569', lineHeight: 1.5, flexGrow: 1 }}>
-              "Absolutely amazing doorstep service! The cleaning crew brought their own RO water and electricity generator. They cleaned my Thar inside out. The foam wash is super thick and wax polish is excellent."
-            </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', borderTop: '1px solid #F1F5F9', paddingTop: '1rem' }}>
-              <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#38BDF8', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold' }}>RK</div>
-              <div>
-                <h5 style={{ margin: 0, fontWeight: 700 }}>Rakesh Kumar</h5>
-                <small style={{ color: '#94A3B8' }}>MVP Colony, Vizag</small>
-              </div>
-            </div>
-          </div>
-
-          {/* Review 2 */}
-          <div style={{ background: 'white', padding: '2rem', borderRadius: '16px', border: '1px solid #E2E8F0', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: 'var(--shadow-sm)' }}>
-            <div style={{ display: 'flex', color: '#F59E0B', gap: '0.15rem' }}>
-              <Star size={16} fill="#F59E0B" />
-              <Star size={16} fill="#F59E0B" />
-              <Star size={16} fill="#F59E0B" />
-              <Star size={16} fill="#F59E0B" />
-              <Star size={16} fill="#F59E0B" />
-            </div>
-            <p style={{ fontStyle: 'italic', fontSize: '0.95rem', color: '#475569', lineHeight: 1.5, flexGrow: 1 }}>
-              "I scheduled a deep foam wash for my Honda City on a Sunday morning. The employee arrived exactly on time, was extremely polite, and completed the work cleanly. Highly recommended!"
-            </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', borderTop: '1px solid #F1F5F9', paddingTop: '1rem' }}>
-              <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#34D399', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold' }}>AN</div>
-              <div>
-                <h5 style={{ margin: 0, fontWeight: 700 }}>Ananya N.</h5>
-                <small style={{ color: '#94A3B8' }}>Sujatha Nagar, Vizag</small>
-              </div>
-            </div>
-          </div>
-
-          {/* Review 3 */}
-          <div style={{ background: 'white', padding: '2rem', borderRadius: '16px', border: '1px solid #E2E8F0', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: 'var(--shadow-sm)' }}>
-            <div style={{ display: 'flex', color: '#F59E0B', gap: '0.15rem' }}>
-              <Star size={16} fill="#F59E0B" />
-              <Star size={16} fill="#F59E0B" />
-              <Star size={16} fill="#F59E0B" />
-              <Star size={16} fill="#F59E0B" />
-              <Star size={16} fill="#F59E0B" />
-            </div>
-            <p style={{ fontStyle: 'italic', fontSize: '0.95rem', color: '#475569', lineHeight: 1.5, flexGrow: 1 }}>
-              "Paint correction and clay detailing did magic on my old Swift. Scratches are completely gone and it looks brand new. The convenience of having it done right at my driveway is unmatched."
-            </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', borderTop: '1px solid #F1F5F9', paddingTop: '1rem' }}>
-              <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#A78BFA', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold' }}>VS</div>
-              <div>
-                <h5 style={{ margin: 0, fontWeight: 700 }}>Vijay S.</h5>
-                <small style={{ color: '#94A3B8' }}>Gajuwaka, Vizag</small>
+                <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0284C7' }}>From ₹1,499</span>
+                <span style={{ color: '#94A3B8', fontSize: '0.8rem', fontWeight: 600 }}>120 Mins</span>
               </div>
             </div>
           </div>
@@ -501,10 +404,17 @@ const Home = () => {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <img 
-              src="/images/map_vizag.png" 
-              alt="Map of Visakhapatnam" 
-              style={{ width: '100%', height: '240px', objectFit: 'cover', borderRadius: '16px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', marginBottom: '2rem' }} 
+            <div 
+              ref={mapContainerRef} 
+              style={{ 
+                width: '100%', 
+                height: '240px', 
+                borderRadius: '16px', 
+                border: '1px solid #E2E8F0',
+                boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', 
+                marginBottom: '2rem',
+                zIndex: 1
+              }} 
             />
             
             <div className="flex-col gap-4" style={{ display: 'flex' }}>
