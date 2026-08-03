@@ -226,3 +226,17 @@ model SystemSettings {
   pointsToCashRatio   Float   @default(4.0)   // 4 points = 1 Rs
   rewardPointsRatio   Float   @default(0.1)   // 10% points reward
 }
+
+model CmsContent {
+  id             Int      @id @default(1)
+  heroTitle      String   @default("Professional Car Wash at Your Doorstep")
+  heroSubtitle   String   @default("Fast, affordable, and eco-friendly car cleaning in Visakhapatnam.")
+  heroImage      String   @default("/images/hero_wash.png")
+  aboutTitle     String   @default("Serving Visakhapatnam & Surrounds")
+  aboutText      String   @default("We proudly serve all Visakhapatnam neighborhoods with professional care and premium equipment!")
+  contactPhone   String   @default("+91 98765 43210")
+  contactEmail   String   @default("washmycarorg@gmail.com")
+  contactAddress String   @default("Sujatha Nagar, Vizag")
+  promoTitle     String   @default("Get 20% OFF Your First Wash!")
+  promoText      String   @default("Claim Offer")
+}

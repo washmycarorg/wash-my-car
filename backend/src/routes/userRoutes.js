@@ -17,10 +17,14 @@ import {
   addSavedAddress,
   deleteSavedAddress,
   getEligibleCoupons,
-  getPublicSettings
+  getPublicSettings,
+  getPublicHomeContent
 } from '../controllers/userController.js';
 
 const router = express.Router();
+
+// Public homepage content endpoint
+router.get('/home-content', getPublicHomeContent);
 
 router.use(verifyToken);
 

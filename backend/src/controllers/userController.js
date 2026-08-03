@@ -594,3 +594,31 @@ export const getPublicSettings = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+export const getPublicHomeContent = async (req, res) => {
+  try {
+    let cms = await prisma.cmsContent.findUnique({
+      where: { id: 1 }
+    });
+    if (!cms) {
+      cms = await prisma.cmsContent.create({
+        data: {
+          id: 1,
+          heroTitle: "Professional Car Wash at Your Doorstep",
+          heroSubtitle: "Fast, affordable, and eco-friendly car cleaning in Visakhapatnam.",
+          heroImage: "/images/hero_wash.png",
+          aboutTitle: "Serving Visakhapatnam & Surrounds",
+          aboutText: "We proudly serve all Visakhapatnam neighborhoods with professional care and premium equipment!",
+          contactPhone: "+91 98765 43210",
+          contactEmail: "washmycarorg@gmail.com",
+          contactAddress: "Sujatha Nagar, Vizag",
+          promoTitle: "Get 20% OFF Your First Wash!",
+          promoText: "Claim Offer"
+        }
+      });
+    }
+    res.json(cms);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};

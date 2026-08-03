@@ -350,3 +350,19 @@ export const updateSettings = async (data) => {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 };
+
+export const getCmsSettings = async () => {
+  const res = await fetch(`${API_URL}/admin/cms`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const updateCmsSettings = async (data) => {
+  const res = await fetch(`${API_URL}/admin/cms`, {
+    method: 'PUT',
+    headers: getHeaders(),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};

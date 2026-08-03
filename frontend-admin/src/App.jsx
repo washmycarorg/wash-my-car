@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Calendar, Settings, Bell, Search, DollarSign, Briefcase, FileText, Tag, Menu, X, MapPin, Package } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Settings, Bell, Search, DollarSign, Briefcase, FileText, Tag, Menu, X, MapPin, Package, Globe } from 'lucide-react';
 import { loginAdmin, getStats, getEmployees, toggleEmployeeStatus, updateEmployee, getServiceAreas } from './api';
 
 import Bookings from './pages/Bookings';
@@ -11,6 +11,7 @@ import Offers from './pages/Offers';
 import Areas from './pages/Areas';
 import Inventory from './pages/Inventory';
 import SettingsPage from './pages/Settings';
+import CmsSettings from './pages/CmsSettings';
 import logo from './assets/wash my car.png';
 
 const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
@@ -70,6 +71,9 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
           </Link>
           <Link to="/areas" className={`sidebar-link ${isActive('/areas')}`}>
             <MapPin size={20} /> Service Areas
+          </Link>
+          <Link to="/cms" className={`sidebar-link ${isActive('/cms')}`}>
+            <Globe size={20} /> Homepage CMS
           </Link>
           <Link to="/settings" className={`sidebar-link ${isActive('/settings')}`}>
             <Settings size={20} /> Settings
@@ -571,6 +575,7 @@ const App = () => {
         <Route path="/inventory" element={auth ? <AdminLayout title="Inventory & Stock Tracking"><Inventory /></AdminLayout> : <Navigate to="/"/>} />
         <Route path="/offers" element={auth ? <AdminLayout title="Execute Offers"><Offers /></AdminLayout> : <Navigate to="/"/>} />
         <Route path="/areas" element={auth ? <AdminLayout title="Service Areas Management"><Areas /></AdminLayout> : <Navigate to="/"/>} />
+        <Route path="/cms" element={auth ? <AdminLayout title="Homepage CMS Editor"><CmsSettings /></AdminLayout> : <Navigate to="/"/>} />
         <Route path="/settings" element={auth ? <AdminLayout title="System Settings"><SettingsPage /></AdminLayout> : <Navigate to="/"/>} />
       </Routes>
     </Router>

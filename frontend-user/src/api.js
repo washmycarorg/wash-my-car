@@ -157,3 +157,9 @@ export const getSettings = async () => {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 };
+
+export const getHomeContent = async () => {
+  const res = await fetch(`${API_URL}/users/home-content`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};

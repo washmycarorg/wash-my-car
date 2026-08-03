@@ -65,4 +65,8 @@ router.delete('/inventory/allocate/:id', adminController.deleteAllocation);
 router.get('/settings', adminController.getSystemSettings);
 router.put('/settings', adminController.updateSystemSettings);
 
+// Homepage CMS settings
+router.get('/cms', adminController.getCmsContent);
+router.put('/cms', adminController.updateCmsContent);
+
 export default router;
