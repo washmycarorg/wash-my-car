@@ -16,9 +16,9 @@ const SettingsPage = () => {
     getSettings()
       .then(res => {
         setSettings({
-          autoAssignment: res.autoAssignment,
-          pointsRedemption: res.pointsRedemption,
-          pointsReward: res.pointsReward,
+          autoAssignment: !!res.autoAssignment,
+          pointsRedemption: !!res.pointsRedemption,
+          pointsReward: !!res.pointsReward,
           pointsToCashRatio: res.pointsToCashRatio,
           rewardPointsRatio: res.rewardPointsRatio
         });
@@ -41,7 +41,13 @@ const SettingsPage = () => {
         pointsToCashRatio: Number(settings.pointsToCashRatio),
         rewardPointsRatio: Number(settings.rewardPointsRatio)
       });
-      setSettings(res);
+      setSettings({
+        autoAssignment: !!res.autoAssignment,
+        pointsRedemption: !!res.pointsRedemption,
+        pointsReward: !!res.pointsReward,
+        pointsToCashRatio: res.pointsToCashRatio,
+        rewardPointsRatio: res.rewardPointsRatio
+      });
       alert('System settings updated successfully!');
     } catch (err) {
       console.error(err);

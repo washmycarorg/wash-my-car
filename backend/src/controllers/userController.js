@@ -23,7 +23,7 @@ export const getProfile = async (req, res) => {
       where: { userId: req.user.id }
     });
     
-    const dynamicRewardPoints = (user.points || 0) + (totalWashes * 100);
+    const actualRewardPoints = user.points || 0;
  
     const nextBooking = await prisma.booking.findFirst({
       where: { userId: req.user.id, status: { in: ['PENDING', 'ASSIGNED', 'STARTED'] } },
@@ -37,7 +37,7 @@ export const getProfile = async (req, res) => {
         upcomingBookings,
         totalWashes,
         savedCars: savedCarsCount,
-        rewardPoints: dynamicRewardPoints
+        rewardPoints: actualRewardPoints
       },
       nextBooking
     });
@@ -436,6 +436,17 @@ export const getWashPrice = async (req, res) => {
       }
     });
     res.json(priceSetting || { price: 0, payoutType: 'PERCENTAGE', payoutValue: 0 });
+  } catch (error) { 
+    res.status(500).json({ error: error.message }); 
+  }
+};
+
+export const getAllWashPrices = async (req, res) => {
+  try {
+    const prices = await prisma.washPrice.findMany({
+      include: { carType: true, washType: true }
+    });
+    res.json(prices);
   } catch (error) { 
     res.status(500).json({ error: error.message }); 
   }

@@ -19,6 +19,7 @@ export const loginEmployee = async (phone, otp) => {
   if (!res.ok) throw new Error(await res.text());
   const data = await res.json();
   localStorage.setItem('employeeToken', data.token);
+  localStorage.setItem('employeeInfo', JSON.stringify(data.employee));
   return data;
 };
 

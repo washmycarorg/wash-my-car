@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
 import DashboardLayout from './components/DashboardLayout';
 import { loginEmployee, registerEmployee, getServiceAreas } from './api';
@@ -212,8 +212,28 @@ const EmployeeRegister = () => {
   );
 };
 
+const ProtectedEmployeeRoute = ({ children }) => {
+  const token = localStorage.getItem('employeeToken');
+  const employeeInfo = localStorage.getItem('employeeInfo');
+  if (!token || !employeeInfo) return <Navigate to="/" replace />;
+  return children;
+};
+
 const App = () => {
-  const [auth, setAuth] = useState(!!localStorage.getItem('employeeToken'));
+  const [auth, setAuth] = useState(!!localStorage.getItem('employeeToken') && !!localStorage.getItem('employeeInfo'));
+
+  useEffect(() => {
+    const syncAuth = () => {
+      const hasAuth = !!localStorage.getItem('employeeToken') && !!localStorage.getItem('employeeInfo');
+      setAuth(hasAuth);
+    };
+    window.addEventListener('storage', syncAuth);
+    window.addEventListener('focus', syncAuth);
+    return () => {
+      window.removeEventListener('storage', syncAuth);
+      window.removeEventListener('focus', syncAuth);
+    };
+  }, []);
   
   return (
     <Router>
@@ -222,11 +242,11 @@ const App = () => {
         <Route path="/register" element={auth ? <Navigate to="/dashboard"/> : <EmployeeRegister />} />
         
         {/* Protected Dashboard Routes */}
-        <Route path="/dashboard" element={auth ? <DashboardLayout><Dashboard /></DashboardLayout> : <Navigate to="/"/>} />
-        <Route path="/schedule" element={auth ? <DashboardLayout><Schedule /></DashboardLayout> : <Navigate to="/"/>} />
-        <Route path="/earnings" element={auth ? <DashboardLayout><Earnings /></DashboardLayout> : <Navigate to="/"/>} />
-        <Route path="/leaves" element={auth ? <DashboardLayout><Leaves /></DashboardLayout> : <Navigate to="/"/>} />
-        <Route path="/profile" element={auth ? <DashboardLayout><Profile /></DashboardLayout> : <Navigate to="/"/>} />
+        <Route path="/dashboard" element={<ProtectedEmployeeRoute><DashboardLayout><Dashboard /></DashboardLayout></ProtectedEmployeeRoute>} />
+        <Route path="/schedule" element={<ProtectedEmployeeRoute><DashboardLayout><Schedule /></DashboardLayout></ProtectedEmployeeRoute>} />
+        <Route path="/earnings" element={<ProtectedEmployeeRoute><DashboardLayout><Earnings /></DashboardLayout></ProtectedEmployeeRoute>} />
+        <Route path="/leaves" element={<ProtectedEmployeeRoute><DashboardLayout><Leaves /></DashboardLayout></ProtectedEmployeeRoute>} />
+        <Route path="/profile" element={<ProtectedEmployeeRoute><DashboardLayout><Profile /></DashboardLayout></ProtectedEmployeeRoute>} />
       </Routes>
     </Router>
   );

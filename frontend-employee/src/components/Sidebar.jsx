@@ -76,7 +76,7 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
           })}
 
           <button 
-            onClick={() => { localStorage.removeItem('employeeToken'); window.location.href = '/'; }}
+            onClick={() => { localStorage.removeItem('employeeToken'); localStorage.removeItem('employeeInfo'); window.location.href = '/'; }}
             style={{
               display: 'flex', alignItems: 'center', gap: '1rem',
               padding: '1.5rem', color: 'white', textDecoration: 'none',

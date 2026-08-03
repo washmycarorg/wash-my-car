@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, CalendarCheck, CalendarDays, Droplets, Car, History, Gift, User, LogOut, X } from 'lucide-react';
+import { LayoutDashboard, CalendarCheck, CalendarDays, Droplets, Car, Gift, User, LogOut, X } from 'lucide-react';
 
 import logo from '../assets/wash my car.png';
 
@@ -14,7 +14,6 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
     { name: 'My Bookings', path: '/bookings', icon: CalendarDays },
     { name: 'Services', path: '/services', icon: Droplets },
     { name: 'Saved Cars', path: '/cars', icon: Car },
-    { name: 'History', path: '/history', icon: History },
     { name: 'Rewards', path: '/rewards', icon: Gift },
     { name: 'Profile', path: '/profile', icon: User },
   ];

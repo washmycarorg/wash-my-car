@@ -18,7 +18,8 @@ import {
   deleteSavedAddress,
   getEligibleCoupons,
   getPublicSettings,
-  getPublicHomeContent
+  getPublicHomeContent,
+  getAllWashPrices
 } from '../controllers/userController.js';
 
 const router = express.Router();
@@ -44,6 +45,7 @@ router.get('/car-types', getCarTypes);
 router.get('/wash-types', getWashTypes);
 router.get('/service-areas', getServiceAreas);
 router.get('/price', getWashPrice);
+router.get('/wash-prices', getAllWashPrices);
 
 // Saved addresses CRUD
 router.get('/addresses', getSavedAddresses);

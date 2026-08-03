@@ -80,7 +80,7 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
           </Link>
           
           <div style={{marginTop: 'auto', paddingTop: '2rem'}}>
-            <button className="btn btn-outline btn-block" style={{borderColor: 'rgba(255,255,255,0.2)', color: 'white'}} onClick={() => { localStorage.removeItem('adminToken'); window.location.href='/'; }}>
+            <button className="btn btn-outline btn-block" style={{borderColor: 'rgba(255,255,255,0.2)', color: 'white'}} onClick={() => { localStorage.removeItem('adminToken'); localStorage.removeItem('adminInfo'); window.location.href='/'; }}>
               Log Out
             </button>
           </div>
@@ -559,24 +559,44 @@ const EmployeeManagement = () => {
   );
 };
 
+const ProtectedAdminRoute = ({ children }) => {
+  const token = localStorage.getItem('adminToken');
+  const adminInfo = localStorage.getItem('adminInfo');
+  if (!token || !adminInfo) return <Navigate to="/" replace />;
+  return children;
+};
+
 const App = () => {
-  const [auth, setAuth] = useState(!!localStorage.getItem('adminToken'));
+  const [auth, setAuth] = useState(!!localStorage.getItem('adminToken') && !!localStorage.getItem('adminInfo'));
+
+  useEffect(() => {
+    const syncAuth = () => {
+      const hasAuth = !!localStorage.getItem('adminToken') && !!localStorage.getItem('adminInfo');
+      setAuth(hasAuth);
+    };
+    window.addEventListener('storage', syncAuth);
+    window.addEventListener('focus', syncAuth);
+    return () => {
+      window.removeEventListener('storage', syncAuth);
+      window.removeEventListener('focus', syncAuth);
+    };
+  }, []);
   
   return (
     <Router>
       <Routes>
         <Route path="/" element={auth ? <Navigate to="/dashboard"/> : <AdminLogin setAuth={setAuth} />} />
-        <Route path="/dashboard" element={auth ? <Dashboard /> : <Navigate to="/"/>} />
-        <Route path="/employees" element={auth ? <EmployeeManagement /> : <Navigate to="/"/>} />
-        <Route path="/bookings" element={auth ? <AdminLayout title="Slots Details & Assignment"><Bookings /></AdminLayout> : <Navigate to="/"/>} />
-        <Route path="/earnings" element={auth ? <AdminLayout title="Earnings & Cost to Company"><Financials /></AdminLayout> : <Navigate to="/"/>} />
-        <Route path="/leaves" element={auth ? <AdminLayout title="Leave Approval"><LeaveApprovals /></AdminLayout> : <Navigate to="/"/>} />
-        <Route path="/services" element={auth ? <AdminLayout title="Packages & Plans"><Services /></AdminLayout> : <Navigate to="/"/>} />
-        <Route path="/inventory" element={auth ? <AdminLayout title="Inventory & Stock Tracking"><Inventory /></AdminLayout> : <Navigate to="/"/>} />
-        <Route path="/offers" element={auth ? <AdminLayout title="Execute Offers"><Offers /></AdminLayout> : <Navigate to="/"/>} />
-        <Route path="/areas" element={auth ? <AdminLayout title="Service Areas Management"><Areas /></AdminLayout> : <Navigate to="/"/>} />
-        <Route path="/cms" element={auth ? <AdminLayout title="Homepage CMS Editor"><CmsSettings /></AdminLayout> : <Navigate to="/"/>} />
-        <Route path="/settings" element={auth ? <AdminLayout title="System Settings"><SettingsPage /></AdminLayout> : <Navigate to="/"/>} />
+        <Route path="/dashboard" element={<ProtectedAdminRoute><Dashboard /></ProtectedAdminRoute>} />
+        <Route path="/employees" element={<ProtectedAdminRoute><EmployeeManagement /></ProtectedAdminRoute>} />
+        <Route path="/bookings" element={<ProtectedAdminRoute><AdminLayout title="Slots Details & Assignment"><Bookings /></AdminLayout></ProtectedAdminRoute>} />
+        <Route path="/earnings" element={<ProtectedAdminRoute><AdminLayout title="Earnings & Cost to Company"><Financials /></AdminLayout></ProtectedAdminRoute>} />
+        <Route path="/leaves" element={<ProtectedAdminRoute><AdminLayout title="Leave Approval"><LeaveApprovals /></AdminLayout></ProtectedAdminRoute>} />
+        <Route path="/services" element={<ProtectedAdminRoute><AdminLayout title="Packages & Plans"><Services /></AdminLayout></ProtectedAdminRoute>} />
+        <Route path="/inventory" element={<ProtectedAdminRoute><AdminLayout title="Inventory & Stock Tracking"><Inventory /></AdminLayout></ProtectedAdminRoute>} />
+        <Route path="/offers" element={<ProtectedAdminRoute><AdminLayout title="Execute Offers"><Offers /></AdminLayout></ProtectedAdminRoute>} />
+        <Route path="/areas" element={<ProtectedAdminRoute><AdminLayout title="Service Areas Management"><Areas /></AdminLayout></ProtectedAdminRoute>} />
+        <Route path="/cms" element={<ProtectedAdminRoute><AdminLayout title="Homepage CMS Editor"><CmsSettings /></AdminLayout></ProtectedAdminRoute>} />
+        <Route path="/settings" element={<ProtectedAdminRoute><AdminLayout title="System Settings"><SettingsPage /></AdminLayout></ProtectedAdminRoute>} />
       </Routes>
     </Router>
   );

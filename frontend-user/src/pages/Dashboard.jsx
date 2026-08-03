@@ -75,7 +75,7 @@ const Dashboard = () => {
           <div className="flex justify-between items-center text-muted text-xs font-semibold" style={{textTransform: 'uppercase', letterSpacing: '0.05em'}}>
             REWARD POINTS <Gift size={18} color="var(--primary-blue)" />
           </div>
-          <h2 style={{margin: 0, fontSize: '1.75rem'}}>{stats.rewardPoints}</h2>
+          <h2 style={{margin: 0, fontSize: '1.75rem'}}>{profile?.points || 0}</h2>
           <p className="text-muted text-xs" style={{margin: 0}}>Redeem at checkout</p>
         </div>
       </div>

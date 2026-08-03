@@ -15,6 +15,7 @@ const Login = ({ setAuth }) => {
     try {
       const res = await loginUser(phone, otp);
       localStorage.setItem('userToken', res.token);
+      localStorage.setItem('userInfo', JSON.stringify(res.user));
       setAuth(true);
       navigate('/dashboard');
     } catch (err) {

@@ -9,6 +9,7 @@ export const loginAdmin = async (email, password) => {
   if (!res.ok) throw new Error(await res.text());
   const data = await res.json();
   localStorage.setItem('adminToken', data.token);
+  localStorage.setItem('adminInfo', JSON.stringify({ email }));
   return data;
 };
 

@@ -9,6 +9,7 @@ export const loginUser = async (phone, otp) => {
   if (!res.ok) throw new Error(await res.text());
   const data = await res.json();
   localStorage.setItem('userToken', data.token);
+  localStorage.setItem('userInfo', JSON.stringify(data.user));
   return data;
 };
 
@@ -111,6 +112,12 @@ export const getServiceAreas = async () => {
 
 export const getWashPrice = async (carTypeId, washTypeId) => {
   const res = await fetch(`${API_URL}/users/price?carTypeId=${carTypeId}&washTypeId=${washTypeId}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const getAllWashPrices = async () => {
+  const res = await fetch(`${API_URL}/users/wash-prices`, { headers: getHeaders() });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 };

@@ -459,8 +459,8 @@ const BookSlot = () => {
   }
   const subtotal = Math.max(0, basePrice - discountVal);
   
-  const redemptionEnabled = systemSettings?.pointsRedemption ?? true;
-  const rewardEnabled = systemSettings?.pointsReward ?? true;
+  const redemptionEnabled = !systemSettings || systemSettings.pointsRedemption !== false;
+  const rewardEnabled = !systemSettings || systemSettings.pointsReward !== false;
   const pointsToCashRatio = systemSettings?.pointsToCashRatio || 4;
   const rewardPointsRatio = systemSettings?.rewardPointsRatio || 0.1;
   const maxPointsCashValue = userPoints / pointsToCashRatio;
