@@ -93,7 +93,9 @@ export const getServices = async () => {
 
 // New API endpoints for advanced booking details
 export const getCarTypes = async () => {
-  const res = await fetch(`${API_URL}/users/car-types`, { headers: getHeaders() });
+  const token = localStorage.getItem('userToken');
+  const headers = token ? getHeaders() : { 'Content-Type': 'application/json' };
+  const res = await fetch(`${API_URL}/users/car-types`, { headers });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 };

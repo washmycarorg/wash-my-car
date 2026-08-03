@@ -4,7 +4,7 @@ import {
   Droplets, CheckCircle, Leaf, Car, Calendar, MapPin, Phone, 
   Mail, Award, Clock, Menu, X, Sparkles, Star, ChevronRight, Check, Compass, Shield, Tag
 } from 'lucide-react';
-import { getHomeContent, getServiceAreas, getWashTypes, getAllWashPrices } from '../api';
+import { getHomeContent, getServiceAreas, getWashTypes, getAllWashPrices, getCarTypes } from '../api';
 import logo from '../assets/wash my car.png';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
@@ -29,6 +29,8 @@ const Home = () => {
   const [areas, setAreas] = useState([]);
   const [washTypes, setWashTypes] = useState([]);
   const [washPrices, setWashPrices] = useState([]);
+  const [carTypes, setCarTypes] = useState([]);
+  const [selectedCarType, setSelectedCarType] = useState(null);
   const mapContainerRef = useRef(null);
   const googleMapInstance = useRef(null);
 
@@ -52,6 +54,10 @@ const Home = () => {
     getAllWashPrices()
       .then(setWashPrices)
       .catch(err => console.warn("Could not load wash prices:", err));
+
+    getCarTypes()
+      .then(setCarTypes)
+      .catch(err => console.warn("Could not load car types:", err));
   }, []);
 
   // Initialize public Google Map showing all coverage circles
@@ -287,7 +293,7 @@ const Home = () => {
 
       {/* Services Grid Section */}
       <section id="services" style={{ padding: '6rem 8%', textAlign: 'center' }}>
-        <div style={{ maxWidth: '800px', margin: '0 auto 4rem' }}>
+        <div style={{ maxWidth: '800px', margin: '0 auto 3rem' }}>
           <span style={{ color: '#0284C7', fontWeight: 800, fontSize: '0.9rem', letterSpacing: '1.5px', textTransform: 'uppercase' }}>Professional Detailing</span>
           <h2 style={{ fontSize: '2.6rem', fontWeight: 800, color: '#0F172A', marginTop: '0.5rem', marginBottom: '1rem' }}>
             Doorstep Wash Packages
@@ -297,12 +303,68 @@ const Home = () => {
           </p>
         </div>
 
+        {/* Car Type Selector */}
+        {carTypes.length > 0 && (
+          <div style={{ maxWidth: '700px', margin: '0 auto 3rem', textAlign: 'center' }}>
+            <p style={{ color: '#475569', fontSize: '0.95rem', marginBottom: '1rem', fontWeight: 500 }}>
+              🚗 Select your vehicle type below to see the exact price for each package.
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', justifyContent: 'center' }}>
+              <button
+                onClick={() => setSelectedCarType(null)}
+                style={{
+                  padding: '0.55rem 1.25rem',
+                  borderRadius: '30px',
+                  border: selectedCarType === null ? '2px solid #0EA5E9' : '1.5px solid #CBD5E1',
+                  background: selectedCarType === null ? '#EFF6FF' : 'white',
+                  color: selectedCarType === null ? '#0284C7' : '#64748B',
+                  fontWeight: selectedCarType === null ? 700 : 500,
+                  fontSize: '0.88rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                All Vehicles
+              </button>
+              {carTypes.map(ct => (
+                <button
+                  key={ct.id}
+                  onClick={() => setSelectedCarType(ct)}
+                  style={{
+                    padding: '0.55rem 1.25rem',
+                    borderRadius: '30px',
+                    border: selectedCarType?.id === ct.id ? '2px solid #0EA5E9' : '1.5px solid #CBD5E1',
+                    background: selectedCarType?.id === ct.id ? '#EFF6FF' : 'white',
+                    color: selectedCarType?.id === ct.id ? '#0284C7' : '#64748B',
+                    fontWeight: selectedCarType?.id === ct.id ? 700 : 500,
+                    fontSize: '0.88rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  {ct.name}
+                </button>
+              ))}
+            </div>
+            {selectedCarType && (
+              <p style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: '#0284C7', fontWeight: 600 }}>
+                ✓ Showing prices for: <strong>{selectedCarType.name}</strong>
+              </p>
+            )}
+          </div>
+        )}
+
         <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '2rem', alignItems: 'start' }}>
           {washTypes.length > 0 ? washTypes.map((wt, idx) => {
-            // Find the minimum price for this wash type across all car types
+            // Prices for this wash type
             const pricesForType = washPrices.filter(p => p.washTypeId === wt.id);
-            const minPrice = pricesForType.length > 0 
-              ? Math.min(...pricesForType.map(p => p.price)) 
+
+            // If a car type is selected, find exact price; otherwise show minimum
+            const selectedPrice = selectedCarType
+              ? (pricesForType.find(p => p.carTypeId === selectedCarType.id)?.price ?? null)
+              : null;
+            const minPrice = pricesForType.length > 0
+              ? Math.min(...pricesForType.map(p => p.price))
               : null;
 
             // Mark middle card as "most popular"
@@ -391,9 +453,28 @@ const Home = () => {
                   )}
 
                   <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0284C7' }}>
-                      {minPrice != null ? `From ₹${minPrice.toLocaleString('en-IN')}` : 'Contact for price'}
-                    </span>
+                    <div>
+                      {selectedCarType ? (
+                        selectedPrice != null ? (
+                          <span style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0284C7' }}>
+                            ₹{selectedPrice.toLocaleString('en-IN')}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '0.9rem', color: '#94A3B8', fontWeight: 600 }}>Not available for this vehicle</span>
+                        )
+                      ) : (
+                        <div>
+                          <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0284C7' }}>
+                            {minPrice != null ? `From ₹${minPrice.toLocaleString('en-IN')}` : 'Contact for price'}
+                          </span>
+                          {carTypes.length > 0 && (
+                            <p style={{ margin: '0.2rem 0 0', fontSize: '0.75rem', color: '#94A3B8' }}>
+                              Select vehicle type above for exact pricing
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
                     {wt.durationMinutes && (
                       <span style={{ color: '#94A3B8', fontSize: '0.8rem', fontWeight: 600 }}>
                         {wt.durationMinutes} Mins

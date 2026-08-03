@@ -29,6 +29,7 @@ router.get('/home-content', getPublicHomeContent);
 router.get('/service-areas', getServiceAreas);
 router.get('/wash-types', getWashTypes);
 router.get('/wash-prices', getAllWashPrices);
+router.get('/car-types', getCarTypes);
 
 router.use(verifyToken);
 
