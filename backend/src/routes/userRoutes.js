@@ -27,6 +27,8 @@ const router = express.Router();
 // Public endpoints
 router.get('/home-content', getPublicHomeContent);
 router.get('/service-areas', getServiceAreas);
+router.get('/wash-types', getWashTypes);
+router.get('/wash-prices', getAllWashPrices);
 
 router.use(verifyToken);
 
@@ -43,9 +45,7 @@ router.get('/services', getServices);
 
 // New endpoints for new booking workflow
 router.get('/car-types', getCarTypes);
-router.get('/wash-types', getWashTypes);
 router.get('/price', getWashPrice);
-router.get('/wash-prices', getAllWashPrices);
 
 // Saved addresses CRUD
 router.get('/addresses', getSavedAddresses);

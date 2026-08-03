@@ -4,7 +4,7 @@ import {
   Droplets, CheckCircle, Leaf, Car, Calendar, MapPin, Phone, 
   Mail, Award, Clock, Menu, X, Sparkles, Star, ChevronRight, Check, Compass, Shield, Tag
 } from 'lucide-react';
-import { getHomeContent, getServiceAreas } from '../api';
+import { getHomeContent, getServiceAreas, getWashTypes, getAllWashPrices } from '../api';
 import logo from '../assets/wash my car.png';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
@@ -27,6 +27,8 @@ const Home = () => {
   });
 
   const [areas, setAreas] = useState([]);
+  const [washTypes, setWashTypes] = useState([]);
+  const [washPrices, setWashPrices] = useState([]);
   const mapContainerRef = useRef(null);
   const googleMapInstance = useRef(null);
 
@@ -42,6 +44,14 @@ const Home = () => {
     getServiceAreas()
       .then(setAreas)
       .catch(err => console.warn("Could not load service areas:", err));
+
+    getWashTypes()
+      .then(setWashTypes)
+      .catch(err => console.warn("Could not load wash types:", err));
+
+    getAllWashPrices()
+      .then(setWashPrices)
+      .catch(err => console.warn("Could not load wash prices:", err));
   }, []);
 
   // Initialize public Google Map showing all coverage circles
@@ -232,7 +242,7 @@ const Home = () => {
               className="btn btn-teal" 
               style={{ padding: '1rem 2.5rem', fontSize: '1.05rem', fontWeight: 700, borderRadius: '30px', boxShadow: '0 10px 20px rgba(14, 165, 233, 0.35)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
             >
-              Book Doorstep Spa <ChevronRight size={18} />
+              Book Doorstep Wash <ChevronRight size={18} />
             </button>
             <a 
               href="#services" 
@@ -287,71 +297,138 @@ const Home = () => {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8" style={{ maxWidth: '1200px', margin: '0 auto' }}>
-          
-          {/* Card 1 */}
-          <div className="card" style={{ padding: 0, overflow: 'hidden', border: '1px solid #E2E8F0', borderRadius: '16px', background: 'white', display: 'flex', flexDirection: 'column', transition: 'transform 0.3s, box-shadow 0.3s' }}
-               onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-8px)'; e.currentTarget.style.boxShadow = '0 20px 25px -5px rgba(0,0,0,0.1)'; }}
-               onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; }}>
-            <div style={{ position: 'relative' }}>
-              <img src="/images/basic_wash.png" alt="Basic Clean" style={{ width: '100%', height: '220px', objectFit: 'cover' }} />
-              <span style={{ position: 'absolute', bottom: '1rem', right: '1rem', background: '#0F172A', color: 'white', padding: '0.4rem 1rem', borderRadius: '20px', fontWeight: 800, fontSize: '0.85rem' }}>Basic</span>
-            </div>
-            <div style={{ padding: '1.5rem 1.75rem', textAlign: 'left', flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-              <h3 style={{ fontSize: '1.35rem', color: '#0F172A', fontWeight: 800, marginBottom: '0.5rem' }}>Eco Waterless Wash</h3>
-              <p style={{ color: '#64748B', fontSize: '0.9rem', lineHeight: 1.5, marginBottom: '1.25rem' }}>
-                Ideal for regular maintenance. High gloss spray, microfiber cleaning, interior vacuuming & dashboard polish.
-              </p>
-              <div style={{ marginTop: 'auto', borderTop: '1px solid #F1F5F9', paddingTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0284C7' }}>From ₹499</span>
-                <span style={{ color: '#94A3B8', fontSize: '0.8rem', fontWeight: 600 }}>45 Mins</span>
-              </div>
-            </div>
-          </div>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '2rem', alignItems: 'start' }}>
+          {washTypes.length > 0 ? washTypes.map((wt, idx) => {
+            // Find the minimum price for this wash type across all car types
+            const pricesForType = washPrices.filter(p => p.washTypeId === wt.id);
+            const minPrice = pricesForType.length > 0 
+              ? Math.min(...pricesForType.map(p => p.price)) 
+              : null;
 
-          {/* Card 2 */}
-          <div className="card" style={{ padding: 0, overflow: 'hidden', border: '2px solid #0EA5E9', borderRadius: '16px', background: 'white', display: 'flex', flexDirection: 'column', position: 'relative', transform: 'scale(1.03)', zIndex: 10, boxShadow: '0 20px 25px -5px rgba(14,165,233,0.15)' }}>
-            <div style={{ background: '#0EA5E9', color: 'white', textAlign: 'center', padding: '0.4rem', fontWeight: 800, fontSize: '0.75rem', letterSpacing: '1px', textTransform: 'uppercase' }}>
-              MOST POPULAR CHOICE
-            </div>
-            <div style={{ position: 'relative' }}>
-              <img src="/images/premium_wash.png" alt="Premium Clean" style={{ width: '100%', height: '220px', objectFit: 'cover' }} />
-              <span style={{ position: 'absolute', bottom: '1rem', right: '1rem', background: '#0EA5E9', color: 'white', padding: '0.4rem 1rem', borderRadius: '20px', fontWeight: 800, fontSize: '0.85rem' }}>Premium</span>
-            </div>
-            <div style={{ padding: '1.5rem 1.75rem', textAlign: 'left', flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-              <h3 style={{ fontSize: '1.35rem', color: '#0F172A', fontWeight: 800, marginBottom: '0.5rem' }}>Deep Foam & Wax Spa</h3>
-              <p style={{ color: '#64748B', fontSize: '0.9rem', lineHeight: 1.5, marginBottom: '1.25rem' }}>
-                Total restoration. High pressure foam wash, alloy wash, underbody clean, tire conditioning, and liquid wax coat.
-              </p>
-              <div style={{ marginTop: 'auto', borderTop: '1px solid #F1F5F9', paddingTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0284C7' }}>From ₹899</span>
-                <span style={{ color: '#94A3B8', fontSize: '0.8rem', fontWeight: 600 }}>90 Mins</span>
-              </div>
-            </div>
-          </div>
+            // Mark middle card as "most popular"
+            const isMostPopular = washTypes.length >= 2 && idx === Math.floor(washTypes.length / 2);
 
-          {/* Card 3 */}
-          <div className="card" style={{ padding: 0, overflow: 'hidden', border: '1px solid #E2E8F0', borderRadius: '16px', background: 'white', display: 'flex', flexDirection: 'column', transition: 'transform 0.3s, box-shadow 0.3s' }}
-               onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-8px)'; e.currentTarget.style.boxShadow = '0 20px 25px -5px rgba(0,0,0,0.1)'; }}
-               onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; }}>
-            <div style={{ position: 'relative' }}>
-              <img src="/images/full_detail.png" alt="Ultra Detail" style={{ width: '100%', height: '220px', objectFit: 'cover' }} />
-              <span style={{ position: 'absolute', bottom: '1rem', right: '1rem', background: '#0F172A', color: 'white', padding: '0.4rem 1rem', borderRadius: '20px', fontWeight: 800, fontSize: '0.85rem' }}>Full Detail</span>
-            </div>
-            <div style={{ padding: '1.5rem 1.75rem', textAlign: 'left', flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-              <h3 style={{ fontSize: '1.35rem', color: '#0F172A', fontWeight: 800, marginBottom: '0.5rem' }}>Complete Internal Spa</h3>
-              <p style={{ color: '#64748B', fontSize: '0.9rem', lineHeight: 1.5, marginBottom: '1.25rem' }}>
-                Showroom finish. Deep upholstery shampoo, seat stain removal, dashboard dressing, AC duct sanitization & engine clean.
-              </p>
-              <div style={{ marginTop: 'auto', borderTop: '1px solid #F1F5F9', paddingTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0284C7' }}>From ₹1,499</span>
-                <span style={{ color: '#94A3B8', fontSize: '0.8rem', fontWeight: 600 }}>120 Mins</span>
-              </div>
-            </div>
-          </div>
+            return (
+              <div
+                key={wt.id}
+                className="card"
+                style={{
+                  padding: 0,
+                  overflow: 'hidden',
+                  border: isMostPopular ? '2px solid #0EA5E9' : '1px solid #E2E8F0',
+                  borderRadius: '16px',
+                  background: 'white',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  position: 'relative',
+                  transform: isMostPopular ? 'scale(1.03)' : 'scale(1)',
+                  zIndex: isMostPopular ? 10 : 1,
+                  boxShadow: isMostPopular ? '0 20px 25px -5px rgba(14,165,233,0.15)' : 'var(--shadow-sm)',
+                  transition: 'transform 0.3s, box-shadow 0.3s'
+                }}
+                onMouseEnter={e => {
+                  if (!isMostPopular) {
+                    e.currentTarget.style.transform = 'translateY(-8px)';
+                    e.currentTarget.style.boxShadow = '0 20px 25px -5px rgba(0,0,0,0.1)';
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!isMostPopular) {
+                    e.currentTarget.style.transform = 'scale(1)';
+                    e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+                  }
+                }}
+              >
+                {isMostPopular && (
+                  <div style={{ background: '#0EA5E9', color: 'white', textAlign: 'center', padding: '0.4rem', fontWeight: 800, fontSize: '0.75rem', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                    MOST POPULAR CHOICE
+                  </div>
+                )}
 
+                {/* Gradient banner instead of image */}
+                <div style={{
+                  height: '140px',
+                  background: isMostPopular
+                    ? 'linear-gradient(135deg, #0EA5E9, #0369A1)'
+                    : 'linear-gradient(135deg, #1E293B, #334155)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  position: 'relative'
+                }}>
+                  <Sparkles size={48} color="rgba(255,255,255,0.25)" style={{ position: 'absolute' }} />
+                  <span style={{
+                    position: 'absolute',
+                    bottom: '1rem',
+                    right: '1rem',
+                    background: isMostPopular ? '#0F172A' : 'rgba(255,255,255,0.15)',
+                    color: 'white',
+                    padding: '0.4rem 1rem',
+                    borderRadius: '20px',
+                    fontWeight: 800,
+                    fontSize: '0.8rem',
+                    border: '1px solid rgba(255,255,255,0.2)'
+                  }}>
+                    {wt.name}
+                  </span>
+                </div>
+
+                <div style={{ padding: '1.5rem 1.75rem', textAlign: 'left', flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+                  <h3 style={{ fontSize: '1.25rem', color: '#0F172A', fontWeight: 800, marginBottom: '0.5rem' }}>{wt.name}</h3>
+                  <p style={{ color: '#64748B', fontSize: '0.9rem', lineHeight: 1.6, marginBottom: '1rem', flexGrow: 1 }}>
+                    {wt.description || 'Professional doorstep wash service delivered right to your location with premium equipment.'}
+                  </p>
+
+                  {/* Features list */}
+                  {wt.features && wt.features.length > 0 && (
+                    <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 1rem 0', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      {wt.features.slice(0, 3).map((f, fi) => (
+                        <li key={fi} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
+                          <Check size={14} color="#0EA5E9" style={{ flexShrink: 0 }} /> {f}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0284C7' }}>
+                      {minPrice != null ? `From ₹${minPrice.toLocaleString('en-IN')}` : 'Contact for price'}
+                    </span>
+                    {wt.durationMinutes && (
+                      <span style={{ color: '#94A3B8', fontSize: '0.8rem', fontWeight: 600 }}>
+                        {wt.durationMinutes} Mins
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          }) : (
+            // Skeleton loaders while fetching
+            [1, 2, 3].map(i => (
+              <div key={i} className="card" style={{ padding: 0, overflow: 'hidden', border: '1px solid #E2E8F0', borderRadius: '16px', background: 'white' }}>
+                <div style={{ height: '140px', background: '#F1F5F9', animation: 'pulse 1.5s ease-in-out infinite' }} />
+                <div style={{ padding: '1.5rem' }}>
+                  <div style={{ height: '20px', background: '#E2E8F0', borderRadius: '8px', marginBottom: '0.75rem', animation: 'pulse 1.5s ease-in-out infinite' }} />
+                  <div style={{ height: '14px', background: '#F1F5F9', borderRadius: '6px', marginBottom: '0.5rem', animation: 'pulse 1.5s ease-in-out infinite' }} />
+                  <div style={{ height: '14px', background: '#F1F5F9', borderRadius: '6px', width: '70%', animation: 'pulse 1.5s ease-in-out infinite' }} />
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div style={{ marginTop: '3rem', textAlign: 'center' }}>
+          <button
+            onClick={() => navigate('/login')}
+            className="btn btn-teal"
+            style={{ padding: '1rem 2.5rem', fontSize: '1rem', fontWeight: 700, borderRadius: '30px', boxShadow: '0 10px 20px rgba(14, 165, 233, 0.35)' }}
+          >
+            Book Any Package →
+          </button>
         </div>
       </section>
+
 
       {/* Dynamic Contact / Serving Location CMS data */}
       <section id="contact" style={{ padding: '6rem 8%', maxWidth: '1200px', margin: '0 auto' }}>

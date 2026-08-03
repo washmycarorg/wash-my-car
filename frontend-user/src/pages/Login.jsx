@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock } from 'lucide-react';
+import { Mail, Lock, ArrowLeft } from 'lucide-react';
 import { loginUser } from '../api';
 import logo from '../assets/wash my car.png';
 
@@ -28,8 +28,19 @@ const Login = ({ setAuth }) => {
       {/* Left side branding */}
       <div className="hidden md:flex flex-col items-center justify-center p-10" style={{flex: 1, background: 'linear-gradient(135deg, var(--primary-navy), var(--primary-blue))', color: 'white', position: 'relative', overflow: 'hidden'}}>
         <div style={{position: 'relative', zIndex: 2, textAlign: 'center'}}>
-          <img src={logo} alt="Wash My Car Logo" style={{height: '100px', objectFit: 'contain', marginBottom: '1.5rem', filter: 'brightness(0) invert(1)'}} />
-          <p style={{fontSize: '1.25rem', marginTop: '1rem', opacity: 0.9}}>Your Car, Cleaned At Your Door.</p>
+          <div style={{
+            background: 'white',
+            padding: '1.25rem 2.5rem',
+            borderRadius: '1.5rem',
+            boxShadow: '0 0 30px rgba(56, 189, 248, 0.65), 0 10px 20px rgba(0,0,0,0.2)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: '2rem'
+          }}>
+            <img src={logo} alt="Wash My Car Logo" style={{height: '110px', objectFit: 'contain'}} />
+          </div>
+          <p style={{fontSize: '1.25rem', marginTop: '0.5rem', opacity: 0.9, fontWeight: 600}}>Your Car, Cleaned At Your Door.</p>
         </div>
         {/* Decorative elements */}
         <div style={{position: 'absolute', bottom: '-10%', right: '-10%', width: '300px', height: '300px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)'}}></div>
@@ -39,8 +50,23 @@ const Login = ({ setAuth }) => {
       {/* Right side form */}
       <div className="flex flex-col justify-center p-8 md:p-16" style={{flex: 1, background: 'white'}}>
         <div style={{maxWidth: '400px', width: '100%', margin: '0 auto'}}>
+          {/* Back to Homepage Button */}
+          <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-muted)', textDecoration: 'none', marginBottom: '1.5rem', fontSize: '0.9rem', fontWeight: 600 }}>
+            <ArrowLeft size={16} /> Back to Homepage
+          </Link>
+
           <div className="md:hidden flex justify-center mb-8">
-             <img src={logo} alt="Wash My Car Logo" style={{height: '50px', objectFit: 'contain'}} />
+            <div style={{
+              background: 'white',
+              padding: '0.75rem 1.75rem',
+              borderRadius: '1rem',
+              boxShadow: '0 0 20px rgba(56, 189, 248, 0.4), 0 4px 12px rgba(0,0,0,0.08)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <img src={logo} alt="Wash My Car Logo" style={{height: '80px', objectFit: 'contain'}} />
+            </div>
           </div>
           
           <h2 style={{marginBottom: '0.5rem'}}>Welcome Back!</h2>

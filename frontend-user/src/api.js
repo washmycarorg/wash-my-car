@@ -99,13 +99,17 @@ export const getCarTypes = async () => {
 };
 
 export const getWashTypes = async () => {
-  const res = await fetch(`${API_URL}/users/wash-types`, { headers: getHeaders() });
+  const token = localStorage.getItem('userToken');
+  const headers = token ? getHeaders() : { 'Content-Type': 'application/json' };
+  const res = await fetch(`${API_URL}/users/wash-types`, { headers });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 };
 
 export const getServiceAreas = async () => {
-  const res = await fetch(`${API_URL}/users/service-areas`, { headers: getHeaders() });
+  const token = localStorage.getItem('userToken');
+  const headers = token ? getHeaders() : { 'Content-Type': 'application/json' };
+  const res = await fetch(`${API_URL}/users/service-areas`, { headers });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 };
@@ -117,7 +121,9 @@ export const getWashPrice = async (carTypeId, washTypeId) => {
 };
 
 export const getAllWashPrices = async () => {
-  const res = await fetch(`${API_URL}/users/wash-prices`, { headers: getHeaders() });
+  const token = localStorage.getItem('userToken');
+  const headers = token ? getHeaders() : { 'Content-Type': 'application/json' };
+  const res = await fetch(`${API_URL}/users/wash-prices`, { headers });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 };
