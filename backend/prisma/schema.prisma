@@ -103,6 +103,9 @@ model Service {
 model ServiceArea {
   id             Int            @id @default(autoincrement())
   name           String         @unique // e.g. Bandra, Hitech City
+  latitude       Float?
+  longitude      Float?
+  radius         Float?         // in meters
   employees      Employee[]     @relation("EmployeeAreas")
   bookings       Booking[]
   savedAddresses SavedAddress[]

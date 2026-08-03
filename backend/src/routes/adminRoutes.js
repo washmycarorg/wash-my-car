@@ -31,6 +31,7 @@ router.delete('/services/:id', adminController.deleteService);
 // Service Areas
 router.get('/service-areas', adminController.getServiceAreas);
 router.post('/service-areas', adminController.createServiceArea);
+router.put('/service-areas/:id', adminController.updateServiceArea);
 router.delete('/service-areas/:id', adminController.deleteServiceArea);
 
 // Car Types

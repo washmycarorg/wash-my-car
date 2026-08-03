@@ -175,11 +175,21 @@ export const getServiceAreas = async () => {
   return res.json();
 };
 
-export const createServiceArea = async (name) => {
+export const createServiceArea = async (data) => {
   const res = await fetch(`${API_URL}/admin/service-areas`, {
     method: 'POST',
     headers: getHeaders(),
-    body: JSON.stringify({ name })
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const updateServiceArea = async (id, data) => {
+  const res = await fetch(`${API_URL}/admin/service-areas/${id}`, {
+    method: 'PUT',
+    headers: getHeaders(),
+    body: JSON.stringify(data)
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();

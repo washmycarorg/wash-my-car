@@ -355,8 +355,34 @@ export const getServiceAreas = async (req, res) => {
 
 export const createServiceArea = async (req, res) => {
   try {
-    const { name } = req.body;
-    const area = await prisma.serviceArea.create({ data: { name } });
+    const { name, latitude, longitude, radius } = req.body;
+    const area = await prisma.serviceArea.create({
+      data: {
+        name,
+        latitude: latitude ? Number(latitude) : null,
+        longitude: longitude ? Number(longitude) : null,
+        radius: radius ? Number(radius) : null
+      }
+    });
+    res.json(area);
+  } catch (error) { 
+    res.status(500).json({ error: error.message }); 
+  }
+};
+
+export const updateServiceArea = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, latitude, longitude, radius } = req.body;
+    const area = await prisma.serviceArea.update({
+      where: { id: Number(id) },
+      data: {
+        name,
+        latitude: latitude ? Number(latitude) : null,
+        longitude: longitude ? Number(longitude) : null,
+        radius: radius ? Number(radius) : null
+      }
+    });
     res.json(area);
   } catch (error) { 
     res.status(500).json({ error: error.message }); 
