@@ -1,6 +1,4 @@
-const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? 'http://localhost:5001/api'
-  : 'https://wash-my-car.onrender.com/api';
+const API_URL = 'https://wash-my-car.onrender.com/api';
 
 export const loginAdmin = async (email, password) => {
   const res = await fetch(`${API_URL}/auth/admin/login`, {
@@ -280,6 +278,51 @@ export const saveWashPrice = async (data) => {
 
 export const getEmployeesWorkload = async (date, timeSlot) => {
   const res = await fetch(`${API_URL}/admin/employees/workload?date=${encodeURIComponent(date)}&timeSlot=${encodeURIComponent(timeSlot)}`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+// Inventory Management
+export const getInventoryItems = async () => {
+  const res = await fetch(`${API_URL}/admin/inventory`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const createInventoryItem = async (data) => {
+  const res = await fetch(`${API_URL}/admin/inventory`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const deleteInventoryItem = async (id) => {
+  const res = await fetch(`${API_URL}/admin/inventory/${id}`, {
+    method: 'DELETE',
+    headers: getHeaders()
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const allocateInventory = async (data) => {
+  const res = await fetch(`${API_URL}/admin/inventory/allocate`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const deleteAllocation = async (id) => {
+  const res = await fetch(`${API_URL}/admin/inventory/allocate/${id}`, {
+    method: 'DELETE',
     headers: getHeaders()
   });
   if (!res.ok) throw new Error(await res.text());

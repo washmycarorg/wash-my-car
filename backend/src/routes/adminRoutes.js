@@ -53,4 +53,11 @@ router.get('/bookings', adminController.getBookings);
 router.put('/bookings/:id/assign', adminController.assignSlot);
 router.put('/bookings/:id/auto-assign', adminController.autoAssignSlot);
 
+// Inventory
+router.get('/inventory', adminController.getInventoryItems);
+router.post('/inventory', adminController.createInventoryItem);
+router.delete('/inventory/:id', adminController.deleteInventoryItem);
+router.post('/inventory/allocate', adminController.allocateInventory);
+router.delete('/inventory/allocate/:id', adminController.deleteAllocation);
+
 export default router;

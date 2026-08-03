@@ -1,6 +1,4 @@
-const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? 'http://localhost:5001/api'
-  : 'https://wash-my-car.onrender.com/api';
+const API_URL = 'https://wash-my-car.onrender.com/api';
 
 export const registerEmployee = async (name, phone, email, photo, aadhaarNumber, address, idProofFile, serviceAreaIds) => {
   const res = await fetch(`${API_URL}/auth/employee/register`, {
@@ -82,12 +80,13 @@ export const updateProfile = async (data) => {
 };
 
 export const getServiceAreas = async () => {
-  const res = await fetch(`${API_URL}/employees/profile`, { headers: getHeaders() }); // Service areas can be fetched from config or public routes. Let's make a call to public or profile
-  // Actually, we can fetch all service areas. Let's create an area fetch helper:
-  const areaRes = await fetch(`${API_URL}/admin/service-areas`, { headers: getHeaders() }); // Or fall back to a public service-areas endpoint if available.
-  // Wait, does employee have admin access? No, so let's call users/service-areas which is public! That's very smart!
-  const userAPI = API_URL.replace('/employees', '/users');
-  const fallbackRes = await fetch(`${API_URL.replace('/employees', '/users')}/service-areas`, { headers: getHeaders() });
+  const fallbackRes = await fetch(`${API_URL}/users/service-areas`, { headers: getHeaders() });
   if (!fallbackRes.ok) throw new Error(await fallbackRes.text());
   return fallbackRes.json();
+};
+
+export const getInventory = async () => {
+  const res = await fetch(`${API_URL}/employees/inventory`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
 };

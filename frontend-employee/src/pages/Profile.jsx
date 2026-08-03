@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { updateProfile, getServiceAreas } from '../api';
-import { MapPin, User as UserIcon, Shield, CreditCard, FileText } from 'lucide-react';
+import { updateProfile, getServiceAreas, getInventory } from '../api';
+import { MapPin, User as UserIcon, Shield, CreditCard, FileText, Droplet, Wrench, Package } from 'lucide-react';
 
 const Profile = ({ profile, setProfile }) => {
   const [formData, setFormData] = useState({ 
@@ -14,11 +14,16 @@ const Profile = ({ profile, setProfile }) => {
   });
   const [areas, setAreas] = useState([]);
   const [selectedAreaIds, setSelectedAreaIds] = useState([]);
+  const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     getServiceAreas()
       .then(setAreas)
+      .catch(err => console.error(err));
+
+    getInventory()
+      .then(setInventory)
       .catch(err => console.error(err));
   }, []);
 
@@ -239,6 +244,43 @@ const Profile = ({ profile, setProfile }) => {
               })}
               {areas.length === 0 && (
                 <p style={{ color: 'var(--text-muted)', gridColumn: 'span 2', margin: 0, fontSize: '0.85rem' }}>No service areas configured by admin.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Allocated Inventory */}
+          <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '1.25rem' }}>
+            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginBottom: '0.75rem', fontWeight: 600 }}>
+              <Package size={16} /> My Allocated Stock & Tools
+            </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {inventory.map(alloc => {
+                const maxWashes = alloc.quantity * alloc.inventoryItem.washesPerUnit;
+                const remainingWashes = Math.max(0, maxWashes - alloc.washesUsed);
+                const isDepleted = alloc.washesUsed >= maxWashes;
+                
+                return (
+                  <div key={alloc.id} style={{ padding: '0.75rem 1rem', background: '#F8FAFC', borderRadius: 'var(--radius-md)', border: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      {alloc.inventoryItem.type === 'CHEMICAL' ? <Droplet size={16} color="#10B981" /> : alloc.inventoryItem.type === 'EQUIPMENT' ? <Wrench size={16} color="#3B82F6" /> : <Package size={16} color="#64748B" />}
+                      <div style={{ textAlign: 'left' }}>
+                        <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{alloc.inventoryItem.name}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          Qty: {alloc.quantity} • Washes done: {alloc.washesUsed}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: isDepleted ? '#EF4444' : '#10B981' }}>
+                        {isDepleted ? 'Depleted' : `${remainingWashes.toFixed(0)} wash(es) left`}
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Est. Remaining</div>
+                    </div>
+                  </div>
+                );
+              })}
+              {inventory.length === 0 && (
+                <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: '0.85rem', textAlign: 'left' }}>No inventory allocated to you yet.</p>
               )}
             </div>
           </div>

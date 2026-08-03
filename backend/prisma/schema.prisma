@@ -33,6 +33,7 @@ model Employee {
   bookings      Booking[]
   leaves        Leave[]
   serviceAreas  ServiceArea[] @relation("EmployeeAreas")
+  inventoryAllocations InventoryAllocation[]
   createdAt     DateTime      @default(now())
 }
 
@@ -62,15 +63,16 @@ model WashType {
 }
 
 model WashPrice {
-  id         Int      @id @default(autoincrement())
-  carTypeId  Int
-  carType    CarType  @relation(fields: [carTypeId], references: [id], onDelete: Cascade)
-  washTypeId Int
-  washType   WashType @relation(fields: [washTypeId], references: [id], onDelete: Cascade)
-  price      Float
-  payoutType String   @default("PERCENTAGE") // PERCENTAGE or AMOUNT
+  id          Int      @id @default(autoincrement())
+  carTypeId   Int
+  carType     CarType  @relation(fields: [carTypeId], references: [id], onDelete: Cascade)
+  washTypeId  Int
+  washType    WashType @relation(fields: [washTypeId], references: [id], onDelete: Cascade)
+  price       Float
+  payoutType  String   @default("PERCENTAGE") // PERCENTAGE or AMOUNT
   payoutValue Float   @default(50.0)         // 50% or flat price
-  createdAt  DateTime @default(now())
+  companyCost Float    @default(0.0)
+  createdAt   DateTime @default(now())
 
   @@unique([carTypeId, washTypeId])
 }
@@ -141,6 +143,7 @@ model Booking {
   serviceArea   ServiceArea  @relation(fields: [serviceAreaId], references: [id])
   price         Float
   employeePayout Float       @default(0.0)
+  companyCost   Float       @default(0.0)
   paymentStatus String       @default("PENDING")
   paymentMethod String       @default("ONLINE")
   
@@ -176,4 +179,27 @@ model Offer {
   validUntil  DateTime
   active      Boolean   @default(true)
   createdAt   DateTime  @default(now())
+}
+
+model InventoryItem {
+  id             Int                   @id @default(autoincrement())
+  name           String
+  type           String                // EQUIPMENT, CHEMICAL, OTHER
+  totalQuantity  Float                 @default(0.0)
+  washesPerUnit  Float                 @default(1.0) // config for washes per unit
+  allocations    InventoryAllocation[]
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+}
+
+model InventoryAllocation {
+  id              Int           @id @default(autoincrement())
+  inventoryItemId Int
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  employeeId      Int
+  employee        Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  quantity        Float         // allocated stock units
+  washesUsed      Int           @default(0) // incremented when employee completes a booking
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 }

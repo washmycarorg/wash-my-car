@@ -48,7 +48,7 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
                <img src={logo} alt="Wash My Car Logo" style={{width: '100%', height: '100%', objectFit: 'contain', transform: 'scale(1.2)'}} />
              </div>
              <div>
-               <h2 style={{color: 'white', fontSize: '1.1rem', margin: 0, fontWeight: 700, letterSpacing: '1px'}}>PRO <span style={{color: 'var(--accent-teal)'}}>WASH</span></h2>
+               <h2 style={{color: 'white', fontSize: '1.1rem', margin: 0, fontWeight: 700, letterSpacing: '1px'}}>WASH MY <span style={{color: 'var(--accent-teal)'}}>CAR</span></h2>
                <p style={{fontSize: '0.65rem', margin: 0, opacity: 0.8}}>Employee Portal</p>
              </div>
            </div>

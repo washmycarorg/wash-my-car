@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Calendar, Settings, Bell, Search, DollarSign, Briefcase, FileText, Tag, Menu, X, MapPin } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Settings, Bell, Search, DollarSign, Briefcase, FileText, Tag, Menu, X, MapPin, Package } from 'lucide-react';
 import { loginAdmin, getStats, getEmployees, toggleEmployeeStatus } from './api';
 
 import Bookings from './pages/Bookings';
@@ -9,6 +9,7 @@ import LeaveApprovals from './pages/LeaveApprovals';
 import Services from './pages/Services';
 import Offers from './pages/Offers';
 import Areas from './pages/Areas';
+import Inventory from './pages/Inventory';
 import logo from './assets/wash my car.png';
 
 const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
@@ -59,6 +60,9 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
           </Link>
           <Link to="/services" className={`sidebar-link ${isActive('/services')}`}>
             <Briefcase size={20} /> Packages & Plans
+          </Link>
+          <Link to="/inventory" className={`sidebar-link ${isActive('/inventory')}`}>
+            <Package size={20} /> Inventory Management
           </Link>
           <Link to="/offers" className={`sidebar-link ${isActive('/offers')}`}>
             <Tag size={20} /> Offers
@@ -489,6 +493,7 @@ const App = () => {
         <Route path="/earnings" element={auth ? <AdminLayout title="Earnings & Cost to Company"><Financials /></AdminLayout> : <Navigate to="/"/>} />
         <Route path="/leaves" element={auth ? <AdminLayout title="Leave Approval"><LeaveApprovals /></AdminLayout> : <Navigate to="/"/>} />
         <Route path="/services" element={auth ? <AdminLayout title="Packages & Plans"><Services /></AdminLayout> : <Navigate to="/"/>} />
+        <Route path="/inventory" element={auth ? <AdminLayout title="Inventory & Stock Tracking"><Inventory /></AdminLayout> : <Navigate to="/"/>} />
         <Route path="/offers" element={auth ? <AdminLayout title="Execute Offers"><Offers /></AdminLayout> : <Navigate to="/"/>} />
         <Route path="/areas" element={auth ? <AdminLayout title="Service Areas Management"><Areas /></AdminLayout> : <Navigate to="/"/>} />
         <Route path="/settings" element={auth ? <AdminLayout title="System Settings"><div className="card p-8">Settings (In Development)</div></AdminLayout> : <Navigate to="/"/>} />

@@ -16,8 +16,11 @@ export const getDashboardStats = async (req, res) => {
     });
     const totalRevenue = completedBookings.reduce((sum, b) => sum + (b.price || 0), 0);
     
-    // Cost to Company (sum of employee payouts)
-    const totalCostToCompany = completedBookings.reduce((sum, b) => sum + (b.employeePayout || 0), 0);
+    // Cost to Company (sum of employee payouts + additional company cost like chemicals/materials)
+    const totalCostToCompany = completedBookings.reduce(
+      (sum, b) => sum + (b.employeePayout || 0) + (b.companyCost || 0),
+      0
+    );
 
     res.json({
       totalRevenue,
@@ -357,7 +360,7 @@ export const getWashPrices = async (req, res) => {
 
 export const saveWashPrice = async (req, res) => {
   try {
-    const { carTypeId, washTypeId, price, payoutType, payoutValue } = req.body;
+    const { carTypeId, washTypeId, price, payoutType, payoutValue, companyCost } = req.body;
     const washPrice = await prisma.washPrice.upsert({
       where: {
         carTypeId_washTypeId: {
@@ -368,14 +371,16 @@ export const saveWashPrice = async (req, res) => {
       update: {
         price: Number(price),
         payoutType,
-        payoutValue: Number(payoutValue)
+        payoutValue: Number(payoutValue),
+        companyCost: companyCost !== undefined ? Number(companyCost) : 0.0
       },
       create: {
         carTypeId: Number(carTypeId),
         washTypeId: Number(washTypeId),
         price: Number(price),
         payoutType,
-        payoutValue: Number(payoutValue)
+        payoutValue: Number(payoutValue),
+        companyCost: companyCost !== undefined ? Number(companyCost) : 0.0
       }
     });
     res.json(washPrice);
@@ -527,6 +532,142 @@ export const getEmployeesWorkload = async (req, res) => {
     });
 
     res.json(workloadList);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Inventory Management
+export const getInventoryItems = async (req, res) => {
+  try {
+    const items = await prisma.inventoryItem.findMany({
+      include: {
+        allocations: {
+          include: {
+            employee: {
+              select: { id: true, name: true, phone: true }
+            }
+          }
+        }
+      },
+      orderBy: { name: 'asc' }
+    });
+    res.json(items);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const createInventoryItem = async (req, res) => {
+  try {
+    const { name, type, totalQuantity, washesPerUnit } = req.body;
+    const item = await prisma.inventoryItem.create({
+      data: {
+        name,
+        type,
+        totalQuantity: Number(totalQuantity),
+        washesPerUnit: Number(washesPerUnit)
+      }
+    });
+    res.json(item);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const deleteInventoryItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await prisma.inventoryItem.delete({
+      where: { id: Number(id) }
+    });
+    res.json({ message: 'Inventory item deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const allocateInventory = async (req, res) => {
+  try {
+    const { inventoryItemId, employeeId, quantity } = req.body;
+    
+    // 1. Verify item exists and has enough quantity
+    const item = await prisma.inventoryItem.findUnique({
+      where: { id: Number(inventoryItemId) }
+    });
+    if (!item) {
+      return res.status(404).json({ error: 'Inventory item not found' });
+    }
+    const qtyToAllocate = Number(quantity);
+    if (item.totalQuantity < qtyToAllocate) {
+      return res.status(400).json({ error: `Not enough stock in warehouse. Available: ${item.totalQuantity}` });
+    }
+
+    // 2. Decrement main warehouse inventory
+    await prisma.inventoryItem.update({
+      where: { id: Number(inventoryItemId) },
+      data: { totalQuantity: item.totalQuantity - qtyToAllocate }
+    });
+
+    // 3. Create or update Employee's allocation
+    const existing = await prisma.inventoryAllocation.findFirst({
+      where: {
+        inventoryItemId: Number(inventoryItemId),
+        employeeId: Number(employeeId)
+      }
+    });
+
+    let allocation;
+    if (existing) {
+      allocation = await prisma.inventoryAllocation.update({
+        where: { id: existing.id },
+        data: {
+          quantity: existing.quantity + qtyToAllocate
+        }
+      });
+    } else {
+      allocation = await prisma.inventoryAllocation.create({
+        data: {
+          inventoryItemId: Number(inventoryItemId),
+          employeeId: Number(employeeId),
+          quantity: qtyToAllocate,
+          washesUsed: 0
+        }
+      });
+    }
+
+    res.json(allocation);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const deleteAllocation = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Find allocation to get quantity back
+    const allocation = await prisma.inventoryAllocation.findUnique({
+      where: { id: Number(id) }
+    });
+    if (!allocation) {
+      return res.status(404).json({ error: 'Allocation not found' });
+    }
+
+    // Return stock to warehouse
+    await prisma.inventoryItem.update({
+      where: { id: allocation.inventoryItemId },
+      data: {
+        totalQuantity: { increment: allocation.quantity }
+      }
+    });
+
+    // Delete allocation record
+    await prisma.inventoryAllocation.delete({
+      where: { id: Number(id) }
+    });
+
+    res.json({ message: 'Allocation returned/deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

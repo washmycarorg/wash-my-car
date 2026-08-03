@@ -1,6 +1,4 @@
-const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? 'http://localhost:5001/api'
-  : 'https://wash-my-car.onrender.com/api';
+const API_URL = 'https://wash-my-car.onrender.com/api';
 
 export const loginUser = async (phone, otp) => {
   const res = await fetch(`${API_URL}/auth/user/login`, {

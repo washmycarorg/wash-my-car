@@ -111,6 +111,7 @@ export const createBooking = async (req, res) => {
     }
 
     const price = priceSetting.price;
+    const companyCost = priceSetting.companyCost || 0.0;
     let employeePayout = 0;
     if (priceSetting.payoutType === 'PERCENTAGE') {
       employeePayout = (price * priceSetting.payoutValue) / 100;
@@ -161,6 +162,7 @@ export const createBooking = async (req, res) => {
         address,
         price,
         employeePayout,
+        companyCost,
         paymentStatus: 'PAID', // payment is mock and completed online
         status: 'PENDING'
       }

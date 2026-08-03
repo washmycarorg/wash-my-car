@@ -100,7 +100,8 @@ const Services = () => {
         washTypeId: editingCell.washTypeId,
         price: Number(editingCell.price),
         payoutType: editingCell.payoutType,
-        payoutValue: Number(editingCell.payoutValue)
+        payoutValue: Number(editingCell.payoutValue),
+        companyCost: Number(editingCell.companyCost || 0)
       });
       setEditingCell(null);
       fetchData();
@@ -114,7 +115,8 @@ const Services = () => {
     return prices.find(p => p.carTypeId === carTypeId && p.washTypeId === washTypeId) || {
       price: 0,
       payoutType: 'PERCENTAGE',
-      payoutValue: 50.0
+      payoutValue: 50.0,
+      companyCost: 0
     };
   };
 
@@ -256,6 +258,16 @@ const Services = () => {
                                 onChange={e => setEditingCell({ ...editingCell, payoutValue: e.target.value })}
                               />
                             </div>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, textAlign: 'left' }}>Company Cost (₹)</label>
+                              <input 
+                                type="number" 
+                                className="form-input" 
+                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.85rem', marginBottom: 0 }}
+                                value={editingCell.companyCost}
+                                onChange={e => setEditingCell({ ...editingCell, companyCost: e.target.value })}
+                              />
+                            </div>
                             <div style={{ display: 'flex', gap: '0.25rem', marginTop: '0.25rem' }}>
                               <button onClick={handleSavePriceCell} className="btn btn-teal" style={{ padding: '0.25rem', flex: 1, borderRadius: '4px' }}>
                                 <Check size={14} />
@@ -272,7 +284,8 @@ const Services = () => {
                               washTypeId: wt.id,
                               price: priceInfo.price,
                               payoutType: priceInfo.payoutType,
-                              payoutValue: priceInfo.payoutValue
+                              payoutValue: priceInfo.payoutValue,
+                              companyCost: priceInfo.companyCost || 0
                             })}
                             style={{
                               padding: '0.75rem',
@@ -282,7 +295,7 @@ const Services = () => {
                               background: priceInfo.price > 0 ? '#F0FDF4' : '#FFF7ED',
                               transition: 'all 0.2s',
                               display: 'inline-block',
-                              minWidth: '110px'
+                              minWidth: '120px'
                             }}
                             className="hover:border-primary-blue"
                           >
@@ -292,6 +305,18 @@ const Services = () => {
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
                               Emp: {priceInfo.payoutType === 'PERCENTAGE' ? `${priceInfo.payoutValue}%` : `₹${priceInfo.payoutValue}`}
                             </div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                              Co. Cost: ₹{priceInfo.companyCost || 0}
+                            </div>
+                            {priceInfo.price > 0 && (() => {
+                              const empPayout = priceInfo.payoutType === 'PERCENTAGE' ? (priceInfo.price * priceInfo.payoutValue) / 100 : priceInfo.payoutValue;
+                              const netProfit = priceInfo.price - empPayout - (priceInfo.companyCost || 0);
+                              return (
+                                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: netProfit >= 0 ? 'var(--success)' : 'var(--danger)', marginTop: '0.1rem' }}>
+                                  Net: ₹{netProfit}
+                                </div>
+                              );
+                            })()}
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.1rem', fontSize: '0.65rem', color: 'var(--primary-blue)', marginTop: '0.25rem', opacity: 0.8 }}>
                               <Edit3 size={10} /> Edit Settings
                             </div>
