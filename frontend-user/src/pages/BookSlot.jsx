@@ -459,14 +459,15 @@ const BookSlot = () => {
   }
   const subtotal = Math.max(0, basePrice - discountVal);
   
-  const pointsEnabled = systemSettings?.royaltyPointsEnabled;
+  const redemptionEnabled = systemSettings?.pointsRedemption ?? true;
+  const rewardEnabled = systemSettings?.pointsReward ?? true;
   const pointsToCashRatio = systemSettings?.pointsToCashRatio || 4;
   const rewardPointsRatio = systemSettings?.rewardPointsRatio || 0.1;
   const maxPointsCashValue = userPoints / pointsToCashRatio;
   
   let pointsCashValueUsed = 0;
   let pointsRedeemedUsed = 0;
-  if (redeemPoints && pointsEnabled && userPoints > 0) {
+  if (redeemPoints && redemptionEnabled && userPoints > 0) {
     if (maxPointsCashValue >= subtotal) {
       pointsCashValueUsed = subtotal;
       pointsRedeemedUsed = Math.ceil(subtotal * pointsToCashRatio);
@@ -477,7 +478,7 @@ const BookSlot = () => {
   }
   
   const finalPrice = Math.max(0, subtotal - pointsCashValueUsed);
-  const pointsEarned = pointsEnabled ? Math.floor(finalPrice * rewardPointsRatio) : 0;
+  const pointsEarned = rewardEnabled ? Math.floor(finalPrice * rewardPointsRatio) : 0;
 
   const currentCarTypeName = carTypes.find(c => c.id.toString() === selectedCarType)?.name || '';
   const currentWashTypeName = washTypes.find(w => w.id.toString() === selectedWashType)?.name || '';
@@ -793,7 +794,7 @@ const BookSlot = () => {
               <option value="">-- No Coupon Code --</option>
               {eligibleCoupons.map(c => (
                 <option key={c.id} value={c.code}>
-                  {c.code} ({c.discountPct}% OFF) - {c.title}
+                  {c.code} ({c.discountType === 'FLAT' ? `₹${c.discountAmount} FLAT OFF` : `${c.discountPct}% OFF${c.limitOption === 'UP_TO' ? ` up to ₹${c.maxDiscountAmount}` : ''}`}) - {c.title}
                 </option>
               ))}
             </select>
@@ -805,7 +806,7 @@ const BookSlot = () => {
           </div>
 
           {/* Loyalty Points redemption checkbox */}
-          {pointsEnabled && userPoints > 0 && (
+          {redemptionEnabled && userPoints > 0 && (
             <div style={{
               display: 'flex',
               alignItems: 'flex-start',

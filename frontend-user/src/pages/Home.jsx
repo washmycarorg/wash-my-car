@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   Droplets, CheckCircle, Leaf, Car, Calendar, MapPin, Phone, 
-  Mail, Award, Clock, Menu, X, Sparkles, Star, ChevronRight, Check, Compass, Shield
+  Mail, Award, Clock, Menu, X, Sparkles, Star, ChevronRight, Check, Compass, Shield, Tag
 } from 'lucide-react';
 import { getHomeContent } from '../api';
 import logo from '../assets/wash my car.png';

@@ -203,14 +203,16 @@ export const createBooking = async (req, res) => {
     // 2. Royalty Points Redemption
     let redeemedPoints = 0;
     const settings = await prisma.systemSettings.findUnique({ where: { id: 1 } }) || {
-      royaltyPointsEnabled: true,
+      autoAssignment: true,
+      pointsRedemption: true,
+      pointsReward: true,
       pointsToCashRatio: 4.0,
       rewardPointsRatio: 0.1
     };
 
     const user = await prisma.user.findUnique({ where: { id: req.user.id } });
 
-    if (redeemPoints && settings.royaltyPointsEnabled && user.points > 0) {
+    if (redeemPoints && settings.pointsRedemption && user.points > 0) {
       const userPointsCashValue = user.points / settings.pointsToCashRatio;
       if (userPointsCashValue >= finalPrice) {
         redeemedPoints = Math.ceil(finalPrice * settings.pointsToCashRatio);
@@ -222,7 +224,7 @@ export const createBooking = async (req, res) => {
     }
 
     // Earn points based on cash paid
-    const pointsEarned = settings.royaltyPointsEnabled
+    const pointsEarned = settings.pointsReward
       ? Math.floor(finalPrice * settings.rewardPointsRatio)
       : 0;
 
@@ -294,45 +296,47 @@ export const createBooking = async (req, res) => {
     });
 
     // Auto assignment algorithm
-    const candidates = await prisma.employee.findMany({
-      where: {
-        status: 'ACTIVE',
-        onDuty: true,
-        serviceAreas: {
-          some: { id: Number(serviceAreaId) }
-        }
-      },
-      include: {
-        bookings: {
-          where: {
-            date: {
-              gte: new Date(new Date(date).setHours(0, 0, 0, 0)),
-              lte: new Date(new Date(date).setHours(23, 59, 59, 999))
-            },
-            status: { in: ['ASSIGNED', 'STARTED'] }
+    if (settings.autoAssignment) {
+      const candidates = await prisma.employee.findMany({
+        where: {
+          status: 'ACTIVE',
+          onDuty: true,
+          serviceAreas: {
+            some: { id: Number(serviceAreaId) }
+          }
+        },
+        include: {
+          bookings: {
+            where: {
+              date: {
+                gte: new Date(new Date(date).setHours(0, 0, 0, 0)),
+                lte: new Date(new Date(date).setHours(23, 59, 59, 999))
+              },
+              status: { in: ['ASSIGNED', 'STARTED'] }
+            }
           }
         }
-      }
-    });
-
-    const eligible = candidates.filter(emp => {
-      const slotBookingsCount = emp.bookings.filter(b => b.timeSlot === timeSlot).length;
-      return slotBookingsCount < 2; // Cap: Max 2 bookings per slot per day
-    });
-
-    if (eligible.length > 0) {
-      eligible.sort((a, b) => a.bookings.length - b.bookings.length);
-      const chosenEmployee = eligible[0];
-      
-      const updatedBooking = await prisma.booking.update({
-        where: { id: booking.id },
-        data: {
-          employeeId: chosenEmployee.id,
-          status: 'ASSIGNED'
-        },
-        include: { employee: true }
       });
-      return res.json(updatedBooking);
+
+      const eligible = candidates.filter(emp => {
+        const slotBookingsCount = emp.bookings.filter(b => b.timeSlot === timeSlot).length;
+        return slotBookingsCount < 2; // Cap: Max 2 bookings per slot per day
+      });
+
+      if (eligible.length > 0) {
+        eligible.sort((a, b) => a.bookings.length - b.bookings.length);
+        const chosenEmployee = eligible[0];
+        
+        const updatedBooking = await prisma.booking.update({
+          where: { id: booking.id },
+          data: {
+            employeeId: chosenEmployee.id,
+            status: 'ASSIGNED'
+          },
+          include: { employee: true }
+        });
+        return res.json(updatedBooking);
+      }
     }
 
     res.json(booking);
@@ -583,7 +587,9 @@ export const getPublicSettings = async (req, res) => {
       settings = await prisma.systemSettings.create({
         data: {
           id: 1,
-          royaltyPointsEnabled: true,
+          autoAssignment: true,
+          pointsRedemption: true,
+          pointsReward: true,
           pointsToCashRatio: 4.0,
           rewardPointsRatio: 0.1
         }

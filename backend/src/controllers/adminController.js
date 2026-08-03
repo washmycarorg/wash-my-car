@@ -798,7 +798,9 @@ export const getSystemSettings = async (req, res) => {
       settings = await prisma.systemSettings.create({
         data: {
           id: 1,
-          royaltyPointsEnabled: true,
+          autoAssignment: true,
+          pointsRedemption: true,
+          pointsReward: true,
           pointsToCashRatio: 4.0,
           rewardPointsRatio: 0.1
         }
@@ -812,18 +814,22 @@ export const getSystemSettings = async (req, res) => {
 
 export const updateSystemSettings = async (req, res) => {
   try {
-    const { royaltyPointsEnabled, pointsToCashRatio, rewardPointsRatio } = req.body;
+    const { autoAssignment, pointsRedemption, pointsReward, pointsToCashRatio, rewardPointsRatio } = req.body;
     
     const settings = await prisma.systemSettings.upsert({
       where: { id: 1 },
       update: {
-        ...(royaltyPointsEnabled !== undefined && { royaltyPointsEnabled: Boolean(royaltyPointsEnabled) }),
+        ...(autoAssignment !== undefined && { autoAssignment: Boolean(autoAssignment) }),
+        ...(pointsRedemption !== undefined && { pointsRedemption: Boolean(pointsRedemption) }),
+        ...(pointsReward !== undefined && { pointsReward: Boolean(pointsReward) }),
         ...(pointsToCashRatio !== undefined && { pointsToCashRatio: Number(pointsToCashRatio) }),
         ...(rewardPointsRatio !== undefined && { rewardPointsRatio: Number(rewardPointsRatio) })
       },
       create: {
         id: 1,
-        royaltyPointsEnabled: royaltyPointsEnabled !== undefined ? Boolean(royaltyPointsEnabled) : true,
+        autoAssignment: autoAssignment !== undefined ? Boolean(autoAssignment) : true,
+        pointsRedemption: pointsRedemption !== undefined ? Boolean(pointsRedemption) : true,
+        pointsReward: pointsReward !== undefined ? Boolean(pointsReward) : true,
         pointsToCashRatio: pointsToCashRatio !== undefined ? Number(pointsToCashRatio) : 4.0,
         rewardPointsRatio: rewardPointsRatio !== undefined ? Number(rewardPointsRatio) : 0.1
       }

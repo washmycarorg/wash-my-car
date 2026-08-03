@@ -222,7 +222,9 @@ model InventoryAllocation {
 
 model SystemSettings {
   id                  Int     @id @default(1)
-  royaltyPointsEnabled Boolean @default(true)
+  autoAssignment      Boolean @default(true)   // Auto assignment mode ON/OFF
+  pointsRedemption    Boolean @default(true)   // Royalty redemption mode ON/OFF
+  pointsReward        Boolean @default(true)   // Earning points reward mode ON/OFF
   pointsToCashRatio   Float   @default(4.0)   // 4 points = 1 Rs
   rewardPointsRatio   Float   @default(0.1)   // 10% points reward
 }
