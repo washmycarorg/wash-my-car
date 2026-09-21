@@ -1,8 +1,275 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getBookings, assignSlot, autoAssignSlot, getEmployees, getEmployeesWorkload, getCarTypes, getWashTypes } from '../api';
-import { Calendar, User, Car, MapPin, Compass, Image, Eye, RefreshCw, CheckCircle, Navigation, AlertCircle, Search, X } from 'lucide-react';
+import { getBookings, assignSlot, autoAssignSlot, getEmployees, getEmployeesWorkload, getCarTypes, getWashTypes, getSettings, updateSettings } from '../api';
+import { Calendar, User, Car, MapPin, Compass, Image, Eye, RefreshCw, CheckCircle, Navigation, AlertCircle, Search, X, Zap, Sparkles, ChevronDown } from 'lucide-react';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+
+// Modern Custom Assignment Dropdown Component
+const AssignEmployeeDropdown = ({ booking, employees, workloads, onAssign, onFetchWorkload }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleToggle = () => {
+    if (!isOpen) {
+      onFetchWorkload(booking.date, booking.timeSlot);
+    }
+    setIsOpen(!isOpen);
+  };
+
+  // Split specialists and other available employees
+  const regionEmployees = employees.filter(emp =>
+    emp.status === 'ACTIVE' &&
+    emp.serviceAreas.some(sa => sa.id === booking.serviceAreaId)
+  );
+
+  const otherEmployees = employees.filter(emp =>
+    emp.status === 'ACTIVE' &&
+    !regionEmployees.some(re => re.id === emp.id)
+  );
+
+  const workloadKey = `${booking.date}_${booking.timeSlot}`;
+  const slotWorkload = workloads[workloadKey] || [];
+
+  return (
+    <div ref={dropdownRef} style={{ position: 'relative', width: '100%', maxWidth: '210px' }}>
+      {/* Trigger Button */}
+      <button
+        type="button"
+        onClick={handleToggle}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.4rem',
+          padding: '0.45rem 0.75rem',
+          background: isOpen ? '#F0F9FF' : '#FFFFFF',
+          border: isOpen ? '1.5px solid #0EA5E9' : '1px solid #CBD5E1',
+          borderRadius: '8px',
+          fontSize: '0.82rem',
+          fontWeight: 600,
+          color: 'var(--primary-navy)',
+          cursor: 'pointer',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+          transition: 'all 0.2s ease'
+        }}
+      >
+        <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <User size={13} color="#0EA5E9" /> Manual Assign
+        </span>
+        <ChevronDown 
+          size={14} 
+          color="#64748B" 
+          style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} 
+        />
+      </button>
+
+      {/* Popover Menu */}
+      {isOpen && (
+        <div style={{
+          position: 'absolute',
+          top: 'calc(100% + 6px)',
+          left: 0,
+          width: '270px',
+          background: '#FFFFFF',
+          borderRadius: '12px',
+          boxShadow: '0 14px 35px rgba(15, 23, 42, 0.16), 0 4px 12px rgba(0,0,0,0.06)',
+          border: '1px solid #E2E8F0',
+          zIndex: 100,
+          padding: '0.4rem',
+          maxHeight: '340px',
+          overflowY: 'auto'
+        }}>
+          <div style={{ padding: '0.35rem 0.5rem 0.45rem', borderBottom: '1px solid #F1F5F9', marginBottom: '0.25rem' }}>
+            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Select Technician
+            </span>
+          </div>
+
+          {/* Region Specialists Group */}
+          {regionEmployees.length > 0 ? (
+            <div style={{ marginBottom: '0.4rem' }}>
+              <div style={{
+                padding: '0.25rem 0.5rem',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                color: '#0369A1',
+                background: '#E0F2FE',
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.3rem',
+                margin: '0.2rem 0.1rem 0.3rem'
+              }}>
+                <MapPin size={11} /> Region Specialists ({booking.serviceArea?.name || 'Local'})
+              </div>
+              {regionEmployees.map(emp => {
+                const wInfo = slotWorkload.find(w => w.id === emp.id);
+                return (
+                  <div
+                    key={emp.id}
+                    onClick={() => {
+                      onAssign(booking.id, emp.id);
+                      setIsOpen(false);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '0.45rem 0.55rem',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      transition: 'background 0.15s',
+                      marginBottom: '0.15rem'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#F0FDF4'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
+                      <div style={{ position: 'relative' }}>
+                        {emp.photo ? (
+                          <img src={emp.photo} alt={emp.name} style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} />
+                        ) : (
+                          <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#0EA5E9', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700 }}>
+                            {emp.name[0]}
+                          </div>
+                        )}
+                        <span style={{
+                          position: 'absolute',
+                          bottom: '-1px',
+                          right: '-1px',
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          background: emp.onDuty ? '#22C55E' : '#94A3B8',
+                          border: '1.5px solid white'
+                        }} />
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--primary-navy)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {emp.name}
+                        </div>
+                        <div style={{ fontSize: '0.7rem', color: emp.onDuty ? '#16A34A' : '#64748B', fontWeight: 500 }}>
+                          {emp.onDuty ? '● On Duty' : '○ Off Duty'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      {wInfo ? (
+                        <span style={{ fontSize: '0.68rem', background: '#DCFCE7', color: '#166534', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: 600 }}>
+                          {wInfo.dailyCount} today · {wInfo.slotCount} slot
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '0.68rem', color: '#94A3B8' }}>Available</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div style={{ padding: '0.5rem', fontSize: '0.75rem', color: '#94A3B8', fontStyle: 'italic', textAlign: 'center' }}>
+              No specialists mapped to this region
+            </div>
+          )}
+
+          {/* All Other Employees */}
+          {otherEmployees.length > 0 && (
+            <div>
+              <div style={{
+                padding: '0.25rem 0.5rem',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                color: '#475569',
+                background: '#F1F5F9',
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.3rem',
+                margin: '0.3rem 0.1rem 0.25rem'
+              }}>
+                <User size={11} /> All Other Employees
+              </div>
+              {otherEmployees.map(emp => {
+                const wInfo = slotWorkload.find(w => w.id === emp.id);
+                return (
+                  <div
+                    key={emp.id}
+                    onClick={() => {
+                      onAssign(booking.id, emp.id);
+                      setIsOpen(false);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '0.45rem 0.55rem',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      transition: 'background 0.15s',
+                      marginBottom: '0.15rem'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#F8FAFC'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
+                      <div style={{ position: 'relative' }}>
+                        {emp.photo ? (
+                          <img src={emp.photo} alt={emp.name} style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} />
+                        ) : (
+                          <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#CBD5E1', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700 }}>
+                            {emp.name[0]}
+                          </div>
+                        )}
+                        <span style={{
+                          position: 'absolute',
+                          bottom: '-1px',
+                          right: '-1px',
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          background: emp.onDuty ? '#22C55E' : '#94A3B8',
+                          border: '1.5px solid white'
+                        }} />
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--primary-navy)' }}>
+                          {emp.name}
+                        </div>
+                        <div style={{ fontSize: '0.7rem', color: emp.onDuty ? '#16A34A' : '#64748B' }}>
+                          {emp.onDuty ? '● On Duty' : '○ Off Duty'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      {wInfo && (
+                        <span style={{ fontSize: '0.68rem', background: '#F1F5F9', color: '#475569', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: 600 }}>
+                          {wInfo.dailyCount} today
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const Bookings = () => {
   const [bookings, setBookings] = useState([]);
@@ -11,6 +278,8 @@ const Bookings = () => {
   const [washTypes, setWashTypes] = useState([]);
   const [workloads, setWorkloads] = useState({});
   const [loading, setLoading] = useState(true);
+  const [autoAssignMode, setAutoAssignMode] = useState(true);
+  const [updatingMode, setUpdatingMode] = useState(false);
 
   // Search & Filter States
   const [searchPhone, setSearchPhone] = useState('');
@@ -37,16 +306,20 @@ const Bookings = () => {
 
   const fetchData = async () => {
     try {
-      const [bRes, eRes, ctRes, wtRes] = await Promise.all([
+      const [bRes, eRes, ctRes, wtRes, setRes] = await Promise.all([
         getBookings(),
         getEmployees(),
         getCarTypes().catch(() => []),
-        getWashTypes().catch(() => [])
+        getWashTypes().catch(() => []),
+        getSettings().catch(() => null)
       ]);
       setBookings(bRes);
       setEmployees(eRes);
       setCarTypes(ctRes);
       setWashTypes(wtRes);
+      if (setRes && setRes.autoAssignment !== undefined) {
+        setAutoAssignMode(setRes.autoAssignment);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -58,25 +331,27 @@ const Bookings = () => {
     fetchData();
   }, []);
 
+  const handleToggleAutoAssignMode = async () => {
+    const nextVal = !autoAssignMode;
+    setUpdatingMode(true);
+    try {
+      await updateSettings({ autoAssignment: nextVal });
+      setAutoAssignMode(nextVal);
+    } catch (err) {
+      console.error('Failed to update auto assign mode:', err);
+      alert('Failed to update Auto-Assign Mode setting.');
+    } finally {
+      setUpdatingMode(false);
+    }
+  };
+
   const handleManualAssign = async (bookingId, employeeId) => {
     try {
       await assignSlot(bookingId, employeeId);
-      alert('Employee assigned successfully.');
       fetchData();
     } catch (err) {
       console.error(err);
       alert('Failed to assign employee.');
-    }
-  };
-
-  const handleAutoAssign = async (bookingId) => {
-    try {
-      const res = await autoAssignSlot(bookingId);
-      alert(res.message || 'Auto-assignment completed.');
-      fetchData();
-    } catch (err) {
-      console.error(err);
-      alert(err.message || 'Auto-assignment failed. No on-duty employees serve this area.');
     }
   };
 
@@ -288,8 +563,109 @@ const Bookings = () => {
         </div>
       </div>
 
+      {/* Auto-Assign Mode Toggle Card */}
+      <div style={{
+        background: autoAssignMode ? 'linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)' : 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)',
+        border: autoAssignMode ? '1.5px solid #86EFAC' : '1.5px solid #CBD5E1',
+        borderRadius: 'var(--radius-lg)',
+        padding: '1.25rem 1.5rem',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '1rem',
+        boxShadow: 'var(--shadow-sm)',
+        transition: 'all 0.3s ease'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{
+            width: '46px',
+            height: '46px',
+            borderRadius: '12px',
+            background: autoAssignMode ? '#16A34A' : '#64748B',
+            color: 'white',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: autoAssignMode ? '0 4px 12px rgba(34, 197, 94, 0.35)' : 'none',
+            transition: 'all 0.3s'
+          }}>
+            <Zap size={24} />
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--primary-navy)', fontWeight: 800 }}>
+                Auto-Assign Mode
+              </h3>
+              <span style={{
+                padding: '0.2rem 0.65rem',
+                borderRadius: '20px',
+                fontSize: '0.75rem',
+                fontWeight: 800,
+                letterSpacing: '0.5px',
+                background: autoAssignMode ? '#16A34A' : '#64748B',
+                color: 'white'
+              }}>
+                {autoAssignMode ? 'MODE: AUTO (ON)' : 'MODE: MANUAL (OFF)'}
+              </span>
+            </div>
+            <p style={{ margin: '0.25rem 0 0', fontSize: '0.84rem', color: autoAssignMode ? '#166534' : 'var(--text-muted)' }}>
+              {autoAssignMode 
+                ? '⚡ When ON: All new incoming bookings are automatically assigned to on-duty employees in the customer\'s service region.' 
+                : '🛠️ When OFF: New bookings are received as Unassigned (Pending). Admin manually assigns an employee to each slot.'}
+            </p>
+          </div>
+        </div>
+
+        {/* Toggle Switch */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <label 
+            onClick={handleToggleAutoAssignMode}
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              cursor: updatingMode ? 'wait' : 'pointer', 
+              userSelect: 'none', 
+              gap: '0.75rem',
+              background: 'white',
+              padding: '0.5rem 1rem',
+              borderRadius: '30px',
+              border: '1px solid #E2E8F0',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.05)'
+            }}
+          >
+            <span style={{ fontSize: '0.85rem', fontWeight: 700, color: autoAssignMode ? '#15803D' : 'var(--text-muted)' }}>
+              {autoAssignMode ? 'Auto-Assign ON' : 'Manual Mode ON'}
+            </span>
+            <div 
+              style={{
+                width: '50px',
+                height: '26px',
+                background: autoAssignMode ? '#16A34A' : '#CBD5E1',
+                borderRadius: '13px',
+                padding: '2px',
+                transition: 'background 0.3s',
+                display: 'flex',
+                alignItems: 'center',
+                boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)'
+              }}
+            >
+              <div style={{
+                width: '22px',
+                height: '22px',
+                background: 'white',
+                borderRadius: '50%',
+                transform: autoAssignMode ? 'translateX(24px)' : 'translateX(0)',
+                transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.25)'
+              }} />
+            </div>
+          </label>
+        </div>
+      </div>
+
       {/* Bookings Table Card */}
-      <div className="card" style={{ padding: 0, overflowX: 'auto', borderRadius: 'var(--radius-lg)' }}>
+      <div className="card" style={{ padding: 0, overflowX: 'auto', borderRadius: 'var(--radius-lg)', minHeight: '480px', paddingBottom: '5rem' }}>
         <div className="flex justify-between items-center p-6 border-b border-gray-200">
           <h3 style={{ margin: 0 }}>Slots Details & Assignment</h3>
           <button onClick={fetchData} className="btn btn-outline" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
@@ -378,19 +754,22 @@ const Bookings = () => {
                 {/* Assignment triggers */}
                 <td style={{ padding: '1.25rem 1.5rem' }}>
                   {b.employeeId ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         {b.employee?.photo ? (
                           <img src={b.employee.photo} alt="Emp" style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} />
                         ) : (
                           <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#CBD5E1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 'bold' }}>
-                            {b.employee?.name[0]}
+                            {b.employee?.name ? b.employee.name[0] : 'E'}
                           </div>
                         )}
-                        <span style={{ fontWeight: 500, fontSize: '0.9rem' }}>{b.employee?.name}</span>
+                        <div>
+                          <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--primary-navy)', display: 'block' }}>{b.employee?.name}</span>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{b.employee?.phone}</span>
+                        </div>
                       </div>
                       {b.status !== 'COMPLETED' && b.status !== 'CANCELLED' && (
-                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.15rem' }}>
                           <button 
                             className="btn btn-outline" 
                             style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', borderRadius: '4px' }}
@@ -402,36 +781,13 @@ const Bookings = () => {
                       )}
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxWidth: '200px' }}>
-                      <select 
-                        className="form-input" 
-                        style={{ padding: '0.35rem', fontSize: '0.85rem', marginBottom: 0 }}
-                        onChange={(e) => handleManualAssign(b.id, e.target.value)}
-                        onFocus={() => fetchWorkload(b.date, b.timeSlot)}
-                        defaultValue=""
-                      >
-                        <option value="" disabled>Manual Assign</option>
-                        {eligibleEmployees.map(emp => {
-                          const key = `${b.date}_${b.timeSlot}`;
-                          const slotWorkload = workloads[key];
-                          const workloadInfo = slotWorkload?.find(w => w.id === emp.id);
-                          const label = workloadInfo 
-                            ? `${emp.name} (${workloadInfo.dailyCount} today, ${workloadInfo.slotCount} this slot)`
-                            : `${emp.name} (Duty: Yes)`;
-                          return (
-                            <option key={emp.id} value={emp.id}>{label}</option>
-                          );
-                        })}
-                      </select>
-                      
-                      <button 
-                        onClick={() => handleAutoAssign(b.id)}
-                        className="btn btn-teal"
-                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', width: '100%', borderRadius: '4px' }}
-                      >
-                        Auto-Assign
-                      </button>
-                    </div>
+                    <AssignEmployeeDropdown
+                      booking={b}
+                      employees={employees}
+                      workloads={workloads}
+                      onAssign={handleManualAssign}
+                      onFetchWorkload={fetchWorkload}
+                    />
                   )}
                 </td>
 

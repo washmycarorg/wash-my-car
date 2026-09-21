@@ -27,7 +27,7 @@ const Home = () => {
     heroCtaPrimary: "Book Doorstep Wash",
     heroCtaSecondary: "Explore Packages",
 
-    quickBarLive: "● LIVE DOORSTEP SPA",
+    quickBarLive: "● LIVE DOORSTEP CAR WASH",
     quickBarTitle: "App & Online Booking is Live.",
     quickBarSubtitle: "Book doorstep vehicle detailing in seconds.",
 
@@ -253,7 +253,7 @@ const Home = () => {
               WASH MY CAR
             </span>
             <span style={{ fontSize: '0.65rem', color: '#94A3B8', fontWeight: 700, letterSpacing: '1px' }}>
-              DOORSTEP SPA
+              DOORSTEP CAR WASH
             </span>
           </div>
         </div>
@@ -578,7 +578,7 @@ const Home = () => {
               </div>
               <div style={{ fontSize: '0.6rem', color: '#94A3B8', marginTop: '0.5rem' }}>Good Day! 👋</div>
               <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'white', margin: '0.2rem 0 0.5rem' }}>
-                Book Your <span style={{ color: '#38BDF8' }}>Spa</span>
+                Book Your <span style={{ color: '#38BDF8' }}>Wash</span>
               </div>
               
               <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '10px', padding: '0.4rem', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.25rem', textAlign: 'center', fontSize: '0.55rem' }}>
@@ -1439,7 +1439,7 @@ const Home = () => {
           </div>
 
           <div style={{ fontSize: '0.82rem' }}>
-            © 2026 Wash My Car Doorstep Spa. All rights reserved.
+            © 2026 Wash My Car Doorstep Care. All rights reserved.
           </div>
         </div>
       </footer>

@@ -1012,7 +1012,7 @@ export const getCmsContent = async (req, res) => {
           heroBadgeText: "WATER EFFICIENT & RO CARE",
           heroCtaPrimary: "Book Doorstep Wash",
           heroCtaSecondary: "Explore Packages",
-          quickBarLive: "● LIVE DOORSTEP SPA",
+          quickBarLive: "● LIVE DOORSTEP CAR WASH",
           quickBarTitle: "App & Online Booking is Live.",
           quickBarSubtitle: "Book doorstep vehicle detailing in seconds.",
           aboutTitle: "Serving Visakhapatnam & Surrounds",

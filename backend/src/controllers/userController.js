@@ -403,12 +403,12 @@ export const createBooking = async (req, res) => {
       }
     });
 
-    // Auto assignment algorithm
+    // Auto assignment algorithm based on region / service area
     if (settings.autoAssignment) {
-      const candidates = await prisma.employee.findMany({
+      // Find active employees mapped to this specific service region
+      const regionCandidates = await prisma.employee.findMany({
         where: {
           status: 'ACTIVE',
-          onDuty: true,
           serviceAreas: {
             some: { id: Number(serviceAreaId) }
           }
@@ -426,14 +426,21 @@ export const createBooking = async (req, res) => {
         }
       });
 
-      const eligible = candidates.filter(emp => {
-        const slotBookingsCount = emp.bookings.filter(b => b.timeSlot === timeSlot).length;
-        return slotBookingsCount < 2; // Cap: Max 2 bookings per slot per day
-      });
+      if (regionCandidates.length > 0) {
+        // Prioritize on-duty employees in the region, otherwise consider all active region employees
+        const onDutyInRegion = regionCandidates.filter(emp => emp.onDuty);
+        const candidatePool = onDutyInRegion.length > 0 ? onDutyInRegion : regionCandidates;
 
-      if (eligible.length > 0) {
-        eligible.sort((a, b) => a.bookings.length - b.bookings.length);
-        const chosenEmployee = eligible[0];
+        const eligible = candidatePool.filter(emp => {
+          const slotBookingsCount = emp.bookings.filter(b => b.timeSlot === timeSlot).length;
+          return slotBookingsCount < 2; // Cap: Max 2 bookings per slot per day
+        });
+
+        const targetList = eligible.length > 0 ? eligible : candidatePool;
+
+        // Sort by lowest daily workload
+        targetList.sort((a, b) => a.bookings.length - b.bookings.length);
+        const chosenEmployee = targetList[0];
         
         const updatedBooking = await prisma.booking.update({
           where: { id: booking.id },
@@ -441,7 +448,14 @@ export const createBooking = async (req, res) => {
             employeeId: chosenEmployee.id,
             status: 'ASSIGNED'
           },
-          include: { employee: true }
+          include: { 
+            employee: true,
+            addons: {
+              include: {
+                addon: true
+              }
+            }
+          }
         });
         return res.json(updatedBooking);
       }
@@ -736,7 +750,7 @@ export const getPublicHomeContent = async (req, res) => {
           heroBadgeText: "WATER EFFICIENT & RO CARE",
           heroCtaPrimary: "Book Doorstep Wash",
           heroCtaSecondary: "Explore Packages",
-          quickBarLive: "● LIVE DOORSTEP SPA",
+          quickBarLive: "● LIVE DOORSTEP CAR WASH",
           quickBarTitle: "App & Online Booking is Live.",
           quickBarSubtitle: "Book doorstep vehicle detailing in seconds.",
           aboutTitle: "Serving Visakhapatnam & Surrounds",
