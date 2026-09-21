@@ -67,13 +67,83 @@ export const getBookings = async (req, res) => {
         washType: true, 
         serviceArea: true, 
         employee: true,
-        car: true
+        car: true,
+        addons: {
+          include: {
+            addon: true
+          }
+        }
       },
       orderBy: { createdAt: 'desc' }
     });
     res.json(bookings);
   } catch (error) { 
     res.status(500).json({ error: error.message }); 
+  }
+};
+
+export const getAddons = async (req, res) => {
+  try {
+    let addons = await prisma.addon.findMany({
+      where: { active: true },
+      orderBy: { price: 'asc' }
+    });
+
+    if (addons.length === 0) {
+      const defaultAddons = [
+        {
+          name: 'Helmet Deep Foam Wash & Sanitization',
+          price: 99,
+          description: 'High-temperature antibacterial steam and visor polish for bike helmets.',
+          icon: 'Shield',
+          active: true
+        },
+        {
+          name: 'Two-Wheeler / Bike Foam Wash',
+          price: 199,
+          description: 'High-pressure foam wash, chain lube spray, and tyre dressing for any bike or scooter.',
+          icon: 'Bike',
+          active: true
+        },
+        {
+          name: 'Engine Bay Steam Degreasing',
+          price: 299,
+          description: 'Safe high-pressure dry steam cleaning and dressing for engine compartment grime.',
+          icon: 'Flame',
+          active: true
+        },
+        {
+          name: 'Interior Ozone Deep Sanitization',
+          price: 349,
+          description: 'Hospital-grade ozone treatment eliminating 99.9% bacteria, odor, and allergens.',
+          icon: 'Sparkles',
+          active: true
+        },
+        {
+          name: 'Pet Hair & Deep Fabric Extraction',
+          price: 249,
+          description: 'Specialized rubber extraction brushes and high-suction vacuuming for pet fur.',
+          icon: 'Feather',
+          active: true
+        },
+        {
+          name: 'Windshield Hydrophobic Rain Repellent',
+          price: 199,
+          description: 'Ceramic glass coating for crystal clear visibility during heavy rain.',
+          icon: 'Droplets',
+          active: true
+        }
+      ];
+
+      for (const item of defaultAddons) {
+        await prisma.addon.create({ data: item });
+      }
+      addons = await prisma.addon.findMany({ where: { active: true }, orderBy: { price: 'asc' } });
+    }
+
+    res.json(addons);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 };
 
@@ -95,9 +165,16 @@ export const createBooking = async (req, res) => {
       carModel,
       addressName,
       couponCode,
-      redeemPoints
+      redeemPoints,
+      addonIds = []
     } = req.body;
     
+    if (!carTypeId || !washTypeId) {
+      return res.status(400).json({ 
+        error: 'A vehicle car type and car wash package must be selected. Add-ons cannot be booked individually.' 
+      });
+    }
+
     // Fetch price setting for the combination
     const priceSetting = await prisma.washPrice.findUnique({
       where: {
@@ -112,9 +189,23 @@ export const createBooking = async (req, res) => {
       return res.status(400).json({ error: 'Selected service combination is not priced yet' });
     }
 
-    const originalPrice = priceSetting.price;
+    // Fetch and calculate selected addons
+    let selectedAddons = [];
+    let addonsTotal = 0;
+    if (Array.isArray(addonIds) && addonIds.length > 0) {
+      selectedAddons = await prisma.addon.findMany({
+        where: {
+          id: { in: addonIds.map(Number) },
+          active: true
+        }
+      });
+      addonsTotal = selectedAddons.reduce((sum, item) => sum + item.price, 0);
+    }
+
+    const baseWashPrice = priceSetting.price;
+    const originalPrice = baseWashPrice + addonsTotal;
     let finalPrice = originalPrice;
-    const companyCost = priceSetting.companyCost || 0.0;
+    const companyCost = (priceSetting.companyCost || 0.0);
     
     // 1. Coupon Discount Calculation
     let appliedCode = null;
@@ -285,13 +376,30 @@ export const createBooking = async (req, res) => {
         longitude: Number(longitude),
         address,
         price: finalPrice,
+        addonsTotal: addonsTotal,
         employeePayout,
         companyCost,
         appliedOfferCode: appliedCode,
         pointsRedeemed: redeemedPoints,
         pointsEarned: pointsEarned,
         paymentStatus: 'PAID', // payment is mock and completed online
-        status: 'PENDING'
+        status: 'PENDING',
+        ...(selectedAddons.length > 0 && {
+          addons: {
+            create: selectedAddons.map(addon => ({
+              addonId: addon.id,
+              price: addon.price,
+              quantity: 1
+            }))
+          }
+        })
+      },
+      include: {
+        addons: {
+          include: {
+            addon: true
+          }
+        }
       }
     });
 
@@ -621,16 +729,52 @@ export const getPublicHomeContent = async (req, res) => {
       cms = await prisma.cmsContent.create({
         data: {
           id: 1,
-          heroTitle: "Professional Car Wash at Your Doorstep",
-          heroSubtitle: "Fast, affordable, and eco-friendly car cleaning in Visakhapatnam.",
-          heroImage: "/images/hero_wash.png",
+          heroKicker: "WASH MY CAR • DOORSTEP CAR WASH",
+          heroTitle: "WE WASH.\nYOU RELAX.",
+          heroSubtitle: "Premium vehicle spa and car detailing at your doorstep. Save time, skip the queue, and let trained professionals care for your car.",
+          heroImage: "https://images.unsplash.com/photo-1504215680853-026ed2a45def?auto=format&fit=crop&w=2200&q=95",
+          heroBadgeText: "WATER EFFICIENT & RO CARE",
+          heroCtaPrimary: "Book Doorstep Wash",
+          heroCtaSecondary: "Explore Packages",
+          quickBarLive: "● LIVE DOORSTEP SPA",
+          quickBarTitle: "App & Online Booking is Live.",
+          quickBarSubtitle: "Book doorstep vehicle detailing in seconds.",
           aboutTitle: "Serving Visakhapatnam & Surrounds",
           aboutText: "We proudly serve all Visakhapatnam neighborhoods with professional care and premium equipment!",
+          servicesTitle: "EVERYDAY CARE. PREMIUM SHINE.",
+          servicesSubtitle: "One destination for your vehicle's everyday wash, interior deep steam, and premium shine.",
+          whyTitle: "SMARTER CAR CARE. BUILT AROUND YOU.",
+          whySubtitle: "Convenience-first automotive detailing with professional equipment and RO water efficiency.",
+          whyCard1Title: "YOUR CAR STAYS. WE COME TO YOU.",
+          whyCard1Text: "No queues. No driving to wash centres. Our technicians arrive at your home or office with high-pressure machines and RO water.",
+          whyCard2Title: "Book in Seconds",
+          whyCard2Text: "Choose your wash package, select your slot, and track everything live.",
+          whyCard3Title: "Trained Specialists",
+          whyCard3Text: "Background-verified, trained vehicle care professionals using pH-neutral premium shampoos.",
+          whyCard4Title: "Water-Efficient Care",
+          whyCard4Text: "Eco-conscious steam & pressure washing saves up to 80% water compared to traditional washing.",
+          statCustomers: "10K+",
+          statCustomersLabel: "Happy Vehicle Owners",
+          statCities: "2+",
+          statCitiesLabel: "Service Hubs Live",
+          statDuration: "30–90",
+          statDurationLabel: "Minutes Service Time",
+          statPrice: "₹299+",
+          statPriceLabel: "Starting Wash Price",
+          partnerTitle: "BUILD THE NEXT CAR CARE BUSINESS",
+          partnerSubtitle: "Choose the operating model that fits your city — doorstep franchise partner or fixed branded outlet.",
+          doorstepPlanTitle: "Doorstep Franchise Partner",
+          doorstepPlanPrice: "₹1.8 LAKH",
+          doorstepPlanPerks: "Low investment,No shop required,Proven high margin model,Machinery & launch support",
+          outletPlanTitle: "Branded Outlet Partner",
+          outletPlanPrice: "₹3.5 LAKH",
+          outletPlanPerks: "Storefront branding,Interior setup,High-end pressure equipment,Technology & SOPs",
           contactPhone: "+91 98765 43210",
           contactEmail: "washmycarorg@gmail.com",
-          contactAddress: "Sujatha Nagar, Vizag",
-          promoTitle: "Get 20% OFF Your First Wash!",
-          promoText: "Claim Offer"
+          contactAddress: "Sujatha Nagar, Visakhapatnam, Andhra Pradesh",
+          whatsappNumber: "+919876543210",
+          promoTitle: "Get 20% OFF Your First Doorstep Wash!",
+          promoText: "Claim Offer Now"
         }
       });
     }

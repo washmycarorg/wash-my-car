@@ -62,6 +62,12 @@ router.delete('/inventory/:id', adminController.deleteInventoryItem);
 router.post('/inventory/allocate', adminController.allocateInventory);
 router.delete('/inventory/allocate/:id', adminController.deleteAllocation);
 
+// Addons
+router.get('/addons', adminController.getAddons);
+router.post('/addons', adminController.createAddon);
+router.put('/addons/:id', adminController.updateAddon);
+router.delete('/addons/:id', adminController.deleteAddon);
+
 // System Settings
 router.get('/settings', adminController.getSystemSettings);
 router.put('/settings', adminController.updateSystemSettings);

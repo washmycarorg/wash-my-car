@@ -175,6 +175,23 @@ const Schedule = () => {
                   </div>
                 </div>
 
+                {/* Add-ons Requirement Pill for Technician */}
+                {booking.addons && booking.addons.length > 0 && (
+                  <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '8px', padding: '0.65rem 0.85rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    <span style={{ fontSize: '0.78rem', color: '#15803D', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      ✨ Additional Add-on Tasks ({booking.addons.length})
+                    </span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                      {booking.addons.map(ba => (
+                        <span key={ba.id} style={{ background: 'white', border: '1px solid #86EFAC', color: '#166534', padding: '0.25rem 0.55rem', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                          <span>{ba.addon?.icon || '➕'}</span>
+                          <span>{ba.addon?.name}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Actions Row */}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', borderTop: '1px solid #F1F5F9', paddingTop: '1rem' }}>
                   

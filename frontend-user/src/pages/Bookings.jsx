@@ -115,6 +115,15 @@ const Bookings = () => {
               {carLabel} &bull; {dateStr} &bull; {booking.timeSlot}
               {areaLabel && <> &bull; {areaLabel}</>}
             </div>
+            {booking.addons && booking.addons.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.35rem' }}>
+                {booking.addons.map(ba => (
+                  <span key={ba.id} style={{ fontSize: '0.72rem', background: '#DCFCE7', color: '#166534', padding: '0.1rem 0.45rem', borderRadius: '6px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                    <span>{ba.addon?.icon || '✨'}</span> {ba.addon?.name} (+₹{ba.price})
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Price + expand */}
@@ -138,6 +147,23 @@ const Bookings = () => {
                 </div>
               </div>
             </div>
+
+            {/* Addons Details */}
+            {booking.addons && booking.addons.length > 0 && (
+              <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '8px', padding: '0.65rem 0.85rem' }}>
+                <div style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.35rem' }}>
+                  Included Add-on Services
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  {booking.addons.map(ba => (
+                    <div key={ba.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#15803D' }}>
+                      <span>{ba.addon?.icon || '✨'} {ba.addon?.name}</span>
+                      <span style={{ fontWeight: 600 }}>+₹{ba.price}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Employee */}
             {employeeName && (
@@ -175,17 +201,21 @@ const Bookings = () => {
               <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Payment Breakdown</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.88rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Base Price</span>
-                  <span style={{ color: 'var(--primary-navy)' }}>₹{booking.originalPrice ?? booking.price}</span>
+                  <span style={{ color: 'var(--text-muted)' }}>Base Wash Price</span>
+                  <span style={{ color: 'var(--primary-navy)' }}>₹{(booking.originalPrice ?? booking.price) - (booking.addonsTotal || 0)}</span>
                 </div>
+                {booking.addonsTotal > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#047857' }}>
+                    <span>Add-ons Total</span>
+                    <span>+₹{booking.addonsTotal}</span>
+                  </div>
+                )}
                 {booking.appliedOfferCode && (
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--accent-teal)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                       <Tag size={12} /> Coupon ({booking.appliedOfferCode})
                     </span>
-                    <span style={{ color: 'var(--accent-teal)', fontWeight: 600 }}>
-                      -{booking.originalPrice && booking.price ? `₹${((booking.originalPrice || 0) - (booking.price || 0) + (booking.pointsRedeemed ? booking.pointsRedeemed / (booking.pointsRedeemed / ((booking.originalPrice - booking.price))) : 0)).toFixed(2)}` : 'Applied'}
-                    </span>
+                    <span style={{ color: 'var(--accent-teal)', fontWeight: 600 }}>Applied</span>
                   </div>
                 )}
                 {booking.pointsRedeemed > 0 && (

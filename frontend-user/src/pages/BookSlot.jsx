@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, MapPin, Car as CarIcon, CreditCard, CheckCircle, Search, Compass, AlertCircle, Tag } from 'lucide-react';
+import { Calendar, MapPin, Car as CarIcon, CreditCard, CheckCircle, Search, Compass, AlertCircle, Tag, Sparkles, Plus, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { 
   createBooking, 
@@ -11,7 +11,8 @@ import {
   getSavedAddresses,
   getEligibleCoupons,
   getSettings,
-  getProfile
+  getProfile,
+  getAddons
 } from '../api';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
@@ -130,6 +131,8 @@ const BookSlot = () => {
   const [savedCars, setSavedCars] = useState([]);
   const [savedAddresses, setSavedAddresses] = useState([]);
   const [eligibleCoupons, setEligibleCoupons] = useState([]);
+  const [availableAddons, setAvailableAddons] = useState([]);
+  const [selectedAddonIds, setSelectedAddonIds] = useState([]);
   const [systemSettings, setSystemSettings] = useState(null);
   const [userPoints, setUserPoints] = useState(0);
 
@@ -185,14 +188,16 @@ const BookSlot = () => {
       getServiceAreas(),
       getCars(),
       getSavedAddresses(),
+      getAddons().catch(() => []),
       getSettings().catch(() => null),
       getProfile().catch(() => null)
-    ]).then(([carsT, washT, areas, cars, addrs, settingsRes, profileRes]) => {
+    ]).then(([carsT, washT, areas, cars, addrs, addonsList, settingsRes, profileRes]) => {
       setCarTypes(carsT);
       setWashTypes(washT);
       setServiceAreas(areas);
       setSavedCars(cars);
       setSavedAddresses(addrs);
+      setAvailableAddons(addonsList || []);
       setSystemSettings(settingsRes);
       if (profileRes) {
         setUserPoints(profileRes.points || 0);
@@ -386,7 +391,16 @@ const BookSlot = () => {
     });
   };
 
+  const handleToggleAddon = (addonId) => {
+    setSelectedAddonIds(prev => 
+      prev.includes(addonId) ? prev.filter(id => id !== addonId) : [...prev, addonId]
+    );
+  };
+
   const handleBookingSubmit = async () => {
+    if (!selectedCarType || !selectedWashType) {
+      return alert('Please select a car type and car wash package. Add-ons cannot be booked individually.');
+    }
     if (!date) return alert('Please choose a service date.');
     if (!timeSlot) return alert('Please select a time slot.');
     if (selectedCarSource === 'new' && (!carMake || !carModel)) {
@@ -425,7 +439,8 @@ const BookSlot = () => {
           saveAddress: selectedAddressSource === 'new' && saveAddress,
           addressName: selectedAddressSource === 'new' ? addressLabel : '',
           couponCode: selectedCouponCode || undefined,
-          redeemPoints: redeemPoints
+          redeemPoints: redeemPoints,
+          addonIds: selectedAddonIds
         };
 
         await createBooking(payload);
@@ -443,7 +458,11 @@ const BookSlot = () => {
     }, 2000);
   };
 
-  const basePrice = price || 0;
+  const selectedAddonsList = availableAddons.filter(a => selectedAddonIds.includes(a.id));
+  const addonsTotal = selectedAddonsList.reduce((sum, a) => sum + a.price, 0);
+  const baseWashPrice = price || 0;
+  const initialTotal = baseWashPrice + addonsTotal;
+
   const appliedCoupon = eligibleCoupons.find(c => c.code === selectedCouponCode);
   
   let discountVal = 0;
@@ -451,13 +470,13 @@ const BookSlot = () => {
     if (appliedCoupon.discountType === 'FLAT') {
       discountVal = appliedCoupon.discountAmount || 0;
     } else {
-      discountVal = (basePrice * (appliedCoupon.discountPct || 0)) / 100;
+      discountVal = (initialTotal * (appliedCoupon.discountPct || 0)) / 100;
       if (appliedCoupon.limitOption === 'UP_TO' && appliedCoupon.maxDiscountAmount) {
         discountVal = Math.min(discountVal, appliedCoupon.maxDiscountAmount);
       }
     }
   }
-  const subtotal = Math.max(0, basePrice - discountVal);
+  const subtotal = Math.max(0, initialTotal - discountVal);
   
   const redemptionEnabled = !systemSettings || systemSettings.pointsRedemption !== false;
   const rewardEnabled = !systemSettings || systemSettings.pointsReward !== false;
@@ -603,6 +622,95 @@ const BookSlot = () => {
             );
           })}
         </div>
+      </div>
+
+      {/* 2.5 Add-on Services (Optional) */}
+      <div className="card" style={{ padding: '1.5rem', marginBottom: '1.5rem', border: '1px solid #E0E7FF', background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary-navy)', margin: 0 }}>
+            <Sparkles size={20} color="var(--accent-teal)" /> Add-on Services (Optional)
+          </h3>
+          <span style={{ fontSize: '0.75rem', background: '#E0F2FE', color: '#0369A1', padding: '0.2rem 0.6rem', borderRadius: '12px', fontWeight: 600 }}>
+            Add with any Wash
+          </span>
+        </div>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0 0 1rem 0' }}>
+          Pamper your ride with extra specialized care. Add-ons must accompany a car wash package.
+        </p>
+
+        {availableAddons.length === 0 ? (
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic' }}>No active add-ons available right now.</p>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.85rem' }}>
+            {availableAddons.map(addon => {
+              const isChecked = selectedAddonIds.includes(addon.id);
+              return (
+                <div
+                  key={addon.id}
+                  onClick={() => handleToggleAddon(addon.id)}
+                  style={{
+                    border: isChecked ? '2px solid var(--accent-teal)' : '1px solid #E2E8F0',
+                    background: isChecked ? '#F0FDF4' : 'white',
+                    borderRadius: '10px',
+                    padding: '0.9rem 1rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '0.75rem',
+                    transition: 'all 0.2s',
+                    boxShadow: isChecked ? '0 2px 8px rgba(16, 185, 129, 0.15)' : 'var(--shadow-sm)'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '8px',
+                      background: isChecked ? '#DCFCE7' : '#F1F5F9',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '1.2rem',
+                      flexShrink: 0
+                    }}>
+                      {addon.icon || '✨'}
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, color: 'var(--primary-navy)', fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <span>{addon.name}</span>
+                      </div>
+                      {addon.description && (
+                        <p style={{ margin: '0.15rem 0 0', color: 'var(--text-muted)', fontSize: '0.78rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {addon.description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+                    <span style={{ fontWeight: 800, color: isChecked ? '#047857' : 'var(--primary-navy)', fontSize: '0.95rem' }}>
+                      +₹{addon.price}
+                    </span>
+                    <div style={{
+                      width: '22px',
+                      height: '22px',
+                      borderRadius: '6px',
+                      border: isChecked ? '2px solid #059669' : '2px solid #CBD5E1',
+                      background: isChecked ? '#059669' : 'white',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white'
+                    }}>
+                      {isChecked ? <Check size={14} strokeWidth={3} /> : <Plus size={14} color="#94A3B8" />}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* 3. Address Map Pinpoint */}
@@ -844,13 +952,29 @@ const BookSlot = () => {
         
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.9rem', color: 'var(--text-main)', textAlign: 'left' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>Plan Subtotal:</span>
-            <span>₹{basePrice}</span>
+            <span>Base Wash Plan ({currentWashTypeName || 'Wash'}):</span>
+            <span>₹{priceLoading ? '...' : baseWashPrice}</span>
           </div>
+
+          {selectedAddonsList.length > 0 && (
+            <div style={{ background: '#F8FAFC', border: '1px dashed #CBD5E1', borderRadius: '6px', padding: '0.5rem 0.75rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: 'var(--primary-navy)', marginBottom: '0.25rem' }}>
+                <span>Add-on Services ({selectedAddonsList.length}):</span>
+                <span>+₹{addonsTotal}</span>
+              </div>
+              {selectedAddonsList.map(addon => (
+                <div key={addon.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  <span>• {addon.name}</span>
+                  <span>+₹{addon.price}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
           {discountVal > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--accent-teal)', fontWeight: 600 }}>
               <span>Coupon Discount ({selectedCouponCode}):</span>
-              <span>-₹{discountVal}</span>
+              <span>-₹{discountVal.toFixed(2)}</span>
             </div>
           )}
           {pointsCashValueUsed > 0 && (
@@ -892,7 +1016,7 @@ const BookSlot = () => {
           zIndex: 1000,
           padding: '1rem'
         }}>
-          <div className="card" style={{ width: '100%', maxWidth: '440px', background: 'white', padding: '2rem', borderRadius: 'var(--radius-lg)', position: 'relative' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '460px', background: 'white', padding: '2rem', borderRadius: 'var(--radius-lg)', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
             
             {paymentSuccess ? (
               <div style={{ textAlign: 'center', padding: '2rem 0' }} className="animate-fade-in">
@@ -905,9 +1029,36 @@ const BookSlot = () => {
                 <h3 style={{ color: 'var(--primary-navy)', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                   <CreditCard color="var(--primary-blue)" /> Pay Online
                 </h3>
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
-                  Complete checkout for wash total <strong>₹{finalPrice.toFixed(2)}</strong>
-                </p>
+                
+                {/* Order Summary inside Modal */}
+                <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1.25rem', fontSize: '0.85rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--primary-navy)', fontWeight: 600, marginBottom: '0.25rem' }}>
+                    <span>{currentWashTypeName} ({currentCarTypeName})</span>
+                    <span>₹{baseWashPrice}</span>
+                  </div>
+                  {selectedAddonsList.map(a => (
+                    <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                      <span>+ {a.name}</span>
+                      <span>₹{a.price}</span>
+                    </div>
+                  ))}
+                  {discountVal > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--accent-teal)', fontSize: '0.8rem' }}>
+                      <span>Coupon Discount</span>
+                      <span>-₹{discountVal.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {pointsCashValueUsed > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#B45309', fontSize: '0.8rem' }}>
+                      <span>Royalty Cashback</span>
+                      <span>-₹{pointsCashValueUsed.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #CBD5E1', paddingTop: '0.4rem', marginTop: '0.4rem', fontWeight: 700, color: 'var(--primary-navy)', fontSize: '0.95rem' }}>
+                    <span>Total to Pay:</span>
+                    <span>₹{finalPrice.toFixed(2)}</span>
+                  </div>
+                </div>
 
                 <form onSubmit={handleProcessPayment} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <div className="form-group" style={{ marginBottom: 0 }}>

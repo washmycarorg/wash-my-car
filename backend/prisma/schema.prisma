@@ -148,6 +148,7 @@ model Booking {
   serviceAreaId Int
   serviceArea   ServiceArea  @relation(fields: [serviceAreaId], references: [id])
   price         Float
+  addonsTotal   Float        @default(0.0)
   employeePayout Float       @default(0.0)
   companyCost   Float       @default(0.0)
   appliedOfferCode String?
@@ -156,6 +157,9 @@ model Booking {
   paymentStatus String       @default("PENDING")
   paymentMethod String       @default("ONLINE")
   
+  // Addons attached to booking
+  addons         BookingAddon[]
+
   // Service pictures and locations
   startImage     String?
   startLatitude  Float?
@@ -168,6 +172,30 @@ model Booking {
   endAt          DateTime?
 
   createdAt   DateTime  @default(now())
+}
+
+model Addon {
+  id          Int            @id @default(autoincrement())
+  name        String         @unique // e.g. "Helmet Wash & Sanitization", "Bike / Scooter Foam Wash"
+  price       Float          // e.g. 99, 199
+  description String?
+  icon        String?        // icon name or image url
+  active      Boolean        @default(true)
+  bookings    BookingAddon[]
+  createdAt   DateTime       @default(now())
+}
+
+model BookingAddon {
+  id        Int      @id @default(autoincrement())
+  bookingId Int
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  addonId   Int
+  addon     Addon    @relation(fields: [addonId], references: [id])
+  price     Float    // Price at the time of booking
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+
+  @@unique([bookingId, addonId])
 }
 
 model Leave {
@@ -234,15 +262,69 @@ model SystemSettings {
 }
 
 model CmsContent {
-  id             Int      @id @default(1)
-  heroTitle      String   @default("Professional Car Wash at Your Doorstep")
-  heroSubtitle   String   @default("Fast, affordable, and eco-friendly car cleaning in Visakhapatnam.")
-  heroImage      String   @default("/images/hero_wash.png")
-  aboutTitle     String   @default("Serving Visakhapatnam & Surrounds")
-  aboutText      String   @default("We proudly serve all Visakhapatnam neighborhoods with professional care and premium equipment!")
-  contactPhone   String   @default("+91 98765 43210")
-  contactEmail   String   @default("washmycarorg@gmail.com")
-  contactAddress String   @default("Sujatha Nagar, Vizag")
-  promoTitle     String   @default("Get 20% OFF Your First Wash!")
-  promoText      String   @default("Claim Offer")
+  id                      Int      @id @default(1)
+  // Hero section
+  heroKicker              String   @default("WASH MY CAR • DOORSTEP CAR WASH")
+  heroTitle               String   @default("WE WASH.\nYOU RELAX.")
+  heroSubtitle            String   @default("Premium vehicle spa and car detailing at your doorstep. Save time, skip the queue, and let trained professionals care for your car.")
+  heroImage               String   @default("https://images.unsplash.com/photo-1504215680853-026ed2a45def?auto=format&fit=crop&w=2200&q=95")
+  heroBadgeText           String   @default("WATER EFFICIENT & RO CARE")
+  heroCtaPrimary          String   @default("Book Doorstep Wash")
+  heroCtaSecondary        String   @default("Explore Packages")
+
+  // Quick announcement bar
+  quickBarLive            String   @default("● LIVE DOORSTEP SPA")
+  quickBarTitle           String   @default("App & Online Booking is Live.")
+  quickBarSubtitle        String   @default("Book doorstep vehicle detailing in seconds.")
+
+  // Services / Detailing info
+  aboutTitle              String   @default("Serving Visakhapatnam & Surrounds")
+  aboutText               String   @default("We proudly serve all Visakhapatnam neighborhoods with professional care and premium equipment!")
+  servicesTitle           String   @default("EVERYDAY CARE. PREMIUM SHINE.")
+  servicesSubtitle        String   @default("One destination for your vehicle's everyday wash, interior deep steam, and premium shine.")
+  
+  // Why Choose Us / The Difference
+  whyTitle                String   @default("SMARTER CAR CARE. BUILT AROUND YOU.")
+  whySubtitle             String   @default("Convenience-first automotive detailing with professional equipment and RO water efficiency.")
+  whyCard1Title           String   @default("YOUR CAR STAYS. WE COME TO YOU.")
+  whyCard1Text            String   @default("No queues. No driving to wash centres. Our technicians arrive at your home or office with high-pressure machines and RO water.")
+  whyCard2Title           String   @default("Book in Seconds")
+  whyCard2Text            String   @default("Choose your wash package, select your slot, and track everything live.")
+  whyCard3Title           String   @default("Trained Specialists")
+  whyCard3Text            String   @default("Background-verified, trained vehicle care professionals using pH-neutral premium shampoos.")
+  whyCard4Title           String   @default("Water-Efficient Care")
+  whyCard4Text            String   @default("Eco-conscious steam & pressure washing saves up to 80% water compared to traditional washing.")
+
+  // Metrics / Stats
+  statCustomers           String   @default("10K+")
+  statCustomersLabel      String   @default("Happy Vehicle Owners")
+  statCities              String   @default("2+")
+  statCitiesLabel         String   @default("Service Hubs Live")
+  statDuration            String   @default("30–90")
+  statDurationLabel       String   @default("Minutes Service Time")
+  statPrice               String   @default("₹299+")
+  statPriceLabel          String   @default("Starting Wash Price")
+
+  // Partner / Franchise
+  partnerTitle            String   @default("BUILD THE NEXT CAR CARE BUSINESS")
+  partnerSubtitle         String   @default("Choose the operating model that fits your city — doorstep franchise partner or fixed branded outlet.")
+  doorstepPlanTitle       String   @default("Doorstep Franchise Partner")
+  doorstepPlanPrice       String   @default("₹1.8 LAKH")
+  doorstepPlanPerks       String   @default("Low investment,No shop required,Proven high margin model,Machinery & launch support")
+  outletPlanTitle         String   @default("Branded Outlet Partner")
+  outletPlanPrice         String   @default("₹3.5 LAKH")
+  outletPlanPerks         String   @default("Storefront branding,Interior setup,High-end pressure equipment,Technology & SOPs")
+
+  // Contact details
+  contactPhone            String   @default("+91 98765 43210")
+  contactEmail            String   @default("washmycarorg@gmail.com")
+  contactAddress          String   @default("Sujatha Nagar, Visakhapatnam, Andhra Pradesh")
+  whatsappNumber          String   @default("+919876543210")
+
+  // Promo Offer
+  promoTitle              String   @default("Get 20% OFF Your First Doorstep Wash!")
+  promoText               String   @default("Claim Offer Now")
+
+  // FAQs JSON string
+  faqs                    String   @default("[{\"q\":\"How do I book a doorstep car wash?\",\"a\":\"Simply select your vehicle type, pick your package & add-ons, choose a convenient date and time slot, and our trained technician will arrive with full equipment.\"},{\"q\":\"Do I need to provide water and electricity?\",\"a\":\"Our mobile units are equipped with water tanks and compact generators for maximum convenience, though access to a standard domestic point is welcome.\"},{\"q\":\"Can I book add-on services like Helmet or Bike wash?\",\"a\":\"Yes! You can add Helmet wash, 2-wheeler wash, interior steam cleaning, and engine bay cleaning directly during your car wash booking checkout.\"},{\"q\":\"Where is Wash My Car currently available?\",\"a\":\"We are actively serving Visakhapatnam and surrounding neighborhoods, with expansion across Andhra Pradesh and Telangana.\"}]")
 }

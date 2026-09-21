@@ -2,36 +2,42 @@ import React, { useState, useEffect } from 'react';
 import { 
   getCarTypes, createCarType, deleteCarType,
   getWashTypes, createWashType, deleteWashType,
-  getWashPrices, saveWashPrice
+  getWashPrices, saveWashPrice,
+  getAddons, createAddon, updateAddon, deleteAddon
 } from '../api';
-import { Settings, Car, Sparkles, DollarSign, Plus, Trash2, Edit3, Check, X } from 'lucide-react';
+import { Settings, Car, Sparkles, DollarSign, Plus, Trash2, Edit3, Check, X, Shield, Bike, Flame, Feather, Droplets, CheckCircle, ToggleLeft, ToggleRight } from 'lucide-react';
 
 const Services = () => {
-  const [activeTab, setActiveTab] = useState('matrix'); // 'matrix', 'cartypes', 'washtypes'
+  const [activeTab, setActiveTab] = useState('matrix'); // 'matrix', 'cartypes', 'washtypes', 'addons'
   
   // Lists
   const [carTypes, setCarTypes] = useState([]);
   const [washTypes, setWashTypes] = useState([]);
   const [prices, setPrices] = useState([]);
+  const [addons, setAddons] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Form states
   const [newCarType, setNewCarType] = useState('');
   const [newWashType, setNewWashType] = useState({ name: '', description: '' });
+  const [newAddon, setNewAddon] = useState({ name: '', price: '', description: '', active: true });
+  const [editingAddon, setEditingAddon] = useState(null);
 
   // Inline editing state for matrix cell
   const [editingCell, setEditingCell] = useState(null); // { carTypeId, washTypeId, price, payoutType, payoutValue }
 
   const fetchData = async () => {
     try {
-      const [cars, washes, matrixPrices] = await Promise.all([
+      const [cars, washes, matrixPrices, addonsList] = await Promise.all([
         getCarTypes(),
         getWashTypes(),
-        getWashPrices()
+        getWashPrices(),
+        getAddons().catch(() => [])
       ]);
       setCarTypes(cars);
       setWashTypes(washes);
       setPrices(matrixPrices);
+      setAddons(addonsList);
     } catch (err) {
       console.error(err);
     } finally {
@@ -91,6 +97,56 @@ const Services = () => {
     }
   };
 
+  // Addons Handlers
+  const handleAddAddon = async (e) => {
+    e.preventDefault();
+    if (!newAddon.name.trim() || !newAddon.price) return;
+    try {
+      await createAddon({
+        name: newAddon.name,
+        price: Number(newAddon.price),
+        description: newAddon.description,
+        active: newAddon.active
+      });
+      setNewAddon({ name: '', price: '', description: '', active: true });
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to add add-on. Make sure the name is unique.');
+    }
+  };
+
+  const handleUpdateAddon = async (id, data) => {
+    try {
+      await updateAddon(id, data);
+      setEditingAddon(null);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to update add-on.');
+    }
+  };
+
+  const handleToggleAddon = async (addon) => {
+    try {
+      await updateAddon(addon.id, { active: !addon.active });
+      fetchData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteAddon = async (id) => {
+    if (!confirm('Are you sure you want to delete this add-on?')) return;
+    try {
+      await deleteAddon(id);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to delete add-on.');
+    }
+  };
+
   // Save Pricing Matrix
   const handleSavePriceCell = async () => {
     if (!editingCell) return;
@@ -125,7 +181,7 @@ const Services = () => {
   return (
     <div className="animate-fade-in">
       {/* Navigation tabs */}
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '2px solid #E2E8F0', paddingBottom: '0.5rem' }}>
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '2px solid #E2E8F0', paddingBottom: '0.5rem', flexWrap: 'wrap' }}>
         <button 
           onClick={() => setActiveTab('matrix')}
           style={{
@@ -180,7 +236,26 @@ const Services = () => {
             gap: '0.25rem'
           }}
         >
-          <Sparkles size={18} /> Wash Types
+          <Sparkles size={18} /> Wash Plans
+        </button>
+
+        <button 
+          onClick={() => setActiveTab('addons')}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            fontSize: '1rem',
+            fontWeight: 600,
+            color: activeTab === 'addons' ? 'var(--primary-blue)' : 'var(--text-muted)',
+            borderBottom: activeTab === 'addons' ? '3px solid var(--primary-blue)' : 'none',
+            padding: '0.5rem 1rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.4rem'
+          }}
+        >
+          <Plus size={18} /> Add-ons ({addons.length})
         </button>
       </div>
 
@@ -454,6 +529,184 @@ const Services = () => {
                   </div>
                 ))}
                 {washTypes.length === 0 && <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No wash types created yet.</p>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'addons' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Create Add-on form */}
+          <div className="lg:col-span-1">
+            <div className="card">
+              <h3 style={{ marginBottom: '1.25rem', color: 'var(--primary-navy)' }}>
+                {editingAddon ? 'Edit Add-on Service' : 'Create New Add-on'}
+              </h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+                Add-ons (e.g. Helmet wash, Bike wash, Engine steam) can only be added along with a main vehicle wash.
+              </p>
+              
+              <form 
+                onSubmit={editingAddon ? (e) => { e.preventDefault(); handleUpdateAddon(editingAddon.id, editingAddon); } : handleAddAddon} 
+                style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
+              >
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Add-on Name</label>
+                  <input 
+                    required 
+                    type="text" 
+                    className="form-input" 
+                    placeholder="e.g. Helmet Wash, Two-Wheeler Foam Wash"
+                    value={editingAddon ? editingAddon.name : newAddon.name}
+                    onChange={e => editingAddon 
+                      ? setEditingAddon({ ...editingAddon, name: e.target.value })
+                      : setNewAddon({ ...newAddon, name: e.target.value })
+                    }
+                  />
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Price (₹ INR)</label>
+                  <input 
+                    required 
+                    type="number" 
+                    min="0"
+                    step="1"
+                    className="form-input" 
+                    placeholder="e.g. 99, 199, 299"
+                    value={editingAddon ? editingAddon.price : newAddon.price}
+                    onChange={e => editingAddon 
+                      ? setEditingAddon({ ...editingAddon, price: e.target.value })
+                      : setNewAddon({ ...newAddon, price: e.target.value })
+                    }
+                  />
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Description</label>
+                  <textarea 
+                    className="form-input" 
+                    placeholder="Short summary of what this add-on includes..."
+                    value={editingAddon ? (editingAddon.description || '') : newAddon.description}
+                    onChange={e => editingAddon 
+                      ? setEditingAddon({ ...editingAddon, description: e.target.value })
+                      : setNewAddon({ ...newAddon, description: e.target.value })
+                    }
+                    rows={3}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                  <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
+                    {editingAddon ? 'Save Add-on' : 'Add Service'}
+                  </button>
+                  {editingAddon && (
+                    <button 
+                      type="button" 
+                      onClick={() => setEditingAddon(null)} 
+                      className="btn btn-outline"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
+              </form>
+            </div>
+          </div>
+
+          {/* Add-ons List */}
+          <div className="lg:col-span-2">
+            <div className="card" style={{ padding: 0 }}>
+              <div className="p-6 border-b border-gray-200" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ margin: 0, color: 'var(--primary-navy)' }}>Active Add-ons Catalog</h3>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  Total: {addons.length} items
+                </span>
+              </div>
+
+              <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                {addons.map(addon => (
+                  <div 
+                    key={addon.id} 
+                    style={{
+                      padding: '1.1rem 1.25rem',
+                      border: addon.active ? '1px solid #E2E8F0' : '1px dashed #CBD5E1',
+                      borderRadius: 'var(--radius-md)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      background: addon.active ? 'white' : '#F8FAFC',
+                      opacity: addon.active ? 1 : 0.7,
+                      transition: 'all 0.2s',
+                      boxShadow: 'var(--shadow-sm)'
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0, paddingRight: '1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                        <h4 style={{ margin: 0, color: 'var(--primary-navy)', fontWeight: 700, fontSize: '1rem' }}>
+                          {addon.name}
+                        </h4>
+                        <span style={{ 
+                          fontWeight: 800, 
+                          color: '#0284C7', 
+                          background: '#E0F2FE', 
+                          padding: '0.2rem 0.6rem', 
+                          borderRadius: '20px', 
+                          fontSize: '0.85rem' 
+                        }}>
+                          ₹{addon.price}
+                        </span>
+                        <span style={{
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          padding: '0.15rem 0.5rem',
+                          borderRadius: '12px',
+                          background: addon.active ? '#DCFCE7' : '#F1F5F9',
+                          color: addon.active ? '#15803D' : '#64748B'
+                        }}>
+                          {addon.active ? 'ACTIVE' : 'INACTIVE'}
+                        </span>
+                      </div>
+                      {addon.description && (
+                        <p style={{ margin: '0.35rem 0 0', color: 'var(--text-muted)', fontSize: '0.85rem', lineHeight: 1.4 }}>
+                          {addon.description}
+                        </p>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+                      <button 
+                        onClick={() => handleToggleAddon(addon)}
+                        className="btn btn-outline"
+                        style={{ padding: '0.35rem 0.7rem', fontSize: '0.8rem', borderRadius: '4px' }}
+                        title={addon.active ? 'Deactivate' : 'Activate'}
+                      >
+                        {addon.active ? 'Disable' : 'Enable'}
+                      </button>
+                      <button 
+                        onClick={() => setEditingAddon(addon)}
+                        className="btn btn-outline"
+                        style={{ padding: '0.35rem 0.6rem', borderRadius: '4px' }}
+                        title="Edit"
+                      >
+                        <Edit3 size={15} color="var(--primary-blue)" />
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteAddon(addon.id)}
+                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.35rem' }}
+                        title="Delete"
+                      >
+                        <Trash2 size={16} color="var(--danger)" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {addons.length === 0 && (
+                  <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
+                    No add-on services configured. Create your first add-on using the form on the left.
+                  </p>
+                )}
               </div>
             </div>
           </div>

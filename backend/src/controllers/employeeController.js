@@ -154,7 +154,12 @@ export const getAssignedBookings = async (req, res) => {
         car: true, 
         carType: true, 
         washType: true, 
-        serviceArea: true 
+        serviceArea: true,
+        addons: {
+          include: {
+            addon: true
+          }
+        }
       },
       orderBy: { date: 'asc' }
     });

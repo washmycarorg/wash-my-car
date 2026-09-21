@@ -19,7 +19,8 @@ import {
   getEligibleCoupons,
   getPublicSettings,
   getPublicHomeContent,
-  getAllWashPrices
+  getAllWashPrices,
+  getAddons
 } from '../controllers/userController.js';
 
 const router = express.Router();
@@ -30,6 +31,7 @@ router.get('/service-areas', getServiceAreas);
 router.get('/wash-types', getWashTypes);
 router.get('/wash-prices', getAllWashPrices);
 router.get('/car-types', getCarTypes);
+router.get('/addons', getAddons);
 
 router.use(verifyToken);
 

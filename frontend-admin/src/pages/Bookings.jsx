@@ -340,13 +340,32 @@ const Bookings = () => {
                   <span style={{ fontSize: '0.75rem', background: 'var(--accent-teal-light)', color: 'var(--primary-navy)', padding: '0.2rem 0.5rem', borderRadius: '4px', display: 'inline-block', marginTop: '0.25rem', fontWeight: 600 }}>
                     {b.serviceArea?.name || 'Local'}
                   </span>
+                  {b.addons && b.addons.length > 0 && (
+                    <div style={{ marginTop: '0.5rem', padding: '0.35rem 0.5rem', background: '#EFF6FF', borderRadius: '6px', border: '1px solid #BFDBFE' }}>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1D4ED8', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <Sparkles size={11} /> +{b.addons.length} Add-on{b.addons.length > 1 ? 's' : ''}:
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', marginTop: '0.2rem' }}>
+                        {b.addons.map((ba, idx) => (
+                          <span key={idx} style={{ fontSize: '0.72rem', color: '#1E40AF', fontWeight: 500 }}>
+                            • {ba.addon?.name || 'Add-on'} (+₹{ba.price})
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </td>
                 
                 {/* Date & Price */}
                 <td style={{ padding: '1.25rem 1.5rem' }}>
                   <div style={{ fontWeight: 600 }}>{new Date(b.date).toLocaleDateString()}</div>
                   <div className="text-xs text-muted" style={{ marginBottom: '0.25rem' }}>{b.timeSlot}</div>
-                  <div style={{ fontWeight: 700, color: 'var(--primary-blue)' }}>₹{b.price}</div>
+                  <div style={{ fontWeight: 800, color: 'var(--primary-blue)', fontSize: '1.05rem' }}>₹{b.price}</div>
+                  {b.addonsTotal > 0 && (
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                      (Incl. ₹{b.addonsTotal} add-ons)
+                    </div>
+                  )}
                 </td>
                 
                 {/* Status */}
@@ -556,6 +575,34 @@ const Bookings = () => {
                   <AlertCircle size={24} style={{ marginBottom: '0.25rem' }} />
                   Google Maps SDK could not be loaded because VITE_GOOGLE_MAPS_API_KEY is missing.
                 </div>
+              )}
+            </div>
+
+            {/* Ordered Services & Add-ons info */}
+            <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', padding: '1rem', borderRadius: 'var(--radius-md)', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                <span style={{ fontWeight: 700, color: 'var(--primary-navy)' }}>
+                  {selectedBooking.washType?.name} ({selectedBooking.carType?.name})
+                </span>
+                <span style={{ fontWeight: 800, color: 'var(--primary-blue)', fontSize: '1rem' }}>
+                  Total Paid: ₹{selectedBooking.price}
+                </span>
+              </div>
+              {selectedBooking.addons && selectedBooking.addons.length > 0 ? (
+                <div style={{ marginTop: '0.5rem', borderTop: '1px dashed #93C5FD', paddingTop: '0.5rem' }}>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1E40AF', marginBottom: '0.25rem' }}>
+                    ✨ Attached Add-ons to Perform:
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    {selectedBooking.addons.map((ba, i) => (
+                      <span key={i} style={{ background: 'white', padding: '0.25rem 0.6rem', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 600, color: '#1D4ED8', border: '1px solid #DBEAFE' }}>
+                        + {ba.addon?.name || 'Add-on'} (₹{ba.price})
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No additional add-ons attached.</div>
               )}
             </div>
 

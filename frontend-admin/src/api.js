@@ -377,3 +377,39 @@ export const updateCmsSettings = async (data) => {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 };
+
+// Addons Management
+export const getAddons = async () => {
+  const res = await fetch(`${API_URL}/admin/addons`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const createAddon = async (data) => {
+  const res = await fetch(`${API_URL}/admin/addons`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const updateAddon = async (id, data) => {
+  const res = await fetch(`${API_URL}/admin/addons/${id}`, {
+    method: 'PUT',
+    headers: getHeaders(),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const deleteAddon = async (id) => {
+  const res = await fetch(`${API_URL}/admin/addons/${id}`, {
+    method: 'DELETE',
+    headers: getHeaders()
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
