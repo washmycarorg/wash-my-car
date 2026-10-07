@@ -4,13 +4,65 @@ import {
   Droplets, CheckCircle, Leaf, Car, Calendar, MapPin, Phone, 
   Mail, Award, Clock, Menu, X, Sparkles, Star, ChevronRight, Check, 
   Compass, Shield, Tag, ChevronDown, MessageCircle, ArrowRight,
-  Flame, Bike, Feather, Smartphone, ExternalLink, HelpCircle
+  Flame, Bike, Feather, Smartphone, ExternalLink, HelpCircle,
+  ChevronLeft, Play, Pause
 } from 'lucide-react';
 import { getHomeContent, getServiceAreas, getWashTypes, getAllWashPrices, getCarTypes, getAddons } from '../api';
 import logo from '../assets/wash my car.png';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 const VIZAG_COORDS = { lat: 17.7042, lng: 83.2980 };
+
+const DEFAULT_HERO_SLIDES = [
+  {
+    id: 'slide-1',
+    kicker: 'WASH MY CAR • DOORSTEP CAR WASH',
+    title: 'WE WASH.\nYOU RELAX.',
+    subtitle: 'Premium vehicle spa and car detailing at your doorstep. Save time, skip the queue, and let trained professionals care for your car.',
+    image: 'https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=2200&q=95',
+    badgeText: 'WATER EFFICIENT & RO CARE',
+    ctaPrimary: 'Book Doorstep Wash',
+    ctaSecondary: 'Explore Packages',
+    primaryLink: '/login',
+    secondaryLink: '#packages'
+  },
+  {
+    id: 'slide-2',
+    kicker: 'DEEP INTERIOR & STEAM DETAILING',
+    title: 'SHOWROOM SHINE.\nAT YOUR DOORSTEP.',
+    subtitle: 'High-pressure snow foam wash, germ-free steam disinfection, and deep microfiber rejuvenation for cars and bikes.',
+    image: 'https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=2200&q=95',
+    badgeText: 'ANTI-BACTERIAL STEAM',
+    ctaPrimary: 'Book Interior Spa',
+    ctaSecondary: 'View Packages',
+    primaryLink: '/login',
+    secondaryLink: '#packages'
+  },
+  {
+    id: 'slide-3',
+    kicker: 'CERAMIC & PAINT SHIELD',
+    title: '9H CERAMIC &\nPOLYMER COATING',
+    subtitle: 'Ultra-gloss paint correction and protective nanotech coating that shields against UV rays, swirl marks, and hard water spots.',
+    image: 'https://images.unsplash.com/photo-1507136566006-cfc505b114fc?auto=format&fit=crop&w=2200&q=95',
+    badgeText: '3-YEAR PROTECTION',
+    ctaPrimary: 'Get Ceramic Quote',
+    ctaSecondary: 'Explore Plans',
+    primaryLink: '/login',
+    secondaryLink: '#packages'
+  },
+  {
+    id: 'slide-4',
+    kicker: 'SPECIAL LAUNCH OFFER',
+    title: 'FLAT 20% OFF\nYOUR FIRST SERVICE',
+    subtitle: 'Join over 10,000 happy vehicle owners across Visakhapatnam enjoying doorstep mobile car spa at unbeatable prices.',
+    image: 'https://images.unsplash.com/photo-1504215680853-026ed2a45def?auto=format&fit=crop&w=2200&q=95',
+    badgeText: 'LIMITED TIME OFFER',
+    ctaPrimary: 'Claim 20% Off',
+    ctaSecondary: 'Why Wash My Car',
+    primaryLink: '/register',
+    secondaryLink: '#why-us'
+  }
+];
 
 const Home = () => {
   const navigate = useNavigate();
@@ -19,6 +71,7 @@ const Home = () => {
 
   // Dynamic CMS State with rich defaults
   const [cms, setCms] = useState({
+    heroSlides: DEFAULT_HERO_SLIDES,
     heroKicker: "WASH MY CAR • DOORSTEP CAR WASH",
     heroTitle: "WE WASH.\nYOU RELAX.",
     heroSubtitle: "Premium vehicle spa and car detailing at your doorstep. Save time, skip the queue, and let trained professionals care for your car.",
@@ -80,6 +133,11 @@ const Home = () => {
     ]
   });
 
+  // Slider State (Pexa Car Care Carousel)
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const [isAutoplayPaused, setIsAutoplayPaused] = useState(false);
+  const [touchStartX, setTouchStartX] = useState(0);
+
   const [areas, setAreas] = useState([]);
   const [washTypes, setWashTypes] = useState([]);
   const [washPrices, setWashPrices] = useState([]);
@@ -102,9 +160,24 @@ const Home = () => {
               faqsParsed = null;
             }
           }
+
+          let slidesParsed = res.heroSlides;
+          if (typeof slidesParsed === 'string') {
+            try {
+              slidesParsed = JSON.parse(slidesParsed);
+            } catch (e) {
+              slidesParsed = null;
+            }
+          }
+
+          const resolvedSlides = Array.isArray(slidesParsed) && slidesParsed.length > 0
+            ? slidesParsed
+            : DEFAULT_HERO_SLIDES;
+
           setCms(prev => ({
             ...prev,
             ...res,
+            heroSlides: resolvedSlides,
             faqs: Array.isArray(faqsParsed) && faqsParsed.length > 0 ? faqsParsed : prev.faqs
           }));
         }
@@ -117,6 +190,48 @@ const Home = () => {
     getCarTypes().then(setCarTypes).catch(console.warn);
     getAddons().then(setAddons).catch(console.warn);
   }, []);
+
+  const slides = Array.isArray(cms.heroSlides) && cms.heroSlides.length > 0
+    ? cms.heroSlides
+    : DEFAULT_HERO_SLIDES;
+
+  const activeSlide = slides[currentSlideIndex] || slides[0] || DEFAULT_HERO_SLIDES[0];
+
+  const nextSlide = () => {
+    setCurrentSlideIndex(prev => (prev === slides.length - 1 ? 0 : prev + 1));
+  };
+
+  const prevSlide = () => {
+    setCurrentSlideIndex(prev => (prev === 0 ? slides.length - 1 : prev - 1));
+  };
+
+  const goToSlide = (idx) => {
+    setCurrentSlideIndex(idx);
+  };
+
+  // Carousel Autoplay (Pexa style, pauses on hover)
+  useEffect(() => {
+    if (isAutoplayPaused || slides.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentSlideIndex(prev => (prev === slides.length - 1 ? 0 : prev + 1));
+    }, 5500);
+    return () => clearInterval(interval);
+  }, [isAutoplayPaused, slides.length]);
+
+  // Touch Swipe for Mobile
+  const handleTouchStart = (e) => {
+    setTouchStartX(e.touches[0].clientX);
+  };
+
+  const handleTouchEnd = (e) => {
+    const touchEndX = e.changedTouches[0].clientX;
+    const diff = touchStartX - touchEndX;
+    if (diff > 50) {
+      nextSlide();
+    } else if (diff < -50) {
+      prevSlide();
+    }
+  };
 
   // Initialize Google Maps showing all active coverage zones
   useEffect(() => {
@@ -338,21 +453,145 @@ const Home = () => {
         )}
       </nav>
 
-      {/* 2. SENSATIONAL WASHCARO-STYLE HERO SECTION */}
-      <header style={{
-        position: 'relative',
-        minHeight: '88vh',
-        background: 'linear-gradient(180deg, #0F172A 0%, #1E293B 70%, #F8FAFC 100%)',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        padding: '4rem 6% 6rem'
-      }}>
-        {/* Glow ambient background elements */}
-        <div style={{ position: 'absolute', top: '10%', left: '5%', width: '400px', height: '400px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(14,165,233,0.18), transparent 70%)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', top: '20%', right: '10%', width: '500px', height: '500px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(56,189,248,0.15), transparent 70%)', pointerEvents: 'none' }} />
+      {/* 2. PEXA CAR CARE-STYLE HERO CAROUSEL (SLIDER FRONT PAGE) */}
+      <header
+        onMouseEnter={() => setIsAutoplayPaused(true)}
+        onMouseLeave={() => setIsAutoplayPaused(false)}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        style={{
+          position: 'relative',
+          minHeight: '88vh',
+          background: '#0F172A',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          padding: '4rem 6% 6rem'
+        }}
+      >
+        {/* Dynamic Background Slides with Smooth Crossfade */}
+        {slides.map((slide, sIdx) => {
+          const isCurrent = sIdx === currentSlideIndex;
+          return (
+            <div
+              key={slide.id || sIdx}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                backgroundImage: `url(${slide.image})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                opacity: isCurrent ? 1 : 0,
+                transform: isCurrent ? 'scale(1)' : 'scale(1.05)',
+                transition: 'opacity 0.85s ease-in-out, transform 7s ease-out',
+                pointerEvents: 'none',
+                zIndex: 1
+              }}
+            />
+          );
+        })}
 
+        {/* Dual High-Contrast Cinematic Gradient Overlays */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'linear-gradient(90deg, rgba(15,23,42,0.96) 0%, rgba(15,23,42,0.86) 45%, rgba(15,23,42,0.45) 100%)',
+            pointerEvents: 'none',
+            zIndex: 2
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'linear-gradient(180deg, rgba(15,23,42,0.6) 0%, transparent 60%, rgba(15,23,42,0.95) 100%)',
+            pointerEvents: 'none',
+            zIndex: 2
+          }}
+        />
+
+        {/* Glow ambient background elements */}
+        <div style={{ position: 'absolute', top: '10%', left: '5%', width: '400px', height: '400px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(14,165,233,0.22), transparent 70%)', pointerEvents: 'none', zIndex: 2 }} />
+        <div style={{ position: 'absolute', top: '20%', right: '10%', width: '500px', height: '500px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(56,189,248,0.18), transparent 70%)', pointerEvents: 'none', zIndex: 2 }} />
+
+        {/* PEXA-STYLE PREV / NEXT ARROW CONTROLS */}
+        <button
+          onClick={prevSlide}
+          aria-label="Previous Slide"
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '1.25rem',
+            transform: 'translateY(-50%)',
+            zIndex: 20,
+            background: 'rgba(15, 23, 42, 0.75)',
+            backdropFilter: 'blur(12px)',
+            border: '1.5px solid rgba(255, 255, 255, 0.25)',
+            color: 'white',
+            width: '46px',
+            height: '46px',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            boxShadow: '0 8px 25px rgba(0,0,0,0.4)',
+            transition: 'all 0.2s'
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = '#0EA5E9';
+            e.currentTarget.style.transform = 'translateY(-50%) scale(1.1)';
+            e.currentTarget.style.borderColor = '#38BDF8';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = 'rgba(15, 23, 42, 0.75)';
+            e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
+            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.25)';
+          }}
+        >
+          <ChevronLeft size={24} />
+        </button>
+
+        <button
+          onClick={nextSlide}
+          aria-label="Next Slide"
+          style={{
+            position: 'absolute',
+            top: '50%',
+            right: '1.25rem',
+            transform: 'translateY(-50%)',
+            zIndex: 20,
+            background: 'rgba(15, 23, 42, 0.75)',
+            backdropFilter: 'blur(12px)',
+            border: '1.5px solid rgba(255, 255, 255, 0.25)',
+            color: 'white',
+            width: '46px',
+            height: '46px',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            boxShadow: '0 8px 25px rgba(0,0,0,0.4)',
+            transition: 'all 0.2s'
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = '#0EA5E9';
+            e.currentTarget.style.transform = 'translateY(-50%) scale(1.1)';
+            e.currentTarget.style.borderColor = '#38BDF8';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = 'rgba(15, 23, 42, 0.75)';
+            e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
+            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.25)';
+          }}
+        >
+          <ChevronRight size={24} />
+        </button>
+
+        {/* Slide Content Box */}
         <div style={{
           maxWidth: '1240px',
           margin: '0 auto',
@@ -362,17 +601,17 @@ const Home = () => {
           alignItems: 'center',
           gap: '3.5rem',
           position: 'relative',
-          zIndex: 2
+          zIndex: 5
         }}>
           {/* Left Column: Bold Typography & Actions */}
-          <div style={{ color: 'white', textAlign: 'left' }}>
+          <div key={`slide-content-${currentSlideIndex}`} style={{ color: 'white', textAlign: 'left', animation: 'fadeIn 0.5s ease-out' }}>
             
             {/* Kicker Pill */}
             <div style={{ 
               display: 'inline-flex', 
               alignItems: 'center', 
               gap: '0.6rem', 
-              background: 'rgba(14, 165, 233, 0.15)', 
+              background: 'rgba(14, 165, 233, 0.2)', 
               color: '#38BDF8', 
               padding: '0.45rem 1.1rem', 
               borderRadius: '30px', 
@@ -380,32 +619,33 @@ const Home = () => {
               fontWeight: 800, 
               letterSpacing: '1.2px', 
               marginBottom: '1.5rem', 
-              border: '1px solid rgba(56, 189, 248, 0.3)',
-              boxShadow: '0 4px 15px rgba(14, 165, 233, 0.2)'
+              border: '1px solid rgba(56, 189, 248, 0.35)',
+              boxShadow: '0 4px 15px rgba(14, 165, 233, 0.25)',
+              backdropFilter: 'blur(8px)'
             }}>
-              <Sparkles size={15} /> {cms.heroKicker}
+              <Sparkles size={15} /> {activeSlide.kicker || cms.heroKicker}
             </div>
 
             {/* Giant Hero Title */}
             <h1 style={{ 
-              fontSize: 'clamp(2.8rem, 6.2vw, 5rem)', 
+              fontSize: 'clamp(2.6rem, 5.8vw, 4.8rem)', 
               fontWeight: 900, 
-              lineHeight: 0.95, 
+              lineHeight: 1.02, 
               color: 'white', 
               letterSpacing: '-1.5px',
               marginBottom: '1.5rem',
               whiteSpace: 'pre-line',
-              textShadow: '0 6px 20px rgba(0,0,0,0.5)'
+              textShadow: '0 6px 25px rgba(0,0,0,0.6)'
             }}>
-              {cms.heroTitle.includes('\n') ? (
+              {(activeSlide.title || cms.heroTitle).includes('\n') ? (
                 <>
-                  {cms.heroTitle.split('\n')[0]}<br/>
+                  {(activeSlide.title || cms.heroTitle).split('\n')[0]}<br/>
                   <span style={{ 
                     background: 'linear-gradient(135deg, #38BDF8, #0EA5E9)', 
                     WebkitBackgroundClip: 'text', 
                     WebkitTextFillColor: 'transparent' 
                   }}>
-                    {cms.heroTitle.split('\n')[1]}
+                    {(activeSlide.title || cms.heroTitle).split('\n')[1]}
                   </span>
                 </>
               ) : (
@@ -414,26 +654,35 @@ const Home = () => {
                   WebkitBackgroundClip: 'text', 
                   WebkitTextFillColor: 'transparent' 
                 }}>
-                  {cms.heroTitle}
+                  {activeSlide.title || cms.heroTitle}
                 </span>
               )}
             </h1>
 
             {/* Subtitle */}
             <p style={{ 
-              fontSize: 'clamp(1rem, 2.5vw, 1.2rem)', 
+              fontSize: 'clamp(1rem, 2.3vw, 1.18rem)', 
               color: '#CBD5E1', 
               marginBottom: '2.25rem', 
               lineHeight: 1.65, 
-              maxWidth: '540px' 
+              maxWidth: '540px',
+              textShadow: '0 2px 8px rgba(0,0,0,0.5)'
             }}>
-              {cms.heroSubtitle}
+              {activeSlide.subtitle || cms.heroSubtitle}
             </p>
 
             {/* App Store & Booking Row */}
             <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
               <button 
-                onClick={() => navigate('/login')} 
+                onClick={() => {
+                  const target = activeSlide.primaryLink || '/login';
+                  if (target.startsWith('#')) {
+                    const el = document.querySelector(target);
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  } else {
+                    navigate(target);
+                  }
+                }} 
                 style={{ 
                   background: 'linear-gradient(135deg, #0EA5E9, #0284C7)', 
                   color: 'white', 
@@ -442,25 +691,25 @@ const Home = () => {
                   fontSize: '1.05rem', 
                   fontWeight: 800, 
                   borderRadius: '30px', 
-                  boxShadow: '0 12px 25px rgba(14, 165, 233, 0.45)', 
+                  boxShadow: '0 12px 25px rgba(14, 165, 233, 0.5)', 
                   display: 'flex', 
                   alignItems: 'center', 
                   gap: '0.6rem',
                   cursor: 'pointer',
-                  transition: 'transform 0.2s'
+                  transition: 'transform 0.2s, box-shadow 0.2s'
                 }}
                 onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}
                 onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
               >
-                {cms.heroCtaPrimary} <ChevronRight size={20} />
+                {activeSlide.ctaPrimary || cms.heroCtaPrimary} <ChevronRight size={20} />
               </button>
 
               <a 
-                href="#packages" 
+                href={activeSlide.secondaryLink || '#packages'} 
                 style={{ 
-                  background: 'rgba(255,255,255,0.08)', 
+                  background: 'rgba(255,255,255,0.1)', 
                   color: '#F8FAFC', 
-                  border: '1px solid rgba(255,255,255,0.25)', 
+                  border: '1.5px solid rgba(255,255,255,0.3)', 
                   padding: '1.05rem 2rem', 
                   fontSize: '1rem', 
                   fontWeight: 700, 
@@ -469,24 +718,30 @@ const Home = () => {
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '0.4rem',
-                  transition: 'background 0.2s'
+                  transition: 'background 0.2s, border-color 0.2s'
                 }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.18)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.22)';
+                  e.currentTarget.style.borderColor = '#38BDF8';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)';
+                }}
               >
-                {cms.heroCtaSecondary}
+                {activeSlide.ctaSecondary || cms.heroCtaSecondary}
               </a>
             </div>
 
             {/* Trust Mini Pills */}
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '2rem' }}>
-              <span style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', padding: '0.4rem 0.85rem', borderRadius: '8px', fontSize: '0.78rem', color: '#E2E8F0', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.16)', padding: '0.4rem 0.85rem', borderRadius: '8px', fontSize: '0.78rem', color: '#E2E8F0', display: 'flex', alignItems: 'center', gap: '0.4rem', backdropFilter: 'blur(6px)' }}>
                 <CheckCircle size={14} color="#38BDF8" /> 100% RO Water Used
               </span>
-              <span style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', padding: '0.4rem 0.85rem', borderRadius: '8px', fontSize: '0.78rem', color: '#E2E8F0', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.16)', padding: '0.4rem 0.85rem', borderRadius: '8px', fontSize: '0.78rem', color: '#E2E8F0', display: 'flex', alignItems: 'center', gap: '0.4rem', backdropFilter: 'blur(6px)' }}>
                 <CheckCircle size={14} color="#38BDF8" /> Verified Specialists
               </span>
-              <span style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', padding: '0.4rem 0.85rem', borderRadius: '8px', fontSize: '0.78rem', color: '#E2E8F0', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.16)', padding: '0.4rem 0.85rem', borderRadius: '8px', fontSize: '0.78rem', color: '#E2E8F0', display: 'flex', alignItems: 'center', gap: '0.4rem', backdropFilter: 'blur(6px)' }}>
                 <CheckCircle size={14} color="#38BDF8" /> No Electricity Required
               </span>
             </div>
@@ -495,32 +750,33 @@ const Home = () => {
           {/* Right Column: High-End Vehicle Spa Showcase & Floating Phone Mockup */}
           <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '440px' }}>
             
-            {/* Hero Main Photo Frame */}
+            {/* Hero Main Photo Frame showing Active Slide */}
             <div style={{
               width: '100%',
               maxWidth: '520px',
               height: '380px',
               borderRadius: '28px',
-              background: `linear-gradient(145deg, rgba(14,165,233,0.2), rgba(15,23,42,0.8)), url(${cms.heroImage}) center/cover no-repeat`,
-              boxShadow: '0 30px 60px rgba(0,0,0,0.5)',
-              border: '1px solid rgba(255,255,255,0.15)',
+              background: `linear-gradient(145deg, rgba(14,165,233,0.2), rgba(15,23,42,0.85)), url(${activeSlide.image || cms.heroImage}) center/cover no-repeat`,
+              boxShadow: '0 30px 60px rgba(0,0,0,0.55)',
+              border: '1.5px solid rgba(255,255,255,0.2)',
               position: 'relative',
-              overflow: 'hidden'
+              overflow: 'hidden',
+              transition: 'background-image 0.5s ease-in-out'
             }}>
               {/* Overlay Badge inside photo */}
               <div style={{
                 position: 'absolute',
                 bottom: '1.25rem',
                 left: '1.25rem',
-                background: 'rgba(15, 23, 42, 0.85)',
-                backdropFilter: 'blur(8px)',
+                background: 'rgba(15, 23, 42, 0.88)',
+                backdropFilter: 'blur(10px)',
                 color: 'white',
                 padding: '0.55rem 1.1rem',
                 borderRadius: '30px',
                 fontSize: '0.78rem',
                 fontWeight: 800,
                 letterSpacing: '0.6px',
-                border: '1px solid rgba(255,255,255,0.15)',
+                border: '1px solid rgba(255,255,255,0.2)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.5rem'
@@ -535,11 +791,11 @@ const Home = () => {
               position: 'absolute',
               top: '-15px',
               right: '-10px',
-              width: '95px',
-              height: '95px',
+              width: '100px',
+              height: '100px',
               borderRadius: '50%',
               background: 'white',
-              boxShadow: '0 15px 30px rgba(0,0,0,0.25)',
+              boxShadow: '0 15px 30px rgba(0,0,0,0.3)',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
@@ -554,7 +810,7 @@ const Home = () => {
               zIndex: 10
             }}>
               <Droplets size={22} color="#0EA5E9" style={{ marginBottom: '2px' }} />
-              <span>{cms.heroBadgeText}</span>
+              <span>{activeSlide.badgeText || cms.heroBadgeText}</span>
             </div>
 
             {/* Interactive Floating Phone Mockup (Washcaro style) */}
@@ -567,7 +823,7 @@ const Home = () => {
               border: '4px solid #334155',
               borderRadius: '24px',
               padding: '0.85rem',
-              boxShadow: '0 25px 50px rgba(0,0,0,0.4)',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.5)',
               color: 'white',
               zIndex: 10,
               transform: 'rotate(-4deg)'
@@ -616,7 +872,7 @@ const Home = () => {
               color: '#0F172A',
               padding: '0.5rem 1rem',
               borderRadius: '20px',
-              boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
               display: 'flex',
               alignItems: 'center',
               gap: '0.4rem',
@@ -632,10 +888,90 @@ const Home = () => {
           </div>
         </div>
 
+        {/* PEXA-STYLE SLIDE PROGRESS & INDICATOR TRACK */}
+        <div style={{
+          maxWidth: '1240px',
+          margin: '2rem auto 0',
+          width: '100%',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          position: 'relative',
+          zIndex: 10,
+          padding: '0 0.5rem'
+        }}>
+          {/* Slide Numeric Counter */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.6rem',
+            background: 'rgba(15,23,42,0.7)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(255,255,255,0.15)',
+            padding: '0.35rem 0.85rem',
+            borderRadius: '20px',
+            color: 'white',
+            fontSize: '0.82rem',
+            fontWeight: 800
+          }}>
+            <span style={{ color: '#38BDF8' }}>0{currentSlideIndex + 1}</span>
+            <span style={{ color: 'rgba(255,255,255,0.3)' }}>/</span>
+            <span style={{ color: '#94A3B8' }}>0{slides.length}</span>
+          </div>
+
+          {/* Clickable Indicator Pills */}
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            {slides.map((_, sIdx) => {
+              const isActive = sIdx === currentSlideIndex;
+              return (
+                <button
+                  key={sIdx}
+                  onClick={() => goToSlide(sIdx)}
+                  aria-label={`Go to slide ${sIdx + 1}`}
+                  style={{
+                    width: isActive ? '36px' : '10px',
+                    height: '8px',
+                    borderRadius: '4px',
+                    background: isActive ? 'linear-gradient(90deg, #38BDF8, #0EA5E9)' : 'rgba(255,255,255,0.3)',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    boxShadow: isActive ? '0 0 10px rgba(56,189,248,0.7)' : 'none'
+                  }}
+                />
+              );
+            })}
+          </div>
+
+          {/* Autoplay Pause / Play Toggle */}
+          <button
+            onClick={() => setIsAutoplayPaused(!isAutoplayPaused)}
+            title={isAutoplayPaused ? "Resume Autoplay" : "Pause Autoplay"}
+            style={{
+              background: 'rgba(15,23,42,0.7)',
+              backdropFilter: 'blur(8px)',
+              border: '1px solid rgba(255,255,255,0.15)',
+              color: isAutoplayPaused ? '#FACC15' : '#38BDF8',
+              padding: '0.4rem 0.75rem',
+              borderRadius: '20px',
+              fontSize: '0.72rem',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              cursor: 'pointer'
+            }}
+          >
+            {isAutoplayPaused ? <Play size={13} fill="#FACC15" /> : <Pause size={13} fill="#38BDF8" />}
+            <span>{isAutoplayPaused ? 'Paused' : 'Auto'}</span>
+          </button>
+        </div>
+
         {/* 4 Bottom Benefits Strip */}
         <div style={{
           maxWidth: '1240px',
-          margin: '3.5rem auto 0',
+          margin: '2rem auto 0',
           width: '100%',
           background: 'white',
           borderRadius: '20px',

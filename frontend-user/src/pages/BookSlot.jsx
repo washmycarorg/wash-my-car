@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, MapPin, Car as CarIcon, CreditCard, CheckCircle, Search, Compass, AlertCircle, Tag, Sparkles, Plus, Check } from 'lucide-react';
+import { 
+  Calendar, MapPin, Car as CarIcon, CreditCard, CheckCircle, 
+  Search, Compass, AlertCircle, Tag, Sparkles, Plus, Check,
+  Shield, Bike, Droplets, Feather, Flame 
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { 
   createBooking, 
@@ -16,6 +20,21 @@ import {
 } from '../api';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+
+const renderAddonIcon = (iconName, isChecked = false, size = 18) => {
+  const color = isChecked ? '#047857' : 'var(--primary-blue)';
+  if (!iconName) return <Sparkles size={size} color={color} />;
+  const str = String(iconName).toLowerCase().trim();
+  if (str.includes('shield') || str.includes('helmet') || str.includes('guard')) return <Shield size={size} color={color} />;
+  if (str.includes('bike') || str.includes('scooter') || str.includes('two-wheeler')) return <Bike size={size} color={color} />;
+  if (str.includes('droplet') || str.includes('rain') || str.includes('water') || str.includes('windshield')) return <Droplets size={size} color={color} />;
+  if (str.includes('feather') || str.includes('pet') || str.includes('hair') || str.includes('fur')) return <Feather size={size} color={color} />;
+  if (str.includes('flame') || str.includes('steam') || str.includes('engine') || str.includes('fire')) return <Flame size={size} color={color} />;
+  if (str.includes('sparkle') || str.includes('ozone') || str.includes('clean') || str.includes('shine')) return <Sparkles size={size} color={color} />;
+
+  if (iconName.length <= 4) return <span style={{ fontSize: `${size}px` }}>{iconName}</span>;
+  return <Sparkles size={size} color={color} />;
+};
 
 const CustomSelect = ({ options, value, onChange, placeholder = 'Select option' }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -671,10 +690,9 @@ const BookSlot = () => {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '1.2rem',
                       flexShrink: 0
                     }}>
-                      {addon.icon || '✨'}
+                      {renderAddonIcon(addon.icon, isChecked, 18)}
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontWeight: 700, color: 'var(--primary-navy)', fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>

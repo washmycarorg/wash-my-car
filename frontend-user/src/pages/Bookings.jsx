@@ -1,6 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { getBookings, getCars, getProfile } from '../api';
-import { Calendar, Car, Filter, ChevronDown, CheckCircle, Clock, AlertCircle, XCircle, Star, Tag, Gift } from 'lucide-react';
+import { 
+  Calendar, Car, Filter, ChevronDown, CheckCircle, Clock, 
+  AlertCircle, XCircle, Star, Tag, Gift, Sparkles,
+  Shield, Bike, Droplets, Feather, Flame 
+} from 'lucide-react';
+
+const renderAddonIcon = (iconName, size = 14) => {
+  if (!iconName) return <Sparkles size={size} />;
+  const str = String(iconName).toLowerCase().trim();
+  if (str.includes('shield') || str.includes('helmet') || str.includes('guard')) return <Shield size={size} />;
+  if (str.includes('bike') || str.includes('scooter') || str.includes('two-wheeler')) return <Bike size={size} />;
+  if (str.includes('droplet') || str.includes('rain') || str.includes('water') || str.includes('windshield')) return <Droplets size={size} />;
+  if (str.includes('feather') || str.includes('pet') || str.includes('hair') || str.includes('fur')) return <Feather size={size} />;
+  if (str.includes('flame') || str.includes('steam') || str.includes('engine') || str.includes('fire')) return <Flame size={size} />;
+  if (str.includes('sparkle') || str.includes('ozone') || str.includes('clean') || str.includes('shine')) return <Sparkles size={size} />;
+
+  if (iconName.length <= 4) return <span style={{ fontSize: `${size}px` }}>{iconName}</span>;
+  return <Sparkles size={size} />;
+};
 
 const STATUS_CONFIG = {
   PENDING:   { label: 'Pending',   bg: '#FEF3C7', color: '#92400E' },
@@ -118,8 +136,8 @@ const Bookings = () => {
             {booking.addons && booking.addons.length > 0 && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.35rem' }}>
                 {booking.addons.map(ba => (
-                  <span key={ba.id} style={{ fontSize: '0.72rem', background: '#DCFCE7', color: '#166534', padding: '0.1rem 0.45rem', borderRadius: '6px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
-                    <span>{ba.addon?.icon || '✨'}</span> {ba.addon?.name} (+₹{ba.price})
+                  <span key={ba.id} style={{ fontSize: '0.72rem', background: '#DCFCE7', color: '#166534', padding: '0.1rem 0.45rem', borderRadius: '6px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <span>{renderAddonIcon(ba.addon?.icon, 12)}</span> {ba.addon?.name} (+₹{ba.price})
                   </span>
                 ))}
               </div>
@@ -156,8 +174,10 @@ const Bookings = () => {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                   {booking.addons.map(ba => (
-                    <div key={ba.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#15803D' }}>
-                      <span>{ba.addon?.icon || '✨'} {ba.addon?.name}</span>
+                    <div key={ba.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem', color: '#15803D' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        {renderAddonIcon(ba.addon?.icon, 14)} {ba.addon?.name}
+                      </span>
                       <span style={{ fontWeight: 600 }}>+₹{ba.price}</span>
                     </div>
                   ))}

@@ -1,6 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { getAssignedBookings, startBooking, completeBooking } from '../api';
-import { Phone, MapPin, Compass, CheckCircle, Camera, Navigation, AlertCircle } from 'lucide-react';
+import { 
+  Phone, MapPin, Compass, CheckCircle, Camera, Navigation, AlertCircle, Sparkles,
+  Shield, Bike, Droplets, Feather, Flame 
+} from 'lucide-react';
+
+const renderAddonIcon = (iconName, size = 14) => {
+  if (!iconName) return <Sparkles size={size} />;
+  const str = String(iconName).toLowerCase().trim();
+  if (str.includes('shield') || str.includes('helmet') || str.includes('guard')) return <Shield size={size} />;
+  if (str.includes('bike') || str.includes('scooter') || str.includes('two-wheeler')) return <Bike size={size} />;
+  if (str.includes('droplet') || str.includes('rain') || str.includes('water') || str.includes('windshield')) return <Droplets size={size} />;
+  if (str.includes('feather') || str.includes('pet') || str.includes('hair') || str.includes('fur')) return <Feather size={size} />;
+  if (str.includes('flame') || str.includes('steam') || str.includes('engine') || str.includes('fire')) return <Flame size={size} />;
+  if (str.includes('sparkle') || str.includes('ozone') || str.includes('clean') || str.includes('shine')) return <Sparkles size={size} />;
+
+  if (iconName.length <= 4) return <span style={{ fontSize: `${size}px` }}>{iconName}</span>;
+  return <Sparkles size={size} />;
+};
 
 const Schedule = () => {
   const [bookings, setBookings] = useState([]);
@@ -183,8 +200,8 @@ const Schedule = () => {
                     </span>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
                       {booking.addons.map(ba => (
-                        <span key={ba.id} style={{ background: 'white', border: '1px solid #86EFAC', color: '#166534', padding: '0.25rem 0.55rem', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                          <span>{ba.addon?.icon || '➕'}</span>
+                        <span key={ba.id} style={{ background: 'white', border: '1px solid #86EFAC', color: '#166534', padding: '0.25rem 0.55rem', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <span>{renderAddonIcon(ba.addon?.icon, 14)}</span>
                           <span>{ba.addon?.name}</span>
                         </span>
                       ))}

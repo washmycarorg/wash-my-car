@@ -1069,6 +1069,9 @@ export const updateCmsContent = async (req, res) => {
     if (data.faqs && typeof data.faqs !== 'string') {
       data.faqs = JSON.stringify(data.faqs);
     }
+    if (data.heroSlides && typeof data.heroSlides !== 'string') {
+      data.heroSlides = JSON.stringify(data.heroSlides);
+    }
 
     const cms = await prisma.cmsContent.upsert({
       where: { id: 1 },

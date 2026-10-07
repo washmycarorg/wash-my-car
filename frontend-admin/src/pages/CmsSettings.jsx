@@ -2,15 +2,76 @@ import React, { useState, useEffect } from 'react';
 import { getCmsSettings, updateCmsSettings } from '../api';
 import { 
   Layout, Image, Phone, Mail, MapPin, Tag, Globe, Sparkles, 
-  HelpCircle, BarChart3, Briefcase, Plus, Trash2, Check, ArrowRight, MessageSquare
+  HelpCircle, BarChart3, Briefcase, Plus, Trash2, Check, ArrowRight, 
+  Layers, Upload, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, Eye
 } from 'lucide-react';
+
+const DEFAULT_HERO_SLIDES = [
+  {
+    id: 'slide-1',
+    kicker: 'WASH MY CAR • DOORSTEP CAR WASH',
+    title: 'WE WASH.\nYOU RELAX.',
+    subtitle: 'Premium vehicle spa and car detailing at your doorstep. Save time, skip the queue, and let trained professionals care for your car.',
+    image: 'https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=2200&q=95',
+    badgeText: 'WATER EFFICIENT & RO CARE',
+    ctaPrimary: 'Book Doorstep Wash',
+    ctaSecondary: 'Explore Packages',
+    primaryLink: '/login',
+    secondaryLink: '#packages'
+  },
+  {
+    id: 'slide-2',
+    kicker: 'DEEP INTERIOR & STEAM DETAILING',
+    title: 'SHOWROOM SHINE.\nAT YOUR DOORSTEP.',
+    subtitle: 'High-pressure snow foam wash, germ-free steam disinfection, and deep microfiber rejuvenation for cars and bikes.',
+    image: 'https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=2200&q=95',
+    badgeText: 'ANTI-BACTERIAL STEAM',
+    ctaPrimary: 'Book Interior Spa',
+    ctaSecondary: 'View Packages',
+    primaryLink: '/login',
+    secondaryLink: '#packages'
+  },
+  {
+    id: 'slide-3',
+    kicker: 'CERAMIC & PAINT SHIELD',
+    title: '9H CERAMIC &\nPOLYMER COATING',
+    subtitle: 'Ultra-gloss paint correction and protective nanotech coating that shields against UV rays, swirl marks, and hard water spots.',
+    image: 'https://images.unsplash.com/photo-1507136566006-cfc505b114fc?auto=format&fit=crop&w=2200&q=95',
+    badgeText: '3-YEAR PROTECTION',
+    ctaPrimary: 'Get Ceramic Quote',
+    ctaSecondary: 'Explore Plans',
+    primaryLink: '/login',
+    secondaryLink: '#packages'
+  },
+  {
+    id: 'slide-4',
+    kicker: 'SPECIAL LAUNCH OFFER',
+    title: 'FLAT 20% OFF\nYOUR FIRST SERVICE',
+    subtitle: 'Join over 10,000 happy vehicle owners across Visakhapatnam enjoying doorstep mobile car spa at unbeatable prices.',
+    image: 'https://images.unsplash.com/photo-1504215680853-026ed2a45def?auto=format&fit=crop&w=2200&q=95',
+    badgeText: 'LIMITED TIME OFFER',
+    ctaPrimary: 'Claim 20% Off',
+    ctaSecondary: 'Why Wash My Car',
+    primaryLink: '/register',
+    secondaryLink: '#why-us'
+  }
+];
+
+const CURATED_PRESETS = [
+  { label: 'Foam Wash', url: 'https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=2200&q=95' },
+  { label: 'Interior Spa', url: 'https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=2200&q=95' },
+  { label: 'Ceramic Coating', url: 'https://images.unsplash.com/photo-1507136566006-cfc505b114fc?auto=format&fit=crop&w=2200&q=95' },
+  { label: 'Luxury Gloss', url: 'https://images.unsplash.com/photo-1601362840469-51e4d8d58785?auto=format&fit=crop&w=2200&q=95' },
+  { label: 'Waterless Polish', url: 'https://images.unsplash.com/photo-1504215680853-026ed2a45def?auto=format&fit=crop&w=2200&q=95' }
+];
 
 const CmsSettings = () => {
   const [formData, setFormData] = useState({
+    heroSlides: DEFAULT_HERO_SLIDES,
     heroKicker: 'WASH MY CAR • DOORSTEP CAR WASH',
     heroTitle: 'WE WASH.\nYOU RELAX.',
     heroSubtitle: 'Premium vehicle spa and car detailing at your doorstep. Save time, skip the queue, and let trained professionals care for your car.',
-    heroImage: 'https://images.unsplash.com/photo-1504215680853-026ed2a45def?auto=format&fit=crop&w=2200&q=95',
+    heroImage: 'https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=2200&q=95',
     heroBadgeText: 'WATER EFFICIENT & RO CARE',
     heroCtaPrimary: 'Book Doorstep Wash',
     heroCtaSecondary: 'Explore Packages',
@@ -69,7 +130,9 @@ const CmsSettings = () => {
     ]
   });
 
-  const [activeSection, setActiveSection] = useState('hero'); // 'hero', 'quickbar', 'why', 'stats', 'franchise', 'faqs', 'contact', 'promo'
+  const [activeSection, setActiveSection] = useState('slides'); // 'slides', 'quickbar', 'why', 'stats', 'franchise', 'faqs', 'contact', 'promo'
+  const [selectedSlideIndex, setSelectedSlideIndex] = useState(0);
+  const [previewSlideIndex, setPreviewSlideIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -85,9 +148,24 @@ const CmsSettings = () => {
               faqsParsed = [];
             }
           }
+
+          let slidesParsed = null;
+          if (res.heroSlides) {
+            try {
+              slidesParsed = typeof res.heroSlides === 'string' ? JSON.parse(res.heroSlides) : res.heroSlides;
+            } catch (e) {
+              slidesParsed = null;
+            }
+          }
+
+          const resolvedSlides = Array.isArray(slidesParsed) && slidesParsed.length > 0
+            ? slidesParsed
+            : DEFAULT_HERO_SLIDES;
+
           setFormData(prev => ({
             ...prev,
             ...res,
+            heroSlides: resolvedSlides,
             faqs: Array.isArray(faqsParsed) && faqsParsed.length > 0 ? faqsParsed : prev.faqs
           }));
         }
@@ -96,17 +174,85 @@ const CmsSettings = () => {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleImageChange = (e) => {
+  // --- SLIDE EDITING HANDLERS ---
+  const currentSlides = Array.isArray(formData.heroSlides) && formData.heroSlides.length > 0
+    ? formData.heroSlides
+    : DEFAULT_HERO_SLIDES;
+
+  const activeSlide = currentSlides[selectedSlideIndex] || currentSlides[0] || DEFAULT_HERO_SLIDES[0];
+
+  const handleSlideFieldChange = (field, value) => {
+    setFormData(prev => {
+      const slides = [...(prev.heroSlides || DEFAULT_HERO_SLIDES)];
+      slides[selectedSlideIndex] = {
+        ...slides[selectedSlideIndex],
+        [field]: value
+      };
+      return { ...prev, heroSlides: slides };
+    });
+  };
+
+  const handleSlideImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setFormData(prev => ({ ...prev, heroImage: reader.result }));
+        handleSlideFieldChange('image', reader.result);
       };
       reader.readAsDataURL(file);
     }
   };
 
+  const handleAddSlide = () => {
+    const newSlide = {
+      id: `slide-${Date.now()}`,
+      kicker: 'WASH MY CAR • DOORSTEP SPECIAL',
+      title: 'LUXURY VEHICLE SPA.\nRIGHT AT YOUR DOOR.',
+      subtitle: 'Experience doorstep vehicle detailing with 100% RO water, snow foam treatment, and interior steam rejuvenation.',
+      image: 'https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=2200&q=95',
+      badgeText: '100% RO WATER USED',
+      ctaPrimary: 'Book Doorstep Wash',
+      ctaSecondary: 'Explore Packages',
+      primaryLink: '/login',
+      secondaryLink: '#packages'
+    };
+
+    setFormData(prev => ({
+      ...prev,
+      heroSlides: [...(prev.heroSlides || DEFAULT_HERO_SLIDES), newSlide]
+    }));
+    setSelectedSlideIndex(currentSlides.length);
+    setPreviewSlideIndex(currentSlides.length);
+  };
+
+  const handleRemoveSlide = (idxToRemove) => {
+    if (currentSlides.length <= 1) {
+      alert('You must keep at least 1 slide for the hero section.');
+      return;
+    }
+    const filtered = currentSlides.filter((_, i) => i !== idxToRemove);
+    setFormData(prev => ({ ...prev, heroSlides: filtered }));
+    if (selectedSlideIndex >= filtered.length) {
+      setSelectedSlideIndex(filtered.length - 1);
+    }
+    if (previewSlideIndex >= filtered.length) {
+      setPreviewSlideIndex(filtered.length - 1);
+    }
+  };
+
+  const handleMoveSlide = (idx, direction) => {
+    const targetIdx = idx + direction;
+    if (targetIdx < 0 || targetIdx >= currentSlides.length) return;
+    const reordered = [...currentSlides];
+    const temp = reordered[idx];
+    reordered[idx] = reordered[targetIdx];
+    reordered[targetIdx] = temp;
+    setFormData(prev => ({ ...prev, heroSlides: reordered }));
+    setSelectedSlideIndex(targetIdx);
+    setPreviewSlideIndex(targetIdx);
+  };
+
+  // --- FAQ HANDLERS ---
   const handleAddFaq = () => {
     setFormData(prev => ({
       ...prev,
@@ -129,12 +275,13 @@ const CmsSettings = () => {
     }));
   };
 
+  // --- SAVE & PUBLISH ---
   const handleSave = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     setSaving(true);
     try {
       await updateCmsSettings(formData);
-      alert('Homepage CMS updated & published successfully!');
+      alert('Homepage CMS & Slides updated successfully! Changes are live on the user website.');
     } catch (err) {
       console.error(err);
       alert('Failed to save homepage configurations: ' + err.message);
@@ -145,6 +292,8 @@ const CmsSettings = () => {
 
   if (loading) return <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>Loading CMS Editor...</div>;
 
+  const previewSlide = currentSlides[previewSlideIndex] || currentSlides[0] || DEFAULT_HERO_SLIDES[0];
+
   return (
     <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 animate-fade-in">
       
@@ -152,24 +301,29 @@ const CmsSettings = () => {
       <div className="xl:col-span-7 flex flex-col gap-5">
         <div className="card" style={{ padding: '1.75rem' }}>
           
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid #E2E8F0', paddingBottom: '1rem' }}>
-            <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary-navy)' }}>
-              <Globe size={22} color="var(--primary-blue)" /> Homepage CMS Manager
-            </h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid #E2E8F0', paddingBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary-navy)', fontSize: '1.25rem' }}>
+                <Globe size={22} color="var(--primary-blue)" /> Homepage CMS Manager
+              </h3>
+              <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: '#64748B' }}>
+                Alter front page slides, images, taglines, and marketing content.
+              </p>
+            </div>
             <button
               onClick={handleSave}
               disabled={saving}
               className="btn btn-primary"
-              style={{ padding: '0.55rem 1.25rem', fontSize: '0.9rem', fontWeight: 700 }}
+              style={{ padding: '0.6rem 1.4rem', fontSize: '0.9rem', fontWeight: 800, borderRadius: '25px', boxShadow: '0 4px 14px rgba(14, 165, 233, 0.4)' }}
             >
-              {saving ? 'Publishing...' : 'Save & Publish'}
+              {saving ? 'Publishing...' : 'Save & Publish Live'}
             </button>
           </div>
 
           {/* Section Selector Pills */}
-          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', marginBottom: '1.75rem' }}>
             {[
-              { id: 'hero', label: 'Hero Banner', icon: Sparkles },
+              { id: 'slides', label: `Front Slides (${currentSlides.length})`, icon: Layers, isSpecial: true },
               { id: 'quickbar', label: 'Announcement Bar', icon: Tag },
               { id: 'why', label: 'Why Choose Us', icon: Layout },
               { id: 'stats', label: 'Impact Stats', icon: BarChart3 },
@@ -188,19 +342,19 @@ const CmsSettings = () => {
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '0.35rem',
-                    padding: '0.45rem 0.85rem',
+                    gap: '0.4rem',
+                    padding: '0.5rem 0.95rem',
                     borderRadius: '20px',
-                    fontSize: '0.82rem',
-                    fontWeight: 600,
-                    border: isActive ? '1.5px solid var(--primary-blue)' : '1px solid #CBD5E1',
-                    background: isActive ? '#EFF6FF' : 'white',
-                    color: isActive ? 'var(--primary-blue)' : 'var(--text-main)',
+                    fontSize: '0.84rem',
+                    fontWeight: 700,
+                    border: isActive ? '2px solid var(--primary-blue)' : '1px solid #CBD5E1',
+                    background: isActive ? '#EFF6FF' : tab.isSpecial ? '#F0FDF4' : 'white',
+                    color: isActive ? 'var(--primary-blue)' : tab.isSpecial ? '#15803D' : 'var(--text-main)',
                     cursor: 'pointer',
                     transition: 'all 0.15s'
                   }}
                 >
-                  <Icon size={14} /> {tab.label}
+                  <Icon size={15} /> {tab.label}
                 </button>
               );
             })}
@@ -208,98 +362,297 @@ const CmsSettings = () => {
 
           <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             
-            {/* 1. HERO BANNER */}
-            {activeSection === 'hero' && (
-              <div style={{ background: '#F8FAFC', padding: '1.25rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <h4 style={{ margin: 0, color: 'var(--primary-navy)', fontSize: '0.95rem', fontWeight: 700 }}>
-                  ✨ Hero Banner Content
-                </h4>
-
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">Hero Kicker Tagline</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={formData.heroKicker}
-                    onChange={e => setFormData({ ...formData, heroKicker: e.target.value })}
-                  />
-                </div>
-
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">Hero Title (Use \n or line breaks)</label>
-                  <textarea
-                    rows={2}
-                    className="form-input"
-                    value={formData.heroTitle}
-                    onChange={e => setFormData({ ...formData, heroTitle: e.target.value })}
-                  />
-                </div>
-
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">Hero Subtitle Paragraph</label>
-                  <textarea
-                    rows={3}
-                    className="form-input"
-                    value={formData.heroSubtitle}
-                    onChange={e => setFormData({ ...formData, heroSubtitle: e.target.value })}
-                  />
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label">Primary CTA Button</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={formData.heroCtaPrimary}
-                      onChange={e => setFormData({ ...formData, heroCtaPrimary: e.target.value })}
-                    />
+            {/* 1. HERO SLIDES MANAGER (PEXA CAR CARE CAROUSEL) */}
+            {activeSection === 'slides' && (
+              <div style={{ background: '#F8FAFC', padding: '1.35rem', borderRadius: '14px', border: '1.5px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                
+                {/* Header Strip */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E2E8F0', paddingBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div>
+                    <h4 style={{ margin: 0, color: 'var(--primary-navy)', fontSize: '1.05rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <Layers size={18} color="#0EA5E9" /> Pexa-Style Hero Carousel Slides
+                    </h4>
+                    <span style={{ fontSize: '0.78rem', color: '#64748B' }}>
+                      Add, delete, or alter images and text for each slide in the auto-playing front page carousel.
+                    </span>
                   </div>
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label">Secondary CTA Button</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={formData.heroCtaSecondary}
-                      onChange={e => setFormData({ ...formData, heroCtaSecondary: e.target.value })}
-                    />
+                  <button
+                    type="button"
+                    onClick={handleAddSlide}
+                    className="btn btn-outline"
+                    style={{ padding: '0.4rem 0.9rem', fontSize: '0.82rem', fontWeight: 700, borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#FFFFFF', borderColor: '#0EA5E9', color: '#0284C7' }}
+                  >
+                    <Plus size={15} /> Add New Slide
+                  </button>
+                </div>
+
+                {/* Horizontal Slide Selector Bar */}
+                <div>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.8px', color: '#475569', display: 'block', marginBottom: '0.5rem' }}>
+                    Select Slide to Edit ({currentSlides.length} total)
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.65rem' }}>
+                    {currentSlides.map((slide, sIdx) => {
+                      const isSelected = selectedSlideIndex === sIdx;
+                      return (
+                        <div
+                          key={slide.id || sIdx}
+                          onClick={() => {
+                            setSelectedSlideIndex(sIdx);
+                            setPreviewSlideIndex(sIdx);
+                          }}
+                          style={{
+                            background: isSelected ? '#EFF6FF' : 'white',
+                            border: isSelected ? '2px solid #0EA5E9' : '1px solid #CBD5E1',
+                            borderRadius: '12px',
+                            padding: '0.5rem',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.35rem',
+                            position: 'relative',
+                            transition: 'all 0.15s',
+                            boxShadow: isSelected ? '0 4px 12px rgba(14,165,233,0.2)' : 'none'
+                          }}
+                        >
+                          {/* Mini Thumbnail */}
+                          <div style={{ width: '100%', height: '54px', borderRadius: '6px', background: '#1E293B', overflow: 'hidden', position: 'relative' }}>
+                            <img
+                              src={slide.image}
+                              alt={`Slide ${sIdx + 1}`}
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              onError={(e) => { e.target.style.display = 'none'; }}
+                            />
+                            <span style={{ position: 'absolute', bottom: '2px', left: '4px', fontSize: '0.65rem', fontWeight: 800, background: 'rgba(0,0,0,0.65)', color: 'white', padding: '1px 5px', borderRadius: '4px' }}>
+                              #{sIdx + 1}
+                            </span>
+                          </div>
+
+                          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: isSelected ? '#0284C7' : '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {slide.title?.replace('\n', ' ') || `Slide ${sIdx + 1}`}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">Floating Water Efficiency Badge</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={formData.heroBadgeText}
-                    onChange={e => setFormData({ ...formData, heroBadgeText: e.target.value })}
-                  />
-                </div>
+                {/* Active Slide Editing Card */}
+                <div style={{ background: 'white', border: '1.5px solid #CBD5E1', borderRadius: '14px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
+                  
+                  {/* Slide Control Header */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #F1F5F9', paddingBottom: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ background: '#0EA5E9', color: 'white', padding: '0.2rem 0.65rem', borderRadius: '15px', fontSize: '0.75rem', fontWeight: 800 }}>
+                        Editing Slide #{selectedSlideIndex + 1}
+                      </span>
+                      <span style={{ fontSize: '0.82rem', color: '#64748B', fontWeight: 600 }}>
+                        {activeSlide.id || `slide-${selectedSlideIndex + 1}`}
+                      </span>
+                    </div>
 
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">Hero Background Image</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.25rem' }}>
-                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', cursor: 'pointer', background: 'white', padding: '0.5rem 1rem', borderRadius: '4px', border: '1px solid #CBD5E1' }}>
-                      Choose Hero Photo
-                      <input type="file" accept="image/*" onChange={handleImageChange} style={{ display: 'none' }} />
+                    <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleMoveSlide(selectedSlideIndex, -1)}
+                        disabled={selectedSlideIndex === 0}
+                        title="Move Slide Earlier"
+                        style={{ background: '#F1F5F9', border: '1px solid #CBD5E1', padding: '0.35rem 0.55rem', borderRadius: '8px', cursor: selectedSlideIndex === 0 ? 'not-allowed' : 'pointer', opacity: selectedSlideIndex === 0 ? 0.4 : 1 }}
+                      >
+                        <ArrowUp size={14} color="#0F172A" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleMoveSlide(selectedSlideIndex, 1)}
+                        disabled={selectedSlideIndex === currentSlides.length - 1}
+                        title="Move Slide Later"
+                        style={{ background: '#F1F5F9', border: '1px solid #CBD5E1', padding: '0.35rem 0.55rem', borderRadius: '8px', cursor: selectedSlideIndex === currentSlides.length - 1 ? 'not-allowed' : 'pointer', opacity: selectedSlideIndex === currentSlides.length - 1 ? 0.4 : 1 }}
+                      >
+                        <ArrowDown size={14} color="#0F172A" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveSlide(selectedSlideIndex)}
+                        title="Delete Slide"
+                        style={{ background: '#FEE2E2', border: '1px solid #FCA5A5', padding: '0.35rem 0.55rem', borderRadius: '8px', cursor: 'pointer', color: '#DC2626' }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 1. IMAGE ALTERATION SECTION */}
+                  <div style={{ background: '#F8FAFC', padding: '1rem', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+                    <label style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem' }}>
+                      <Image size={16} color="#0EA5E9" /> Slide Background Image (Alter Image)
                     </label>
-                    {formData.heroImage && (
-                      <img 
-                        src={formData.heroImage} 
-                        alt="Hero Preview" 
-                        style={{ width: '90px', height: '50px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #CBD5E1' }} 
+
+                    {/* Image Preview Banner */}
+                    <div style={{ position: 'relative', width: '100%', height: '160px', borderRadius: '10px', overflow: 'hidden', border: '2px solid #CBD5E1', marginBottom: '0.85rem', background: '#0F172A' }}>
+                      <img
+                        src={activeSlide.image}
+                        alt="Slide Background Preview"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                       />
-                    )}
+                      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, rgba(15,23,42,0.85) 0%, rgba(15,23,42,0.4) 60%, transparent 100%)', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '1rem', color: 'white' }}>
+                        <span style={{ fontSize: '0.7rem', color: '#38BDF8', fontWeight: 800 }}>{activeSlide.kicker || 'TAGLINE'}</span>
+                        <h4 style={{ margin: '0.2rem 0', fontSize: '1rem', fontWeight: 900, whiteSpace: 'pre-line' }}>{activeSlide.title || 'Slide Title'}</h4>
+                        <span style={{ fontSize: '0.65rem', background: 'rgba(255,255,255,0.2)', padding: '0.2rem 0.6rem', borderRadius: '10px', width: 'fit-content' }}>
+                          {activeSlide.badgeText || 'Badge Text'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Image Inputs */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem', alignItems: 'center' }}>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.25rem' }}>
+                          Upload from Computer:
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', background: 'white', border: '1.5px dashed #0EA5E9', padding: '0.55rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem', color: '#0284C7' }}>
+                          <Upload size={15} /> Choose Photo File
+                          <input type="file" accept="image/*" onChange={handleSlideImageUpload} style={{ display: 'none' }} />
+                        </label>
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.25rem' }}>
+                          Or Paste Image URL:
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="https://images.unsplash.com/..."
+                          className="form-input"
+                          style={{ margin: 0, padding: '0.55rem 0.75rem', fontSize: '0.82rem' }}
+                          value={activeSlide.image || ''}
+                          onChange={e => handleSlideFieldChange('image', e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Quick Image Presets */}
+                    <div style={{ marginTop: '0.75rem' }}>
+                      <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 700, marginRight: '0.5rem' }}>
+                        Curated Presets:
+                      </span>
+                      <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.35rem' }}>
+                        {CURATED_PRESETS.map((preset, pi) => (
+                          <button
+                            key={pi}
+                            type="button"
+                            onClick={() => handleSlideFieldChange('image', preset.url)}
+                            style={{
+                              background: activeSlide.image === preset.url ? '#EFF6FF' : 'white',
+                              border: activeSlide.image === preset.url ? '1px solid #0EA5E9' : '1px solid #CBD5E1',
+                              color: activeSlide.image === preset.url ? '#0284C7' : '#334155',
+                              padding: '0.25rem 0.65rem',
+                              borderRadius: '12px',
+                              fontSize: '0.72rem',
+                              fontWeight: 600,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
                   </div>
-                  <input 
-                    type="text" 
-                    placeholder="Or enter image URL" 
-                    className="form-input" 
-                    style={{ marginTop: '0.5rem' }}
-                    value={formData.heroImage} 
-                    onChange={e => setFormData({ ...formData, heroImage: e.target.value })} 
-                  />
+
+                  {/* 2. SLIDE TEXT CUSTOMIZATION */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '0.75rem' }}>
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label className="form-label" style={{ fontSize: '0.78rem' }}>Kicker Tagline (Top Tag)</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={activeSlide.kicker || ''}
+                          onChange={e => handleSlideFieldChange('kicker', e.target.value)}
+                        />
+                      </div>
+
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label className="form-label" style={{ fontSize: '0.78rem' }}>Floating Badge Text</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={activeSlide.badgeText || ''}
+                          onChange={e => handleSlideFieldChange('badgeText', e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label" style={{ fontSize: '0.78rem' }}>Slide Headline / Title (Use \n or Enter for 2-line impact)</label>
+                      <textarea
+                        rows={2}
+                        className="form-input"
+                        value={activeSlide.title || ''}
+                        onChange={e => handleSlideFieldChange('title', e.target.value)}
+                      />
+                    </div>
+
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label" style={{ fontSize: '0.78rem' }}>Slide Subtitle Paragraph</label>
+                      <textarea
+                        rows={2}
+                        className="form-input"
+                        value={activeSlide.subtitle || ''}
+                        onChange={e => handleSlideFieldChange('subtitle', e.target.value)}
+                      />
+                    </div>
+
+                    {/* CTA Buttons Row */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', background: '#F8FAFC', padding: '0.85rem', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
+                      <div>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0F172A', display: 'block', marginBottom: '0.35rem' }}>Primary Action Button</span>
+                        <input
+                          type="text"
+                          placeholder="Button Text"
+                          className="form-input"
+                          style={{ marginBottom: '0.35rem' }}
+                          value={activeSlide.ctaPrimary || ''}
+                          onChange={e => handleSlideFieldChange('ctaPrimary', e.target.value)}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Link (e.g. /login or #packages)"
+                          className="form-input"
+                          style={{ margin: 0, fontSize: '0.78rem' }}
+                          value={activeSlide.primaryLink || ''}
+                          onChange={e => handleSlideFieldChange('primaryLink', e.target.value)}
+                        />
+                      </div>
+
+                      <div>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0F172A', display: 'block', marginBottom: '0.35rem' }}>Secondary Action Button</span>
+                        <input
+                          type="text"
+                          placeholder="Button Text"
+                          className="form-input"
+                          style={{ marginBottom: '0.35rem' }}
+                          value={activeSlide.ctaSecondary || ''}
+                          onChange={e => handleSlideFieldChange('ctaSecondary', e.target.value)}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Link (e.g. #packages)"
+                          className="form-input"
+                          style={{ margin: 0, fontSize: '0.78rem' }}
+                          value={activeSlide.secondaryLink || ''}
+                          onChange={e => handleSlideFieldChange('secondaryLink', e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                  </div>
+
                 </div>
+
               </div>
             )}
 
@@ -760,11 +1113,16 @@ const CmsSettings = () => {
         <div className="card" style={{ padding: 0, overflow: 'hidden', position: 'sticky', top: '1.5rem', boxShadow: 'var(--shadow-md)' }}>
           <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #E2E8F0', background: '#0F172A', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '0.85rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Sparkles size={14} color="#38BDF8" /> Live Homepage Preview
+              <Sparkles size={14} color="#38BDF8" /> Real-Time Slider Preview
             </span>
-            <span style={{ fontSize: '0.7rem', background: '#0EA5E9', padding: '0.15rem 0.5rem', borderRadius: '10px', fontWeight: 700 }}>
-              Real-Time
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.7rem', color: '#94A3B8' }}>
+                Slide {previewSlideIndex + 1}/{currentSlides.length}
+              </span>
+              <span style={{ fontSize: '0.7rem', background: '#0EA5E9', padding: '0.15rem 0.5rem', borderRadius: '10px', fontWeight: 700 }}>
+                Pexa Carousel
+              </span>
+            </div>
           </div>
 
           <div style={{ background: '#F8FAFC', padding: '0.75rem', maxHeight: '82vh', overflowY: 'auto', fontSize: '0.8rem' }}>
@@ -775,30 +1133,113 @@ const CmsSettings = () => {
               <span style={{ background: '#0EA5E9', padding: '0.2rem 0.6rem', borderRadius: '12px', fontSize: '0.65rem', fontWeight: 700 }}>Book Doorstep</span>
             </div>
 
-            {/* Hero Mock */}
+            {/* LIVE CAROUSEL HERO MOCK */}
             <div style={{
-              borderRadius: '12px',
-              padding: '1.25rem 1rem',
-              background: `linear-gradient(135deg, rgba(15,23,42,0.9), rgba(30,41,59,0.85)), url(${formData.heroImage}) center/cover no-repeat`,
+              borderRadius: '14px',
+              padding: '1.25rem 1rem 2.25rem',
+              background: `linear-gradient(135deg, rgba(15,23,42,0.92) 0%, rgba(30,41,59,0.7) 60%, rgba(15,23,42,0.3) 100%), url(${previewSlide.image}) center/cover no-repeat`,
               color: 'white',
-              marginBottom: '0.5rem'
+              marginBottom: '0.5rem',
+              position: 'relative',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+              overflow: 'hidden'
             }}>
-              <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#38BDF8', letterSpacing: '0.5px' }}>
-                {formData.heroKicker}
-              </span>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 900, margin: '0.35rem 0', whiteSpace: 'pre-line', lineHeight: 1.15 }}>
-                {formData.heroTitle}
+              {/* Floating Badge in Mock */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#38BDF8', letterSpacing: '0.5px' }}>
+                  {previewSlide.kicker}
+                </span>
+                <span style={{ background: 'rgba(255,255,255,0.18)', backdropFilter: 'blur(4px)', padding: '0.15rem 0.45rem', borderRadius: '12px', fontSize: '0.58rem', fontWeight: 700, color: '#F8FAFC' }}>
+                  {previewSlide.badgeText}
+                </span>
+              </div>
+
+              {/* Title in Mock */}
+              <h2 style={{ fontSize: '1.15rem', fontWeight: 900, margin: '0.35rem 0', whiteSpace: 'pre-line', lineHeight: 1.15, textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
+                {previewSlide.title}
               </h2>
-              <p style={{ fontSize: '0.68rem', color: '#CBD5E1', margin: '0 0 0.75rem 0', lineHeight: 1.4 }}>
-                {formData.heroSubtitle}
+
+              {/* Subtitle in Mock */}
+              <p style={{ fontSize: '0.68rem', color: '#CBD5E1', margin: '0 0 0.85rem 0', lineHeight: 1.4 }}>
+                {previewSlide.subtitle}
               </p>
-              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                <span style={{ background: '#0EA5E9', color: 'white', padding: '0.3rem 0.7rem', borderRadius: '15px', fontSize: '0.65rem', fontWeight: 700 }}>
-                  {formData.heroCtaPrimary} →
+
+              {/* CTA Buttons in Mock */}
+              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <span style={{ background: '#0EA5E9', color: 'white', padding: '0.35rem 0.8rem', borderRadius: '15px', fontSize: '0.68rem', fontWeight: 800, boxShadow: '0 2px 8px rgba(14,165,233,0.4)' }}>
+                  {previewSlide.ctaPrimary || 'Book Now'} →
                 </span>
-                <span style={{ background: 'rgba(255,255,255,0.15)', padding: '0.3rem 0.6rem', borderRadius: '15px', fontSize: '0.65rem', fontWeight: 600 }}>
-                  {formData.heroCtaSecondary}
+                <span style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.3)', padding: '0.35rem 0.65rem', borderRadius: '15px', fontSize: '0.65rem', fontWeight: 600 }}>
+                  {previewSlide.ctaSecondary || 'Explore'}
                 </span>
+              </div>
+
+              {/* Carousel Arrows in Mock */}
+              <button
+                type="button"
+                onClick={() => setPreviewSlideIndex(prev => (prev === 0 ? currentSlides.length - 1 : prev - 1))}
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '6px',
+                  transform: 'translateY(-50%)',
+                  background: 'rgba(15,23,42,0.65)',
+                  border: '1px solid rgba(255,255,255,0.3)',
+                  color: 'white',
+                  borderRadius: '50%',
+                  width: '24px',
+                  height: '24px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+              >
+                <ChevronLeft size={14} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPreviewSlideIndex(prev => (prev === currentSlides.length - 1 ? 0 : prev + 1))}
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  right: '6px',
+                  transform: 'translateY(-50%)',
+                  background: 'rgba(15,23,42,0.65)',
+                  border: '1px solid rgba(255,255,255,0.3)',
+                  color: 'white',
+                  borderRadius: '50%',
+                  width: '24px',
+                  height: '24px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+              >
+                <ChevronRight size={14} />
+              </button>
+
+              {/* Carousel Indicator Dots in Mock */}
+              <div style={{ position: 'absolute', bottom: '8px', left: 0, width: '100%', display: 'flex', justifyContent: 'center', gap: '5px' }}>
+                {currentSlides.map((_, dotIdx) => (
+                  <button
+                    key={dotIdx}
+                    type="button"
+                    onClick={() => setPreviewSlideIndex(dotIdx)}
+                    style={{
+                      width: previewSlideIndex === dotIdx ? '16px' : '6px',
+                      height: '6px',
+                      borderRadius: '3px',
+                      background: previewSlideIndex === dotIdx ? '#38BDF8' : 'rgba(255,255,255,0.4)',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                  />
+                ))}
               </div>
             </div>
 
