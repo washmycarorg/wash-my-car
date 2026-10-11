@@ -4,12 +4,51 @@ import { getSlotsConfig, updateSlotsConfig } from '../api';
 import { Clock, Users, Navigation, Calendar, Check, AlertCircle, Plus, Trash2, Save, MapPin, Compass, Shield, ExternalLink, RefreshCw, Edit3 } from 'lucide-react';
 
 const DEFAULT_SLOTS = [
-  '08:00 AM',
-  '10:00 AM',
-  '12:00 PM',
-  '02:00 PM',
-  '04:00 PM',
-  '06:00 PM'
+  '08:30 AM - 10:30 AM',
+  '10:30 AM - 12:30 PM',
+  '12:30 PM - 02:30 PM',
+  '02:30 PM - 04:30 PM',
+  '04:30 PM - 06:30 PM',
+  '06:30 PM - 08:30 PM'
+];
+
+const TIME_WINDOW_PRESETS = [
+  '07:00 AM - 09:00 AM',
+  '07:30 AM - 09:30 AM',
+  '08:00 AM - 10:00 AM',
+  '08:30 AM - 10:30 AM',
+  '09:00 AM - 11:00 AM',
+  '09:30 AM - 11:30 AM',
+  '10:00 AM - 12:00 PM',
+  '10:30 AM - 12:30 PM',
+  '11:00 AM - 01:00 PM',
+  '11:30 AM - 01:30 PM',
+  '12:00 PM - 02:00 PM',
+  '12:30 PM - 02:30 PM',
+  '01:00 PM - 03:00 PM',
+  '01:30 PM - 03:30 PM',
+  '02:00 PM - 04:00 PM',
+  '02:30 PM - 04:30 PM',
+  '03:00 PM - 05:00 PM',
+  '03:30 PM - 05:30 PM',
+  '04:00 PM - 06:00 PM',
+  '04:30 PM - 06:30 PM',
+  '05:00 PM - 07:00 PM',
+  '05:30 PM - 07:30 PM',
+  '06:00 PM - 08:00 PM',
+  '06:30 PM - 08:30 PM',
+  '07:00 PM - 09:00 PM'
+];
+
+const TIME_POINTS = [
+  '06:00 AM', '06:30 AM', '07:00 AM', '07:30 AM',
+  '08:00 AM', '08:30 AM', '09:00 AM', '09:30 AM',
+  '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
+  '12:00 PM', '12:30 PM', '01:00 PM', '01:30 PM',
+  '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM',
+  '04:00 PM', '04:30 PM', '05:00 PM', '05:30 PM',
+  '06:00 PM', '06:30 PM', '07:00 PM', '07:30 PM',
+  '08:00 PM', '08:30 PM', '09:00 PM'
 ];
 
 // Helper to calculate realistic road transit distance from GPS coordinates (km)
@@ -42,13 +81,34 @@ const SlotsManagement = () => {
   const [slots, setSlots] = useState(DEFAULT_SLOTS);
   const [newSlotInput, setNewSlotInput] = useState('');
   
-  // Specific Date Override States
+  // Window Builder States (From Time - To Time)
+  const [winStart, setWinStart] = useState('08:30 AM');
+  const [winEnd, setWinEnd] = useState('10:30 AM');
+  const [monthWinStart, setMonthWinStart] = useState('08:30 AM');
+  const [monthWinEnd, setMonthWinEnd] = useState('10:30 AM');
+  const [dateWinStart, setDateWinStart] = useState('08:30 AM');
+  const [dateWinEnd, setDateWinEnd] = useState('10:30 AM');
+
+  // Schedule Override Mode: 'MONTH' (Entire Month at Once) vs 'DATE' (Specific Date)
+  const [overrideMode, setOverrideMode] = useState('MONTH');
+
+  // 1. Entire Month Override States
+  const [overrideMonth, setOverrideMonth] = useState(() => {
+    const d = new Date();
+    return d.toISOString().slice(0, 7); // e.g. '2026-10'
+  });
+  const [monthOverrideSlots, setMonthOverrideSlots] = useState([...DEFAULT_SLOTS]);
+  const [newMonthSlotInput, setNewMonthSlotInput] = useState('');
+
+  // 2. Specific Date Override States
   const [overrideDate, setOverrideDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
     return d.toISOString().split('T')[0];
   });
   const [overrideSlots, setOverrideSlots] = useState([...DEFAULT_SLOTS]);
+  const [newDateSlotInput, setNewDateSlotInput] = useState('');
+
   const [monthlyOverrides, setMonthlyOverrides] = useState({});
   const [overrideNotice, setOverrideNotice] = useState('');
 
@@ -70,6 +130,8 @@ const SlotsManagement = () => {
           if (res.maxTravelKm !== undefined) setMaxTravelKm(Number(res.maxTravelKm));
           if (Array.isArray(res.configuredSlots) && res.configuredSlots.length > 0) {
             setSlots(res.configuredSlots.slice(0, 6));
+            setMonthOverrideSlots(res.configuredSlots.slice(0, 6));
+            setOverrideSlots(res.configuredSlots.slice(0, 6));
           }
           if (res.monthlySlotOverrides) {
             setMonthlyOverrides(res.monthlySlotOverrides);
@@ -86,18 +148,18 @@ const SlotsManagement = () => {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleAddSlot = () => {
-    const trimmed = newSlotInput.trim().toUpperCase();
-    if (!trimmed) return;
+  const handleAddSlot = (slotToAdd = null) => {
+    const val = (slotToAdd || newSlotInput).trim().toUpperCase();
+    if (!val) return;
     if (slots.length >= 6) {
       alert('Maximum 6 slots per day allowed as per company scheduling policy.');
       return;
     }
-    if (slots.includes(trimmed)) {
+    if (slots.includes(val)) {
       alert('This slot time already exists in the schedule.');
       return;
     }
-    setSlots([...slots, trimmed]);
+    setSlots([...slots, val]);
     setNewSlotInput('');
   };
 
@@ -115,21 +177,41 @@ const SlotsManagement = () => {
     setSlots(copy);
   };
 
-  // Specific Date Override handlers
+  // Entire Month Override handler
+  const handleSaveMonthOverride = () => {
+    if (!overrideMonth) return;
+    if (monthOverrideSlots.length === 0) {
+      alert('Please configure at least one slot for this month.');
+      return;
+    }
+    const updated = {
+      ...monthlyOverrides,
+      [overrideMonth]: monthOverrideSlots.slice(0, 6)
+    };
+    setMonthlyOverrides(updated);
+    setOverrideNotice(`Entire month schedule saved for ${overrideMonth}! All days in this month will use these slots. (Click "Save All Settings" to commit)`);
+    setTimeout(() => setOverrideNotice(''), 5000);
+  };
+
+  // Specific Date Override handler
   const handleSaveDateOverride = () => {
     if (!overrideDate) return;
+    if (overrideSlots.length === 0) {
+      alert('Please configure at least one slot for this date.');
+      return;
+    }
     const updated = {
       ...monthlyOverrides,
       [overrideDate]: overrideSlots.slice(0, 6)
     };
     setMonthlyOverrides(updated);
-    setOverrideNotice(`Custom schedule saved for ${overrideDate}! (Click Save All Settings to commit)`);
-    setTimeout(() => setOverrideNotice(''), 4000);
+    setOverrideNotice(`Custom schedule saved for date ${overrideDate}! (Click "Save All Settings" to commit)`);
+    setTimeout(() => setOverrideNotice(''), 5000);
   };
 
-  const handleRemoveDateOverride = (dateKey) => {
+  const handleRemoveOverride = (key) => {
     const updated = { ...monthlyOverrides };
-    delete updated[dateKey];
+    delete updated[key];
     setMonthlyOverrides(updated);
   };
 
@@ -297,39 +379,81 @@ const SlotsManagement = () => {
           </div>
         </div>
 
-        {/* Card 2: Default Daily Slots (Max 6 Allowed) */}
+        {/* Card 2: Default Daily Slots (Max 6 Allowed) - Editable by Super Admin */}
         <div className="card" style={{ padding: '1.75rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #E2E8F0', paddingBottom: '0.75rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <Clock size={20} color="var(--primary-blue)" />
-              <h3 style={{ margin: 0, color: 'var(--primary-navy)', fontSize: '1.15rem' }}>
-                Default Daily Slots ({slots.length}/6)
-              </h3>
+              <div>
+                <h3 style={{ margin: 0, color: 'var(--primary-navy)', fontSize: '1.15rem' }}>
+                  Default Daily Slots ({slots.length}/6)
+                </h3>
+                <span style={{ fontSize: '0.74rem', color: '#64748B' }}>
+                  Configure 2-hour arrival & wash windows (e.g. 08:30 AM - 10:30 AM)
+                </span>
+              </div>
             </div>
             <span style={{ fontSize: '0.78rem', color: slots.length >= 6 ? '#DC2626' : '#059669', fontWeight: 800 }}>
               {slots.length >= 6 ? 'Max Allowed 6 Slots' : `${6 - slots.length} slots remaining`}
             </span>
           </div>
 
-          {/* Slots List */}
+          {/* Service Window Information Alert */}
+          <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', padding: '0.65rem 0.85rem', borderRadius: '10px', fontSize: '0.8rem', color: '#1E40AF', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+            <Clock size={15} color="#2563EB" style={{ flexShrink: 0 }} />
+            <span>
+              <strong>Service Window Model:</strong> Slots represent the time range (e.g. <em>08:30 AM - 10:30 AM</em>) during which your technician arrives at the customer's doorstep and completes the wash.
+            </span>
+          </div>
+
+          {/* Slots List with Direct Timing Editor */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
             {slots.map((slotTime, idx) => (
-              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: '#F8FAFC', padding: '0.5rem 0.85rem', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
-                <span style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'var(--primary-blue)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.8rem' }}>
+              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', background: '#F8FAFC', padding: '0.5rem 0.85rem', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+                <span style={{ width: '26px', height: '26px', borderRadius: '50%', background: 'var(--primary-blue)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.78rem', flexShrink: 0 }}>
                   {idx + 1}
                 </span>
+
+                {/* Preset Time Window Selector */}
+                <select
+                  value={TIME_WINDOW_PRESETS.includes(slotTime) ? slotTime : ''}
+                  onChange={e => e.target.value && handleSlotTimeChange(idx, e.target.value)}
+                  style={{
+                    padding: '0.4rem 0.6rem',
+                    borderRadius: '8px',
+                    border: '1px solid #CBD5E1',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    color: 'var(--primary-navy)',
+                    background: 'white',
+                    cursor: 'pointer',
+                    maxWidth: '185px'
+                  }}
+                  title="Choose standard window preset"
+                >
+                  <option value="" disabled>Window Presets...</option>
+                  {TIME_WINDOW_PRESETS.map(opt => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+
+                {/* Direct Custom Time Text Edit */}
                 <input
                   type="text"
                   value={slotTime}
                   onChange={e => handleSlotTimeChange(idx, e.target.value)}
+                  placeholder="e.g. 08:30 AM - 10:30 AM"
                   className="form-input"
-                  style={{ flex: 1, padding: '0.4rem 0.75rem', fontWeight: 700 }}
+                  style={{ flex: 1, padding: '0.4rem 0.75rem', fontWeight: 800, letterSpacing: '0.04em', margin: 0, fontSize: '0.86rem' }}
+                  title="Direct custom timing window range"
                 />
+
                 <button
+                  type="button"
                   onClick={() => handleRemoveSlot(idx)}
                   className="btn btn-outline"
                   title="Remove Slot"
-                  style={{ borderColor: '#FCA5A5', color: '#DC2626', padding: '0.4rem 0.65rem' }}
+                  style={{ borderColor: '#FCA5A5', color: '#DC2626', padding: '0.4rem 0.6rem', flexShrink: 0 }}
                 >
                   <Trash2 size={15} />
                 </button>
@@ -337,128 +461,500 @@ const SlotsManagement = () => {
             ))}
           </div>
 
-          {/* Add Slot Input */}
+          {/* Window Builder & Quick Presets & Add Slot */}
           {slots.length < 6 && (
-            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-              <input
-                type="text"
-                placeholder="e.g. 07:30 PM or 09:00 AM"
-                value={newSlotInput}
-                onChange={e => setNewSlotInput(e.target.value)}
-                className="form-input"
-                style={{ flex: 1 }}
-              />
-              <button
-                type="button"
-                onClick={handleAddSlot}
-                className="btn btn-primary"
-                style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
-              >
-                <Plus size={16} />
-                <span>Add Slot</span>
-              </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', borderTop: '1px dashed #E2E8F0', paddingTop: '0.75rem' }}>
+              
+              {/* Build Custom Window (From -> To) */}
+              <div style={{ background: '#F1F5F9', border: '1px solid #E2E8F0', padding: '0.7rem 0.85rem', borderRadius: '10px' }}>
+                <span style={{ fontSize: '0.76rem', fontWeight: 800, color: 'var(--primary-navy)', display: 'block', marginBottom: '0.4rem' }}>
+                  ⏱️ Quick Window Range Builder:
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.76rem', color: '#64748B', fontWeight: 700 }}>From:</span>
+                  <select
+                    value={winStart}
+                    onChange={e => setWinStart(e.target.value)}
+                    style={{ padding: '0.35rem 0.5rem', borderRadius: '7px', border: '1px solid #CBD5E1', fontSize: '0.8rem', fontWeight: 700 }}
+                  >
+                    {TIME_POINTS.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                  <span style={{ fontSize: '0.76rem', color: '#64748B', fontWeight: 700 }}>To:</span>
+                  <select
+                    value={winEnd}
+                    onChange={e => setWinEnd(e.target.value)}
+                    style={{ padding: '0.35rem 0.5rem', borderRadius: '7px', border: '1px solid #CBD5E1', fontSize: '0.8rem', fontWeight: 700 }}
+                  >
+                    {TIME_POINTS.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => handleAddSlot(`${winStart} - ${winEnd}`)}
+                    className="btn btn-primary"
+                    style={{ padding: '0.35rem 0.8rem', fontSize: '0.8rem', fontWeight: 800, whiteSpace: 'nowrap' }}
+                  >
+                    + Add Range ({winStart} - {winEnd})
+                  </button>
+                </div>
+              </div>
+
+              {/* Standard 2-Hour Presets */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                  <span style={{ fontSize: '0.76rem', color: '#64748B', fontWeight: 700 }}>
+                    Popular 2-Hour Window Presets:
+                  </span>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--primary-blue)' }}>
+                    Tap to add
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                  {[
+                    '08:30 AM - 10:30 AM',
+                    '10:30 AM - 12:30 PM',
+                    '12:30 PM - 02:30 PM',
+                    '02:30 PM - 04:30 PM',
+                    '04:30 PM - 06:30 PM',
+                    '06:30 PM - 08:30 PM'
+                  ].map(preset => (
+                    <button
+                      key={preset}
+                      type="button"
+                      disabled={slots.includes(preset)}
+                      onClick={() => handleAddSlot(preset)}
+                      style={{
+                        background: slots.includes(preset) ? '#F1F5F9' : '#EFF6FF',
+                        border: slots.includes(preset) ? '1px solid #E2E8F0' : '1px solid #BFDBFE',
+                        color: slots.includes(preset) ? '#94A3B8' : 'var(--primary-blue)',
+                        padding: '0.25rem 0.5rem',
+                        borderRadius: '7px',
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        cursor: slots.includes(preset) ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      + {preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom Input Add Bar */}
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.2rem' }}>
+                <input
+                  type="text"
+                  placeholder="Type any range, e.g. 08:30 AM - 10:30 AM"
+                  value={newSlotInput}
+                  onChange={e => setNewSlotInput(e.target.value)}
+                  className="form-input"
+                  style={{ flex: 1, margin: 0, fontSize: '0.85rem' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => handleAddSlot()}
+                  className="btn btn-outline"
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap', fontSize: '0.84rem' }}
+                >
+                  <Plus size={15} />
+                  <span>Add Window</span>
+                </button>
+              </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Card 3: Date & Month Specific Dynamic Overrides */}
+      {/* Card 3: Entire Month & Specific Date Dynamic Overrides */}
       <div className="card" style={{ padding: '1.75rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', borderBottom: '1px solid #E2E8F0', paddingBottom: '0.75rem', marginBottom: '1.25rem' }}>
-          <Calendar size={20} color="var(--primary-blue)" />
-          <h3 style={{ margin: 0, color: 'var(--primary-navy)', fontSize: '1.15rem' }}>
-            Month & Date-Specific Slot Overrides
-          </h3>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid #E2E8F0', paddingBottom: '0.75rem', marginBottom: '1.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <Calendar size={22} color="var(--primary-blue)" />
+            <div>
+              <h3 style={{ margin: 0, color: 'var(--primary-navy)', fontSize: '1.18rem', fontWeight: 800 }}>
+                Month-Wide & Date-Specific Slot Schedules
+              </h3>
+              <p style={{ margin: '0.15rem 0 0', color: 'var(--text-muted)', fontSize: '0.84rem' }}>
+                Change an entire month at once, or set custom overrides for holidays and festivals.
+              </p>
+            </div>
+          </div>
+
+          {/* Mode Switcher Tabs */}
+          <div style={{ display: 'flex', background: '#F1F5F9', padding: '0.25rem', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+            <button
+              type="button"
+              onClick={() => setOverrideMode('MONTH')}
+              style={{
+                padding: '0.45rem 0.95rem',
+                borderRadius: '9px',
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: overrideMode === 'MONTH' ? 800 : 600,
+                fontSize: '0.84rem',
+                background: overrideMode === 'MONTH' ? 'white' : 'transparent',
+                color: overrideMode === 'MONTH' ? 'var(--primary-blue)' : '#64748B',
+                boxShadow: overrideMode === 'MONTH' ? '0 2px 6px rgba(0,0,0,0.08)' : 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                transition: 'all 0.15s'
+              }}
+            >
+              <Calendar size={14} />
+              <span>Entire Month at Once</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setOverrideMode('DATE')}
+              style={{
+                padding: '0.45rem 0.95rem',
+                borderRadius: '9px',
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: overrideMode === 'DATE' ? 800 : 600,
+                fontSize: '0.84rem',
+                background: overrideMode === 'DATE' ? 'white' : 'transparent',
+                color: overrideMode === 'DATE' ? 'var(--primary-blue)' : '#64748B',
+                boxShadow: overrideMode === 'DATE' ? '0 2px 6px rgba(0,0,0,0.08)' : 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                transition: 'all 0.15s'
+              }}
+            >
+              <Clock size={14} />
+              <span>Specific Date Override</span>
+            </button>
+          </div>
         </div>
 
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', margin: '0 0 1.25rem 0' }}>
-          Need to change slots for a festival, weekend, or holiday in a month? Select any date to override the default 6 slots for that specific day.
-        </p>
-
         {overrideNotice && (
-          <div style={{ background: '#DCFCE7', border: '1px solid #86EFAC', color: '#166534', padding: '0.75rem 1rem', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 700, marginBottom: '1rem' }}>
-            ✓ {overrideNotice}
+          <div style={{ background: '#DCFCE7', border: '1px solid #86EFAC', color: '#166534', padding: '0.75rem 1rem', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Check size={16} />
+            <span>{overrideNotice}</span>
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
           
-          {/* Override Form */}
-          <div style={{ background: '#F8FAFC', padding: '1.25rem', borderRadius: '16px', border: '1px solid #E2E8F0' }}>
-            <h4 style={{ margin: '0 0 1rem 0', color: 'var(--primary-navy)', fontSize: '1rem' }}>
-              Configure Date Override
-            </h4>
-
-            <div className="form-group" style={{ marginBottom: '1rem' }}>
-              <label className="form-label" style={{ fontWeight: 600 }}>Select Specific Date</label>
-              <input
-                type="date"
-                min={new Date().toISOString().split('T')[0]}
-                value={overrideDate}
-                onChange={e => setOverrideDate(e.target.value)}
-                className="form-input"
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label" style={{ fontWeight: 600 }}>Slots For This Date ({overrideSlots.length}/6)</label>
-              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
-                {overrideSlots.map((s, i) => (
-                  <span key={i} style={{ background: '#E0F2FE', color: '#0369A1', padding: '0.35rem 0.75rem', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                    {s}
-                    <button
-                      type="button"
-                      onClick={() => setOverrideSlots(overrideSlots.filter((_, idx) => idx !== i))}
-                      style={{ background: 'none', border: 'none', color: '#0369A1', cursor: 'pointer', padding: 0 }}
-                    >
-                      ✕
-                    </button>
-                  </span>
-                ))}
+          {/* TAB 1: Entire Month Configuration Form */}
+          {overrideMode === 'MONTH' ? (
+            <div style={{ background: '#F8FAFC', padding: '1.25rem', borderRadius: '16px', border: '1.5px solid #BFDBFE' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h4 style={{ margin: 0, color: 'var(--primary-navy)', fontSize: '1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <span>📅</span> Configure Entire Month Schedule
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => setMonthOverrideSlots([...slots])}
+                  style={{ background: 'none', border: 'none', color: 'var(--primary-blue)', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+                  title="Copy the default daily slots into this month"
+                >
+                  Copy Default Slots ↺
+                </button>
               </div>
+
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem' }}>Select Target Month (Year & Month)</label>
+                <input
+                  type="month"
+                  value={overrideMonth}
+                  onChange={e => setOverrideMonth(e.target.value)}
+                  className="form-input"
+                  style={{ fontWeight: 800, fontSize: '1rem' }}
+                />
+                <span style={{ fontSize: '0.75rem', color: '#64748B', display: 'block', marginTop: '0.3rem' }}>
+                  Applying here sets these slots for <strong>every single day</strong> of this month automatically!
+                </span>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                  <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem', margin: 0 }}>
+                    Slots For Entire Month ({monthOverrideSlots.length}/6)
+                  </label>
+                  <span style={{ fontSize: '0.75rem', color: monthOverrideSlots.length >= 6 ? '#DC2626' : '#059669', fontWeight: 800 }}>
+                    {monthOverrideSlots.length >= 6 ? 'Max 6' : `${6 - monthOverrideSlots.length} left`}
+                  </span>
+                </div>
+                
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+                  {monthOverrideSlots.map((s, i) => (
+                    <span key={i} style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', color: '#1E40AF', padding: '0.35rem 0.75rem', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                      {s}
+                      <button
+                        type="button"
+                        onClick={() => setMonthOverrideSlots(monthOverrideSlots.filter((_, idx) => idx !== i))}
+                        style={{ background: 'none', border: 'none', color: '#DC2626', cursor: 'pointer', padding: 0, fontWeight: 900 }}
+                        title="Remove slot"
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  ))}
+                </div>
+
+                {/* Add slot to month */}
+                {monthOverrideSlots.length < 6 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                      <select
+                        value={newMonthSlotInput}
+                        onChange={e => {
+                          if (e.target.value && !monthOverrideSlots.includes(e.target.value)) {
+                            setMonthOverrideSlots([...monthOverrideSlots, e.target.value]);
+                            setNewMonthSlotInput('');
+                          }
+                        }}
+                        className="form-input"
+                        style={{ flex: 1, margin: 0, padding: '0.4rem 0.6rem', fontSize: '0.82rem', fontWeight: 700 }}
+                      >
+                        <option value="">+ Add standard 2-hour window...</option>
+                        {TIME_WINDOW_PRESETS.filter(t => !monthOverrideSlots.includes(t)).map(t => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Window Builder for Month */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#F1F5F9', padding: '0.4rem 0.6rem', borderRadius: '8px', fontSize: '0.78rem' }}>
+                      <span style={{ fontWeight: 700, color: '#64748B' }}>From:</span>
+                      <select
+                        value={monthWinStart}
+                        onChange={e => setMonthWinStart(e.target.value)}
+                        style={{ padding: '0.25rem 0.4rem', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '0.76rem', fontWeight: 700 }}
+                      >
+                        {TIME_POINTS.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                      <span style={{ fontWeight: 700, color: '#64748B' }}>To:</span>
+                      <select
+                        value={monthWinEnd}
+                        onChange={e => setMonthWinEnd(e.target.value)}
+                        style={{ padding: '0.25rem 0.4rem', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '0.76rem', fontWeight: 700 }}
+                      >
+                        {TIME_POINTS.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const comb = `${monthWinStart} - ${monthWinEnd}`;
+                          if (!monthOverrideSlots.includes(comb)) {
+                            setMonthOverrideSlots([...monthOverrideSlots, comb]);
+                          }
+                        }}
+                        className="btn btn-outline"
+                        style={{ padding: '0.25rem 0.55rem', fontSize: '0.76rem', fontWeight: 800, whiteSpace: 'nowrap' }}
+                      >
+                        + Add Custom Window
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSaveMonthOverride}
+                className="btn btn-teal"
+                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontWeight: 800, padding: '0.75rem' }}
+              >
+                <Check size={18} />
+                <span>Apply Schedule to Entire Month ({overrideMonth})</span>
+              </button>
             </div>
+          ) : (
+            /* TAB 2: Specific Date Configuration Form */
+            <div style={{ background: '#F8FAFC', padding: '1.25rem', borderRadius: '16px', border: '1.5px solid #FCD34D' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h4 style={{ margin: 0, color: 'var(--primary-navy)', fontSize: '1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <span>📌</span> Configure Specific Date Override
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => setOverrideSlots([...slots])}
+                  style={{ background: 'none', border: 'none', color: 'var(--primary-blue)', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+                  title="Copy the default daily slots into this date"
+                >
+                  Copy Default Slots ↺
+                </button>
+              </div>
 
-            <button
-              type="button"
-              onClick={handleSaveDateOverride}
-              className="btn btn-primary"
-              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
-            >
-              <Check size={16} />
-              <span>Apply Override to {overrideDate}</span>
-            </button>
-          </div>
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem' }}>Select Specific Date</label>
+                <input
+                  type="date"
+                  min={new Date().toISOString().split('T')[0]}
+                  value={overrideDate}
+                  onChange={e => setOverrideDate(e.target.value)}
+                  className="form-input"
+                  style={{ fontWeight: 800, fontSize: '1rem' }}
+                />
+                <span style={{ fontSize: '0.75rem', color: '#64748B', display: 'block', marginTop: '0.3rem' }}>
+                  Overrides default schedule for festivals, holidays, or special staffing on this specific day.
+                </span>
+              </div>
 
-          {/* Active Overrides List */}
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                  <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem', margin: 0 }}>
+                    Slots For This Date ({overrideSlots.length}/6)
+                  </label>
+                  <span style={{ fontSize: '0.75rem', color: overrideSlots.length >= 6 ? '#DC2626' : '#059669', fontWeight: 800 }}>
+                    {overrideSlots.length >= 6 ? 'Max 6' : `${6 - overrideSlots.length} left`}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+                  {overrideSlots.map((s, i) => (
+                    <span key={i} style={{ background: '#FEF3C7', border: '1px solid #FDE68A', color: '#92400E', padding: '0.35rem 0.75rem', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                      {s}
+                      <button
+                        type="button"
+                        onClick={() => setOverrideSlots(overrideSlots.filter((_, idx) => idx !== i))}
+                        style={{ background: 'none', border: 'none', color: '#DC2626', cursor: 'pointer', padding: 0, fontWeight: 900 }}
+                        title="Remove slot"
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  ))}
+                </div>
+
+                {/* Add slot to specific date */}
+                {overrideSlots.length < 6 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                      <select
+                        value={newDateSlotInput}
+                        onChange={e => {
+                          if (e.target.value && !overrideSlots.includes(e.target.value)) {
+                            setOverrideSlots([...overrideSlots, e.target.value]);
+                            setNewDateSlotInput('');
+                          }
+                        }}
+                        className="form-input"
+                        style={{ flex: 1, margin: 0, padding: '0.4rem 0.6rem', fontSize: '0.82rem', fontWeight: 700 }}
+                      >
+                        <option value="">+ Add standard 2-hour window...</option>
+                        {TIME_WINDOW_PRESETS.filter(t => !overrideSlots.includes(t)).map(t => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Window Builder for Date */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#FEF9C3', padding: '0.4rem 0.6rem', borderRadius: '8px', fontSize: '0.78rem' }}>
+                      <span style={{ fontWeight: 700, color: '#854D0E' }}>From:</span>
+                      <select
+                        value={dateWinStart}
+                        onChange={e => setDateWinStart(e.target.value)}
+                        style={{ padding: '0.25rem 0.4rem', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '0.76rem', fontWeight: 700 }}
+                      >
+                        {TIME_POINTS.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                      <span style={{ fontWeight: 700, color: '#854D0E' }}>To:</span>
+                      <select
+                        value={dateWinEnd}
+                        onChange={e => setDateWinEnd(e.target.value)}
+                        style={{ padding: '0.25rem 0.4rem', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '0.76rem', fontWeight: 700 }}
+                      >
+                        {TIME_POINTS.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const comb = `${dateWinStart} - ${dateWinEnd}`;
+                          if (!overrideSlots.includes(comb)) {
+                            setOverrideSlots([...overrideSlots, comb]);
+                          }
+                        }}
+                        className="btn btn-outline"
+                        style={{ padding: '0.25rem 0.55rem', fontSize: '0.76rem', fontWeight: 800, whiteSpace: 'nowrap' }}
+                      >
+                        + Add Custom Window
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSaveDateOverride}
+                className="btn btn-primary"
+                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontWeight: 800, padding: '0.75rem' }}
+              >
+                <Check size={18} />
+                <span>Apply Override to Date ({overrideDate})</span>
+              </button>
+            </div>
+          )}
+
+          {/* Active Overrides List (Month-Wide and Single-Date) */}
           <div>
-            <h4 style={{ margin: '0 0 0.75rem 0', color: 'var(--primary-navy)', fontSize: '1rem' }}>
-              Active Date Overrides ({Object.keys(monthlyOverrides).length})
+            <h4 style={{ margin: '0 0 0.75rem 0', color: 'var(--primary-navy)', fontSize: '1rem', fontWeight: 800 }}>
+              Configured Schedules & Overrides ({Object.keys(monthlyOverrides).length})
             </h4>
 
             {Object.keys(monthlyOverrides).length === 0 ? (
-              <div style={{ padding: '2rem', textAlign: 'center', color: '#94A3B8', border: '1.5px dashed #CBD5E1', borderRadius: '14px' }}>
-                No date-specific overrides configured yet. All dates will use the default 6 daily slots.
+              <div style={{ padding: '2.5rem 1.5rem', textAlign: 'center', color: '#94A3B8', border: '1.5px dashed #CBD5E1', borderRadius: '16px' }}>
+                <Calendar size={32} color="#CBD5E1" style={{ marginBottom: '0.5rem' }} />
+                <p style={{ margin: 0, fontWeight: 600 }}>No month-wide or date overrides saved yet.</p>
+                <span style={{ fontSize: '0.8rem', color: '#64748B', display: 'block', marginTop: '0.25rem' }}>
+                  All days will operate on the default 6 daily slots configured above.
+                </span>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {Object.entries(monthlyOverrides).map(([dateKey, slotsArr]) => (
-                  <div key={dateKey} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', padding: '0.85rem 1.25rem', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
-                    <div>
-                      <strong style={{ color: 'var(--primary-navy)', fontSize: '0.95rem' }}>{dateKey}</strong>
-                      <div style={{ fontSize: '0.8rem', color: '#64748B', marginTop: '0.2rem' }}>
-                        Slots: {(slotsArr || []).join(', ')}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveDateOverride(dateKey)}
-                      className="btn btn-outline"
-                      style={{ borderColor: '#FCA5A5', color: '#DC2626', padding: '0.35rem 0.65rem', fontSize: '0.8rem' }}
+                {Object.entries(monthlyOverrides).map(([key, slotsArr]) => {
+                  const isMonthWide = key.length === 7 && key.includes('-'); // 'YYYY-MM'
+                  return (
+                    <div
+                      key={key}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        background: 'white',
+                        padding: '0.85rem 1.25rem',
+                        borderRadius: '14px',
+                        border: isMonthWide ? '1.5px solid #93C5FD' : '1px solid #E2E8F0',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+                      }}
                     >
-                      Remove
-                    </button>
-                  </div>
-                ))}
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <span style={{
+                            background: isMonthWide ? '#EFF6FF' : '#FEF3C7',
+                            color: isMonthWide ? '#1E40AF' : '#92400E',
+                            padding: '0.15rem 0.5rem',
+                            borderRadius: '6px',
+                            fontSize: '0.72rem',
+                            fontWeight: 800
+                          }}>
+                            {isMonthWide ? '📅 ENTIRE MONTH' : '📌 SINGLE DATE'}
+                          </span>
+                          <strong style={{ color: 'var(--primary-navy)', fontSize: '0.98rem' }}>{key}</strong>
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: '#475569', marginTop: '0.35rem', fontWeight: 600 }}>
+                          Slots: {(slotsArr || []).join(' · ')}
+                        </div>
+                        <div style={{ fontSize: '0.74rem', color: '#64748B', marginTop: '0.15rem' }}>
+                          {isMonthWide ? 'Applies to all days in this calendar month' : 'Applies only to this specific day'}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveOverride(key)}
+                        className="btn btn-outline"
+                        style={{ borderColor: '#FCA5A5', color: '#DC2626', padding: '0.35rem 0.65rem', fontSize: '0.78rem', fontWeight: 700 }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

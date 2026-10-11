@@ -10,12 +10,12 @@ export const DEFAULT_ZONE_DISTANCES = {
 };
 
 export const DEFAULT_SLOTS = [
-  '08:00 AM',
-  '10:00 AM',
-  '12:00 PM',
-  '02:00 PM',
-  '04:00 PM',
-  '06:00 PM'
+  '08:30 AM - 10:30 AM',
+  '10:30 AM - 12:30 PM',
+  '12:30 PM - 02:30 PM',
+  '02:30 PM - 04:30 PM',
+  '04:30 PM - 06:30 PM',
+  '06:30 PM - 08:30 PM'
 ];
 
 // Calculate realistic road transit distance from GPS coordinates (km)
@@ -117,12 +117,15 @@ export const getAvailableBookingSlots = async (req, res) => {
       }
     }
 
-    // Check monthly/date-specific overrides
+    // Check monthly/date-specific overrides (specific date takes precedence over entire month)
     if (settings?.monthlySlotOverrides) {
       try {
         const overrides = JSON.parse(settings.monthlySlotOverrides);
-        if (overrides[date] && Array.isArray(overrides[date])) {
+        const monthKey = String(date).substring(0, 7); // 'YYYY-MM'
+        if (overrides[date] && Array.isArray(overrides[date]) && overrides[date].length > 0) {
           configuredSlots = overrides[date].slice(0, 6);
+        } else if (overrides[monthKey] && Array.isArray(overrides[monthKey]) && overrides[monthKey].length > 0) {
+          configuredSlots = overrides[monthKey].slice(0, 6);
         }
       } catch (e) {
         console.warn('Could not parse monthlySlotOverrides:', e);

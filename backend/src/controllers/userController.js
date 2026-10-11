@@ -202,6 +202,41 @@ export const createBooking = async (req, res) => {
       });
     }
 
+    // Validate that the slot is an approved admin-configured slot for this date
+    const sysSettings = await prisma.systemSettings.findUnique({ where: { id: 1 } });
+    let configuredSlots = [
+      '08:30 AM - 10:30 AM',
+      '10:30 AM - 12:30 PM',
+      '12:30 PM - 02:30 PM',
+      '02:30 PM - 04:30 PM',
+      '04:30 PM - 06:30 PM',
+      '06:30 PM - 08:30 PM'
+    ];
+    if (sysSettings?.configuredSlots) {
+      try {
+        const parsed = JSON.parse(sysSettings.configuredSlots);
+        if (Array.isArray(parsed) && parsed.length > 0) configuredSlots = parsed.slice(0, 6);
+      } catch (e) {}
+    }
+    if (sysSettings?.monthlySlotOverrides) {
+      try {
+        const overrides = JSON.parse(sysSettings.monthlySlotOverrides);
+        const monthKey = String(date).substring(0, 7);
+        if (overrides[date] && Array.isArray(overrides[date]) && overrides[date].length > 0) {
+          configuredSlots = overrides[date].slice(0, 6);
+        } else if (overrides[monthKey] && Array.isArray(overrides[monthKey]) && overrides[monthKey].length > 0) {
+          configuredSlots = overrides[monthKey].slice(0, 6);
+        }
+      } catch (e) {}
+    }
+    const norm = (str) => (str || '').toUpperCase().replace(/\s+/g, ' ').trim();
+    const isSlotApproved = configuredSlots.some(s => norm(s) === norm(timeSlot));
+    if (timeSlot && !isSlotApproved) {
+      return res.status(400).json({ 
+        error: `Selected slot (${timeSlot}) is not an approved active slot for date ${date}.` 
+      });
+    }
+
     // Fetch price setting for the combination
     const priceSetting = await prisma.washPrice.findUnique({
       where: {

@@ -203,12 +203,19 @@ const BookSlot = () => {
             const firstAvail = res.slots.find(s => s.available);
             if (firstAvail) {
               setTimeSlot(firstAvail.slot);
+            } else {
+              setTimeSlot('');
             }
           }
+        } else {
+          setAvailableSlotsList([]);
+          setTimeSlot('');
         }
       })
       .catch(err => {
         console.warn('Failed to load available slots:', err);
+        setAvailableSlotsList([]);
+        setTimeSlot('');
       })
       .finally(() => {
         setLoadingSlots(false);
@@ -508,6 +515,27 @@ const BookSlot = () => {
   // Submit Booking
   const handleFinalBookingSubmit = async (e) => {
     e.preventDefault();
+
+    if (!timeSlot) {
+      alert('Please select an available approved time slot before confirming your booking.');
+      return;
+    }
+
+    if (availableSlotsList.length > 0) {
+      const selectedSlotObj = availableSlotsList.find(s => s.slot === timeSlot);
+      if (!selectedSlotObj) {
+        alert('The selected time slot is not approved by administration for this date.');
+        return;
+      }
+      if (!selectedSlotObj.available) {
+        alert(`This slot cannot be booked: ${selectedSlotObj.reason || 'Unavailable'}`);
+        return;
+      }
+    } else if (!loadingSlots) {
+      alert('No approved slots are configured by administration for this date. Please choose another date.');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -590,7 +618,7 @@ const BookSlot = () => {
             Car Wash Booked Successfully!
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', margin: '0 0 1.5rem' }}>
-            Your service technician will arrive at your doorstep on <strong>{new Date(date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</strong> at <strong>{timeSlot}</strong>.
+            Your service technician will arrive at your doorstep on <strong>{new Date(date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</strong> during the window <strong>{timeSlot}</strong> to wash your vehicle.
           </p>
 
           <div style={{
@@ -1802,7 +1830,7 @@ const BookSlot = () => {
 
                 <div className="form-group" style={{ margin: 0 }}>
                   <label className="form-label" htmlFor="time-slot-select" style={{ fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span>Time Slot (Select Dropdown)</span>
+                    <span>Service Arrival Window</span>
                     {loadingSlots && <span style={{ fontSize: '0.75rem', color: 'var(--primary-blue)' }}>Checking availability...</span>}
                   </label>
                   <div style={{ position: 'relative' }}>
@@ -1812,6 +1840,7 @@ const BookSlot = () => {
                       value={timeSlot}
                       onChange={e => setTimeSlot(e.target.value)}
                       className="form-input"
+                      disabled={loadingSlots || availableSlotsList.length === 0}
                       style={{
                         padding: '0.75rem 1rem',
                         borderRadius: '12px',
@@ -1819,43 +1848,60 @@ const BookSlot = () => {
                         fontSize: '0.92rem',
                         fontWeight: 600,
                         color: 'var(--primary-navy)',
-                        background: 'white',
-                        cursor: 'pointer',
+                        background: (loadingSlots || availableSlotsList.length === 0) ? '#F1F5F9' : 'white',
+                        cursor: (loadingSlots || availableSlotsList.length === 0) ? 'not-allowed' : 'pointer',
                         width: '100%',
                         boxSizing: 'border-box'
                       }}
                     >
-                      {availableSlotsList.length > 0 ? (
-                        availableSlotsList.map(item => {
-                          const isAvail = item.available;
-                          let label = item.slot;
-                          if (!isAvail) {
-                            label = `${item.slot} — 🚫 ${item.reason || 'Unavailable'}`;
-                          } else {
-                            label = `${item.slot} — Available`;
-                          }
-                          return (
-                            <option 
-                              key={item.slot} 
-                              value={item.slot} 
-                              disabled={!isAvail}
-                              style={{ 
-                                color: isAvail ? '#0F172A' : '#94A3B8',
-                                background: isAvail ? 'white' : '#F8FAFC',
-                                fontWeight: isAvail ? 600 : 400
-                              }}
-                            >
-                              {label}
-                            </option>
-                          );
-                        })
+                      {loadingSlots ? (
+                        <option value="" disabled>Loading approved arrival windows for this date...</option>
+                      ) : availableSlotsList.length > 0 ? (
+                        <>
+                          <option value="" disabled>-- Select Service Arrival Window --</option>
+                          {availableSlotsList.map(item => {
+                            const isAvail = item.available;
+                            let label = item.slot;
+                            if (!isAvail) {
+                              label = `${item.slot} — 🚫 ${item.reason || 'Unavailable'}`;
+                            } else {
+                              label = `${item.slot} — Available (Service Window)`;
+                            }
+                            return (
+                              <option 
+                                key={item.slot} 
+                                value={item.slot} 
+                                disabled={!isAvail}
+                                style={{ 
+                                  color: isAvail ? '#0F172A' : '#94A3B8',
+                                  background: isAvail ? 'white' : '#F8FAFC',
+                                  fontWeight: isAvail ? 600 : 400
+                                }}
+                              >
+                                {label}
+                              </option>
+                            );
+                          })}
+                        </>
                       ) : (
-                        ['08:00 AM', '10:00 AM', '12:00 PM', '02:00 PM', '04:00 PM', '06:00 PM'].map(s => (
-                          <option key={s} value={s}>{s} — Available</option>
-                        ))
+                        <option value="" disabled>No service windows configured by admin for this date</option>
                       )}
                     </select>
                   </div>
+
+                  {timeSlot && availableSlotsList.length > 0 && (
+                    <div style={{ marginTop: '0.45rem', fontSize: '0.76rem', color: '#0369A1', background: '#F0F9FF', border: '1px solid #BAE6FD', padding: '0.45rem 0.65rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <Clock size={14} color="#0284C7" style={{ flexShrink: 0 }} />
+                      <span>Technician arrives & washes your vehicle between <strong>{timeSlot}</strong>.</span>
+                    </div>
+                  )}
+
+                  {!loadingSlots && availableSlotsList.length === 0 && (
+                    <div style={{ marginTop: '0.45rem', fontSize: '0.8rem', color: '#DC2626', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <AlertCircle size={14} color="#DC2626" />
+                      <span>No approved service windows available for this date. Please pick another date.</span>
+                    </div>
+                  )}
 
                   {slotNotice && (
                     <div style={{ marginTop: '0.45rem', fontSize: '0.75rem', color: '#64748B', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
@@ -2298,7 +2344,7 @@ const BookSlot = () => {
                     {selectedWashTypeObj?.name}
                   </div>
                   <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    {date} at {timeSlot}
+                    {date} • Window: <strong>{timeSlot}</strong>
                   </div>
                 </div>
               </div>
