@@ -4,7 +4,8 @@ import {
   Calendar, MapPin, Car as CarIcon, CreditCard, CheckCircle, 
   Search, Compass, AlertCircle, Tag, Sparkles, Plus, Check,
   Shield, Bike, Droplets, Feather, Flame, Info, ArrowRight,
-  ArrowLeft, ArrowDown, X, Gift, CheckSquare, Square, ChevronRight, HelpCircle
+  ArrowLeft, ArrowDown, X, Gift, CheckSquare, Square, ChevronRight, HelpCircle,
+  Clock, Users, Navigation
 } from 'lucide-react';
 import { 
   createBooking, 
@@ -52,7 +53,13 @@ const STEPS = [
 const BookSlot = () => {
   const navigate = useNavigate();
   const mapRef = useRef(null);
+  const autocompleteInputRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const markerInstanceRef = useRef(null);
+  const activeZoneCircleRef = useRef(null);
   const termsCheckboxRef = useRef(null);
+  const [locating, setLocating] = useState(false);
+  const [matchedZoneInfo, setMatchedZoneInfo] = useState(null);
 
   // Stepper State (1 to 6)
   const [currentStep, setCurrentStep] = useState(1);
@@ -107,8 +114,8 @@ const BookSlot = () => {
   const [selectedSavedAddressId, setSelectedSavedAddressId] = useState('');
   const [selectedServiceAreaId, setSelectedServiceAreaId] = useState('');
   const [address, setAddress] = useState('');
-  const [latitude, setLatitude] = useState(19.0760);
-  const [longitude, setLongitude] = useState(72.8777);
+  const [latitude, setLatitude] = useState(17.7386);
+  const [longitude, setLongitude] = useState(83.3182);
   const [addressLabel, setAddressLabel] = useState('Home');
   const [saveAddress, setSaveAddress] = useState(false);
   const [mapsLoaded, setMapsLoaded] = useState(false);
@@ -124,6 +131,7 @@ const BookSlot = () => {
   const [timeSlot, setTimeSlot] = useState('10:00 AM');
   const [availableSlotsList, setAvailableSlotsList] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
+  const [dispatchCapacity, setDispatchCapacity] = useState(1);
   const [slotNotice, setSlotNotice] = useState('');
   const [selectedCouponCode, setSelectedCouponCode] = useState('');
   const [manualCouponInput, setManualCouponInput] = useState('');
@@ -194,8 +202,11 @@ const BookSlot = () => {
       .then(res => {
         if (res && Array.isArray(res.slots)) {
           setAvailableSlotsList(res.slots);
+          if (res.activeWorkers !== undefined) {
+            setDispatchCapacity(Number(res.activeWorkers) || 1);
+          }
           if (res.targetZone) {
-            setSlotNotice(`Zone: ${res.targetZone} (Dispatch Capacity: ${res.activeWorkers || 1} tech)`);
+            setSlotNotice(`Assigned Service Hub: ${res.targetZone}`);
           }
           // If selected slot is disabled or unavailable, default to first available
           const currentIsAvailable = res.slots.some(s => s.slot === timeSlot && s.available);
@@ -351,28 +362,351 @@ const BookSlot = () => {
     }
   }, [currentStep, addressSource]);
 
+  // Visual Map Circle for Active Service Area Coverage Radius
+  const updateZoneCircle = (centerLat, centerLng, radiusMeters) => {
+    if (!mapInstanceRef.current || !window.google?.maps) return;
+    if (activeZoneCircleRef.current) {
+      activeZoneCircleRef.current.setMap(null);
+      activeZoneCircleRef.current = null;
+    }
+    if (centerLat && centerLng && radiusMeters) {
+      const circle = new window.google.maps.Circle({
+        map: mapInstanceRef.current,
+        center: { lat: Number(centerLat), lng: Number(centerLng) },
+        radius: Number(radiusMeters),
+        fillColor: '#0284C7',
+        fillOpacity: 0.12,
+        strokeColor: '#0284C7',
+        strokeOpacity: 0.65,
+        strokeWeight: 1.5,
+        clickable: false
+      });
+      activeZoneCircleRef.current = circle;
+    }
+  };
+
+  // Auto-Match Service Area / Zone based on Pin (lat, lng) and Configured Radius
+  const autoMatchServiceArea = (pinLat, pinLng) => {
+    if (!serviceAreas || serviceAreas.length === 0 || !pinLat || !pinLng) return null;
+
+    const toRad = deg => (deg * Math.PI) / 180;
+    const calcDistMeters = (lat1, lon1, lat2, lon2) => {
+      const R = 6371e3; // Earth radius in meters
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    };
+
+    const zoneCoordsFallback = {
+      'maddilapalem': { lat: 17.7389, lng: 83.3184, radius: 5000 },
+      'madhurawada': { lat: 17.8180, lng: 83.3512, radius: 5000 },
+      'nad junction': { lat: 17.7428, lng: 83.2353, radius: 5000 },
+      'old gajuwaka': { lat: 17.6863, lng: 83.2041, radius: 5000 },
+      'gajuwaka': { lat: 17.6863, lng: 83.2041, radius: 5000 },
+      'pendurthi': { lat: 17.8286, lng: 83.1973, radius: 5000 },
+    };
+
+    let bestWithinArea = null;
+    let minWithinDist = Infinity;
+    let closestAreaOverall = null;
+    let minOverallDist = Infinity;
+
+    for (const area of serviceAreas) {
+      const nameKey = (area.name || '').toLowerCase().trim();
+      const fallback = zoneCoordsFallback[nameKey] || {};
+
+      const areaLat = area.latitude || fallback.lat;
+      const areaLng = area.longitude || fallback.lng;
+      const radiusMeters = Number(area.radius) || Number(fallback.radius) || 5000;
+
+      if (areaLat && areaLng) {
+        const dist = calcDistMeters(Number(pinLat), Number(pinLng), Number(areaLat), Number(areaLng));
+
+        if (dist <= radiusMeters) {
+          if (dist < minWithinDist) {
+            minWithinDist = dist;
+            bestWithinArea = { area, dist, radius: radiusMeters, isWithin: true, centerLat: areaLat, centerLng: areaLng };
+          }
+        }
+
+        if (dist < minOverallDist) {
+          minOverallDist = dist;
+          closestAreaOverall = { area, dist, radius: radiusMeters, isWithin: false, centerLat: areaLat, centerLng: areaLng };
+        }
+      }
+    }
+
+    const matched = bestWithinArea || closestAreaOverall;
+    if (matched && matched.area) {
+      setSelectedServiceAreaId(matched.area.id.toString());
+      setMatchedZoneInfo({
+        name: matched.area.name,
+        distanceKm: (matched.dist / 1000).toFixed(1),
+        radiusKm: (matched.radius / 1000).toFixed(1),
+        isWithin: matched.isWithin
+      });
+      updateZoneCircle(matched.centerLat, matched.centerLng, matched.radius);
+      return matched;
+    }
+    return null;
+  };
+
+  // Reverse Geocode Helper: populates address text from lat/lng
+  const reverseGeocode = (lat, lng) => {
+    if (!window.google || !window.google.maps || !window.google.maps.Geocoder) return;
+    try {
+      const geocoder = new window.google.maps.Geocoder();
+      geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+        if (status === 'OK' && results && results[0]) {
+          const fullAddr = results[0].formatted_address;
+          setAddress(fullAddr);
+          if (autocompleteInputRef.current) {
+            autocompleteInputRef.current.value = fullAddr;
+          }
+        }
+      });
+    } catch (err) {
+      console.warn('Geocoding error:', err);
+    }
+  };
+
+  // GPS "Use Current Location" Handler
+  const handleUseCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser.');
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocating(false);
+        const curLat = pos.coords.latitude;
+        const curLng = pos.coords.longitude;
+        setLatitude(curLat);
+        setLongitude(curLng);
+        if (mapInstanceRef.current && markerInstanceRef.current && window.google?.maps) {
+          const latLng = new window.google.maps.LatLng(curLat, curLng);
+          mapInstanceRef.current.panTo(latLng);
+          mapInstanceRef.current.setZoom(16);
+          markerInstanceRef.current.setPosition(latLng);
+        }
+        autoMatchServiceArea(curLat, curLng);
+        reverseGeocode(curLat, curLng);
+      },
+      (err) => {
+        setLocating(false);
+        console.warn('Geolocation error:', err);
+        alert('Could not detect your current location. Please check browser location permissions or click directly on the map.');
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
+  // Geocode an address/place search query and update pin, map & zone
+  const handleSearchLocation = (overrideQuery) => {
+    const rawQuery = typeof overrideQuery === 'string' ? overrideQuery : (autocompleteInputRef.current ? autocompleteInputRef.current.value : '');
+    const query = (rawQuery || '').trim();
+    if (!query || !window.google?.maps?.Geocoder) return;
+
+    try {
+      const geocoder = new window.google.maps.Geocoder();
+      geocoder.geocode({ address: query, componentRestrictions: { country: 'in' } }, (results, status) => {
+        if (status === 'OK' && results && results[0]) {
+          const loc = results[0].geometry.location;
+          const sLat = loc.lat();
+          const sLng = loc.lng();
+          setLatitude(sLat);
+          setLongitude(sLng);
+          if (mapInstanceRef.current) {
+            mapInstanceRef.current.panTo(loc);
+            mapInstanceRef.current.setZoom(16);
+          }
+          if (markerInstanceRef.current) {
+            markerInstanceRef.current.setPosition(loc);
+          }
+          autoMatchServiceArea(sLat, sLng);
+          const fullAddr = results[0].formatted_address || query;
+          setAddress(fullAddr);
+          if (autocompleteInputRef.current) {
+            autocompleteInputRef.current.value = fullAddr;
+          }
+        } else {
+          alert('Could not locate that address on map. Please check spelling or select from the search suggestions.');
+        }
+      });
+    } catch (err) {
+      console.warn('Geocoding search error:', err);
+    }
+  };
+
+  // Service Area / Zone selection with map fly-to and coordinate sync
+  const handleServiceAreaSelect = (areaId) => {
+    setSelectedServiceAreaId(areaId ? areaId.toString() : '');
+    const matched = serviceAreas.find(a => a.id.toString() === String(areaId));
+    if (!matched) return;
+
+    // Immediately update search bar placeholder/value to reflect selected zone
+    if (autocompleteInputRef.current) {
+      autocompleteInputRef.current.value = `${matched.name}, Visakhapatnam`;
+    }
+
+    // Approximate center coordinates for Visakhapatnam operational zones
+    const zoneCoordsFallback = {
+      'maddilapalem': { lat: 17.7389, lng: 83.3184, radius: 5000 },
+      'madhurawada': { lat: 17.8180, lng: 83.3512, radius: 5000 },
+      'nad junction': { lat: 17.7428, lng: 83.2353, radius: 5000 },
+      'old gajuwaka': { lat: 17.6863, lng: 83.2041, radius: 5000 },
+      'gajuwaka': { lat: 17.6863, lng: 83.2041, radius: 5000 },
+      'pendurthi': { lat: 17.8286, lng: 83.1973, radius: 5000 },
+    };
+
+    const areaNameLower = matched.name.toLowerCase().trim();
+    let targetLat = matched.latitude;
+    let targetLng = matched.longitude;
+    let targetRadius = matched.radius;
+
+    if (!targetLat || !targetLng) {
+      if (zoneCoordsFallback[areaNameLower]) {
+        targetLat = zoneCoordsFallback[areaNameLower].lat;
+        targetLng = zoneCoordsFallback[areaNameLower].lng;
+        targetRadius = zoneCoordsFallback[areaNameLower].radius;
+      }
+    }
+
+    if (targetLat && targetLng) {
+      setLatitude(targetLat);
+      setLongitude(targetLng);
+      if (mapInstanceRef.current && markerInstanceRef.current && window.google?.maps) {
+        const pos = new window.google.maps.LatLng(targetLat, targetLng);
+        mapInstanceRef.current.panTo(pos);
+        mapInstanceRef.current.setZoom(15);
+        markerInstanceRef.current.setPosition(pos);
+      }
+      updateZoneCircle(targetLat, targetLng, targetRadius || 5000);
+      setMatchedZoneInfo({
+        name: matched.name,
+        distanceKm: '0.0',
+        radiusKm: ((targetRadius || 5000) / 1000).toFixed(1),
+        isWithin: true
+      });
+      reverseGeocode(targetLat, targetLng);
+    } else if (window.google?.maps?.Geocoder) {
+      const geocoder = new window.google.maps.Geocoder();
+      geocoder.geocode({ address: `${matched.name}, Visakhapatnam, Andhra Pradesh, India` }, (results, status) => {
+        if (status === 'OK' && results && results[0]) {
+          const loc = results[0].geometry.location;
+          const lat = loc.lat();
+          const lng = loc.lng();
+          setLatitude(lat);
+          setLongitude(lng);
+          if (mapInstanceRef.current && markerInstanceRef.current) {
+            mapInstanceRef.current.panTo(loc);
+            mapInstanceRef.current.setZoom(15);
+            markerInstanceRef.current.setPosition(loc);
+          }
+          updateZoneCircle(lat, lng, 5000);
+          setMatchedZoneInfo({
+            name: matched.name,
+            distanceKm: '0.0',
+            radiusKm: '5.0',
+            isWithin: true
+          });
+          reverseGeocode(lat, lng);
+        }
+      });
+    }
+  };
+
   const initMap = () => {
     if (!mapRef.current || !window.google || !window.google.maps) return;
-    const pos = { lat: latitude, lng: longitude };
+    const pos = { lat: Number(latitude) || 17.7386, lng: Number(longitude) || 83.3182 };
     const newMap = new window.google.maps.Map(mapRef.current, {
       center: pos,
       zoom: 15,
       disableDefaultUI: true,
       zoomControl: true,
+      streetViewControl: false,
+      mapTypeControl: false,
     });
     const newMarker = new window.google.maps.Marker({
       position: pos,
       map: newMap,
       draggable: true,
-      animation: window.google.maps.Animation.DROP
+      animation: window.google.maps.Animation.DROP,
+      title: 'Technician Wash Spot'
     });
+
+    mapInstanceRef.current = newMap;
+    markerInstanceRef.current = newMarker;
     setMap(newMap);
     setMarker(newMarker);
+
+    // 1. Click anywhere on map to pin spot, auto-detect zone & auto-fill address
+    newMap.addListener('click', (e) => {
+      const clickLat = e.latLng.lat();
+      const clickLng = e.latLng.lng();
+      newMarker.setPosition(e.latLng);
+      setLatitude(clickLat);
+      setLongitude(clickLng);
+      autoMatchServiceArea(clickLat, clickLng);
+      reverseGeocode(clickLat, clickLng);
+    });
+
+    // 2. Drag marker to pin exact spot, auto-detect zone & auto-fill address
     newMarker.addListener('dragend', () => {
       const newPos = newMarker.getPosition();
-      setLatitude(newPos.lat());
-      setLongitude(newPos.lng());
+      const dragLat = newPos.lat();
+      const dragLng = newPos.lng();
+      setLatitude(dragLat);
+      setLongitude(dragLng);
+      autoMatchServiceArea(dragLat, dragLng);
+      reverseGeocode(dragLat, dragLng);
     });
+
+    // 3. Attach Google Places Autocomplete to address search input
+    if (autocompleteInputRef.current && window.google?.maps?.places?.Autocomplete) {
+      try {
+        const autocomplete = new window.google.maps.places.Autocomplete(autocompleteInputRef.current, {
+          componentRestrictions: { country: 'in' },
+          fields: ['geometry', 'formatted_address', 'name']
+        });
+        autocompleteRef.current = autocomplete;
+        autocomplete.addListener('place_changed', () => {
+          const place = autocomplete.getPlace();
+          if (!place.geometry || !place.geometry.location) return;
+          const placeLoc = place.geometry.location;
+          const pLat = placeLoc.lat();
+          const pLng = placeLoc.lng();
+          setLatitude(pLat);
+          setLongitude(pLng);
+          newMap.panTo(placeLoc);
+          newMap.setZoom(16);
+          newMarker.setPosition(placeLoc);
+          autoMatchServiceArea(pLat, pLng);
+          const placeAddr = place.formatted_address || place.name || '';
+          if (placeAddr) {
+            setAddress(placeAddr);
+          } else {
+            reverseGeocode(pLat, pLng);
+          }
+        });
+      } catch (e) {
+        console.warn('Autocomplete init error:', e);
+      }
+    }
+
+    // Auto match zone & circle for initial position
+    autoMatchServiceArea(pos.lat, pos.lng);
+
+    // Auto reverse geocode initial position if address is empty
+    if (!address) {
+      reverseGeocode(pos.lat, pos.lng);
+    }
   };
 
   // Price Calculations
@@ -528,7 +862,7 @@ const BookSlot = () => {
         return;
       }
       if (!selectedSlotObj.available) {
-        alert(`This slot cannot be booked: ${selectedSlotObj.reason || 'Unavailable'}`);
+        alert('This arrival window is currently booked. Please select an available time window.');
         return;
       }
     } else if (!loadingSlots) {
@@ -1693,56 +2027,261 @@ const BookSlot = () => {
             </div>
           ) : (
             /* New Address Entry */
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginBottom: '1.5rem' }}>
               
-              {/* Service Area Selector */}
+              {/* 1. Service Area / Zone Selector with Searchable Dropdown & Quick Chips */}
               <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label" style={{ fontWeight: 600 }}>
-                  Service Area / Zone <span style={{ color: '#EF4444' }}>*</span>
-                </label>
-                <select
-                  className="form-input"
-                  value={selectedServiceAreaId}
-                  onChange={e => setSelectedServiceAreaId(e.target.value)}
-                >
-                  <option value="">-- Select Your Service Area --</option>
-                  {serviceAreas.map(area => (
-                    <option key={area.id} value={area.id}>
-                      {area.name}
-                    </option>
-                  ))}
-                </select>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.45rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+                  <label className="form-label" style={{ fontWeight: 700, fontSize: '0.88rem', color: '#1E293B', margin: 0 }}>
+                    Service Area / Zone <span style={{ color: '#EF4444' }}>*</span>
+                  </label>
+                  {matchedZoneInfo && (
+                    <div style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      fontSize: '0.73rem',
+                      fontWeight: 700,
+                      color: matchedZoneInfo.isWithin ? '#047857' : '#B45309',
+                      background: matchedZoneInfo.isWithin ? '#ECFDF5' : '#FFFBEB',
+                      border: matchedZoneInfo.isWithin ? '1px solid #A7F3D0' : '1px solid #FDE68A',
+                      padding: '0.2rem 0.55rem',
+                      borderRadius: '6px'
+                    }}>
+                      <span>{matchedZoneInfo.isWithin ? '🎯 Auto-Matched by Pin:' : '📍 Nearest Hub:'}</span>
+                      <span>{matchedZoneInfo.name} ({matchedZoneInfo.distanceKm} km from hub · {matchedZoneInfo.radiusKm} km radius)</span>
+                    </div>
+                  )}
+                </div>
+                <SearchableDropdown
+                  options={serviceAreas.map(area => ({ value: area.id.toString(), label: area.name }))}
+                  value={selectedServiceAreaId ? selectedServiceAreaId.toString() : ''}
+                  onChange={(val) => handleServiceAreaSelect(val)}
+                  placeholder="-- Select Your Service Area --"
+                  searchPlaceholder="Search service area or zone..."
+                  allowOther={false}
+                />
+
+                {/* Quick Area / Zone Selection Pills */}
+                {serviceAreas.length > 0 && (
+                  <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    {serviceAreas.map(area => {
+                      const isSelected = selectedServiceAreaId === area.id.toString();
+                      return (
+                        <button
+                          key={area.id}
+                          type="button"
+                          onClick={() => handleServiceAreaSelect(area.id.toString())}
+                          style={{
+                            background: isSelected ? '#EFF6FF' : '#FFFFFF',
+                            border: isSelected ? '1.5px solid var(--primary-blue)' : '1px solid #CBD5E1',
+                            color: isSelected ? 'var(--primary-blue)' : '#334155',
+                            padding: '0.35rem 0.65rem',
+                            borderRadius: '8px',
+                            fontSize: '0.78rem',
+                            fontWeight: isSelected ? 800 : 600,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.3rem',
+                            boxShadow: isSelected ? '0 2px 6px rgba(2, 132, 199, 0.12)' : 'none'
+                          }}
+                        >
+                          <span>📍 {area.name}</span>
+                          {isSelected && <Check size={12} strokeWidth={3} />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
-              {/* Full Address Input */}
+              {/* 2. Map Pointing Section FIRST (Address Search + Current Location + Interactive Map) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
+                  <label className="form-label" style={{ fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#1E293B', fontSize: '0.88rem' }}>
+                    <Compass size={16} color="var(--primary-blue)" /> Pinpoint Exact Technician Spot
+                  </label>
+                  <span style={{ fontSize: '0.73rem', color: '#0369A1', background: '#F0F9FF', border: '1px solid #BAE6FD', padding: '0.2rem 0.55rem', borderRadius: '6px', fontWeight: 600 }}>
+                    Tap map or drag pin to auto-fill address
+                  </span>
+                </div>
+
+                {/* Map Search Bar & Use Current Location Button */}
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div style={{ position: 'relative', flex: '1 1 240px', minWidth: '220px', display: 'flex' }}>
+                    <Search size={15} color="#94A3B8" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                    <input
+                      ref={autocompleteInputRef}
+                      type="text"
+                      placeholder="Search apartment, street or landmark..."
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleSearchLocation();
+                        }
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '0.55rem 3.4rem 0.55rem 2rem',
+                        borderRadius: '8px',
+                        border: '1.5px solid #CBD5E1',
+                        fontSize: '0.82rem',
+                        outline: 'none',
+                        background: '#FFFFFF',
+                        transition: 'border-color 0.2s',
+                        boxSizing: 'border-box'
+                      }}
+                      onFocus={e => e.target.style.borderColor = 'var(--primary-blue)'}
+                      onBlur={e => e.target.style.borderColor = '#CBD5E1'}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleSearchLocation()}
+                      style={{
+                        position: 'absolute',
+                        right: '4px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'var(--primary-blue)',
+                        border: 'none',
+                        color: 'white',
+                        padding: '0.3rem 0.6rem',
+                        borderRadius: '6px',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                        boxShadow: '0 1px 3px rgba(2, 132, 199, 0.25)'
+                      }}
+                      title="Search place & pin location"
+                    >
+                      <Search size={11} strokeWidth={2.5} />
+                      <span>Find</span>
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleUseCurrentLocation}
+                    disabled={locating}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      background: locating ? '#E2E8F0' : '#F0FDF4',
+                      border: '1.5px solid #86EFAC',
+                      color: '#166534',
+                      padding: '0.55rem 0.85rem',
+                      borderRadius: '8px',
+                      fontSize: '0.82rem',
+                      fontWeight: 700,
+                      cursor: locating ? 'not-allowed' : 'pointer',
+                      whiteSpace: 'nowrap',
+                      transition: 'all 0.15s ease',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                    }}
+                    title="Detect GPS Location"
+                  >
+                    <Navigation size={14} className={locating ? 'animate-spin' : ''} />
+                    <span>{locating ? 'Locating...' : 'Use Current Location'}</span>
+                  </button>
+                </div>
+
+                {/* Google Map Container */}
+                <div style={{ position: 'relative' }}>
+                  <div
+                    ref={mapRef}
+                    style={{
+                      width: '100%',
+                      height: '220px',
+                      borderRadius: '12px',
+                      border: '1.5px solid #CBD5E1',
+                      background: '#F1F5F9',
+                      overflow: 'hidden'
+                    }}
+                  />
+                  <div style={{
+                    position: 'absolute',
+                    bottom: '8px',
+                    left: '8px',
+                    background: 'rgba(255, 255, 255, 0.92)',
+                    backdropFilter: 'blur(4px)',
+                    padding: '0.25rem 0.6rem',
+                    borderRadius: '6px',
+                    fontSize: '0.72rem',
+                    color: '#334155',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+                    pointerEvents: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.3rem',
+                    fontWeight: 600
+                  }}>
+                    <span>📍 Lat: {Number(latitude).toFixed(4)}, Lng: {Number(longitude).toFixed(4)}</span>
+                  </div>
+                </div>
+
+                <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748B', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <span>💡</span> Tap anywhere on the map or drag the pin. The service zone and address will automatically sync based on your location and configured radius!
+                </p>
+              </div>
+
+              {/* 3. Complete Doorstep Address SECOND (Editable without changing map point, with optional update button) */}
               <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label" style={{ fontWeight: 600 }}>
-                  Complete Doorstep Address <span style={{ color: '#EF4444' }}>*</span>
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+                  <label className="form-label" style={{ fontWeight: 700, margin: 0, fontSize: '0.88rem', color: '#1E293B' }}>
+                    Complete Doorstep Address <span style={{ color: '#EF4444' }}>*</span>
+                  </label>
+                  <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleSearchLocation(address)}
+                      style={{
+                        background: '#EFF6FF',
+                        border: '1px solid #BFDBFE',
+                        color: 'var(--primary-blue)',
+                        padding: '0.2rem 0.55rem',
+                        borderRadius: '6px',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.3rem',
+                        transition: 'all 0.15s ease'
+                      }}
+                      title="Pinpoint this edited address on map and auto-detect zone"
+                    >
+                      <MapPin size={12} /> Pinpoint Address on Map
+                    </button>
+                    <span style={{ fontSize: '0.72rem', color: '#059669', background: '#ECFDF5', border: '1px solid #A7F3D0', padding: '0.2rem 0.5rem', borderRadius: '6px', fontWeight: 600 }}>
+                      ✏️ Editable
+                    </span>
+                  </div>
+                </div>
                 <textarea
                   className="form-input"
                   rows={3}
-                  placeholder="Apartment/Villa No., Street/Road, Landmark..."
+                  placeholder="Apartment/Villa No., Building Name, Street, Landmark..."
                   value={address}
                   onChange={e => setAddress(e.target.value)}
-                />
-              </div>
-
-              {/* Map View */}
-              <div>
-                <label className="form-label" style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <Compass size={14} /> Pinpoint Exact Technician Spot (Drag Marker)
-                </label>
-                <div
-                  ref={mapRef}
                   style={{
                     width: '100%',
-                    height: '200px',
-                    borderRadius: '12px',
-                    border: '1px solid #CBD5E1',
-                    background: '#F1F5F9'
+                    padding: '0.65rem 0.75rem',
+                    borderRadius: '8px',
+                    border: '1.5px solid #CBD5E1',
+                    fontSize: '0.85rem',
+                    lineHeight: '1.45',
+                    boxSizing: 'border-box'
                   }}
                 />
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.25rem', display: 'block' }}>
+                  Auto-filled from map selection. You can freely edit or add Flat No., Floor, Tower, or Gate instructions without changing your pinned spot.
+                </span>
               </div>
 
               {/* Save Address Checkbox */}
@@ -1808,109 +2347,210 @@ const BookSlot = () => {
 
             {/* Schedule Slot Card */}
             <div className="card" style={{ padding: '1.75rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-                <Calendar size={18} color="var(--primary-blue)" />
-                <h3 style={{ margin: 0, color: 'var(--primary-navy)', fontSize: '1.1rem', fontWeight: 700 }}>
-                  Select Service Date & Preferred Time Slot
-                </h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#E0F2FE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Calendar size={18} color="var(--primary-blue)" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, color: 'var(--primary-navy)', fontSize: '1.15rem', fontWeight: 800 }}>
+                    Select Service Date & Arrival Window
+                  </h3>
+                  <p style={{ margin: '0.15rem 0 0', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                    Choose your service date and preferred doorstep arrival window
+                  </p>
+                </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1rem', alignItems: 'center' }}>
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Booking Date</label>
-                  <input
-                    type="date"
-                    required
-                    min={new Date().toISOString().split('T')[0]}
-                    value={date}
-                    onChange={e => setDate(e.target.value)}
-                    className="form-input"
-                  />
-                </div>
+              {/* Booking Date Selector (Full Width & Clean) */}
+              <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.88rem', color: '#1E293B', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <span>Booking Date</span>
+                  <span style={{ color: '#EF4444' }}>*</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  min={new Date().toISOString().split('T')[0]}
+                  value={date}
+                  onChange={e => setDate(e.target.value)}
+                  className="form-input"
+                  style={{
+                    padding: '0.75rem 1rem',
+                    borderRadius: '12px',
+                    border: '1.5px solid #CBD5E1',
+                    fontSize: '0.95rem',
+                    fontWeight: 700,
+                    color: 'var(--primary-navy)',
+                    maxWidth: '320px'
+                  }}
+                />
+              </div>
 
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label" htmlFor="time-slot-select" style={{ fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span>Service Arrival Window</span>
-                    {loadingSlots && <span style={{ fontSize: '0.75rem', color: 'var(--primary-blue)' }}>Checking availability...</span>}
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <select
-                      id="time-slot-select"
-                      required
-                      value={timeSlot}
-                      onChange={e => setTimeSlot(e.target.value)}
-                      className="form-input"
-                      disabled={loadingSlots || availableSlotsList.length === 0}
-                      style={{
-                        padding: '0.75rem 1rem',
-                        borderRadius: '12px',
-                        border: '1.5px solid #CBD5E1',
-                        fontSize: '0.92rem',
-                        fontWeight: 600,
-                        color: 'var(--primary-navy)',
-                        background: (loadingSlots || availableSlotsList.length === 0) ? '#F1F5F9' : 'white',
-                        cursor: (loadingSlots || availableSlotsList.length === 0) ? 'not-allowed' : 'pointer',
-                        width: '100%',
-                        boxSizing: 'border-box'
-                      }}
-                    >
-                      {loadingSlots ? (
-                        <option value="" disabled>Loading approved arrival windows for this date...</option>
-                      ) : availableSlotsList.length > 0 ? (
-                        <>
-                          <option value="" disabled>-- Select Service Arrival Window --</option>
-                          {availableSlotsList.map(item => {
-                            const isAvail = item.available;
-                            let label = item.slot;
-                            if (!isAvail) {
-                              label = `${item.slot} — 🚫 ${item.reason || 'Unavailable'}`;
-                            } else {
-                              label = `${item.slot} — Available (Service Window)`;
-                            }
-                            return (
-                              <option 
-                                key={item.slot} 
-                                value={item.slot} 
-                                disabled={!isAvail}
-                                style={{ 
-                                  color: isAvail ? '#0F172A' : '#94A3B8',
-                                  background: isAvail ? 'white' : '#F8FAFC',
-                                  fontWeight: isAvail ? 600 : 400
-                                }}
-                              >
-                                {label}
-                              </option>
-                            );
-                          })}
-                        </>
-                      ) : (
-                        <option value="" disabled>No service windows configured by admin for this date</option>
-                      )}
-                    </select>
-                  </div>
+              {/* Service Arrival Window Header with Prominent Dispatch Capacity */}
+              <div style={{ marginBottom: '0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.88rem', color: '#1E293B', margin: 0 }}>
+                  Doorstep Arrival Window <span style={{ color: '#EF4444' }}>*</span>
+                </label>
+                
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                  {/* Prominent Dispatch Capacity Badge */}
+                  <span style={{
+                    fontSize: '0.78rem',
+                    color: '#1E40AF',
+                    background: '#EFF6FF',
+                    border: '1px solid #BFDBFE',
+                    padding: '0.25rem 0.65rem',
+                    borderRadius: '8px',
+                    fontWeight: 800,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem'
+                  }}>
+                    <Users size={13} color="#2563EB" />
+                    <span>Dispatch Capacity: {dispatchCapacity} {dispatchCapacity === 1 ? 'Technician' : 'Technicians'}</span>
+                  </span>
 
-                  {timeSlot && availableSlotsList.length > 0 && (
-                    <div style={{ marginTop: '0.45rem', fontSize: '0.76rem', color: '#0369A1', background: '#F0F9FF', border: '1px solid #BAE6FD', padding: '0.45rem 0.65rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <Clock size={14} color="#0284C7" style={{ flexShrink: 0 }} />
-                      <span>Technician arrives & washes your vehicle between <strong>{timeSlot}</strong>.</span>
-                    </div>
-                  )}
-
-                  {!loadingSlots && availableSlotsList.length === 0 && (
-                    <div style={{ marginTop: '0.45rem', fontSize: '0.8rem', color: '#DC2626', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <AlertCircle size={14} color="#DC2626" />
-                      <span>No approved service windows available for this date. Please pick another date.</span>
-                    </div>
-                  )}
-
-                  {slotNotice && (
-                    <div style={{ marginTop: '0.45rem', fontSize: '0.75rem', color: '#64748B', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <Compass size={13} color="var(--primary-blue)" />
-                      <span>{slotNotice}</span>
-                    </div>
+                  {!loadingSlots && availableSlotsList.length > 0 && (
+                    <span style={{ fontSize: '0.78rem', color: '#059669', fontWeight: 800, background: '#DCFCE7', padding: '0.25rem 0.65rem', borderRadius: '8px' }}>
+                      {availableSlotsList.filter(s => s.available).length} of {availableSlotsList.length} Available
+                    </span>
                   )}
                 </div>
               </div>
+
+              {/* Hidden select kept for DOM compatibility & form accessibility */}
+              <select
+                id="time-slot-select"
+                required
+                value={timeSlot}
+                onChange={e => setTimeSlot(e.target.value)}
+                style={{ display: 'none' }}
+              >
+                {availableSlotsList.map(s => (
+                  <option key={s.slot} value={s.slot} disabled={!s.available}>{s.slot}</option>
+                ))}
+              </select>
+
+              {/* Responsive Slot Selection Grid */}
+              {loadingSlots ? (
+                <div style={{ padding: '2rem 1rem', textAlign: 'center', background: '#F8FAFC', borderRadius: '14px', border: '1.5px dashed #CBD5E1', color: 'var(--primary-blue)', fontSize: '0.88rem', fontWeight: 700 }}>
+                  Loading approved arrival windows for {date}...
+                </div>
+              ) : availableSlotsList.length === 0 ? (
+                <div style={{ padding: '1.5rem', textAlign: 'center', background: '#FEF2F2', borderRadius: '14px', border: '1.5px solid #FCA5A5', color: '#991B1B', fontSize: '0.88rem', fontWeight: 600 }}>
+                  <AlertCircle size={22} color="#DC2626" style={{ margin: '0 auto 0.5rem', display: 'block' }} />
+                  No approved arrival windows configured by admin for this date. Please select another date.
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.75rem' }}>
+                  {availableSlotsList.map(item => {
+                    const isSelected = timeSlot === item.slot;
+                    const isAvail = item.available;
+
+                    return (
+                      <div
+                        key={item.slot}
+                        onClick={() => {
+                          if (isAvail) {
+                            setTimeSlot(item.slot);
+                          } else {
+                            alert('This arrival window is already booked. Please choose an available window.');
+                          }
+                        }}
+                        style={{
+                          padding: '0.85rem 1rem',
+                          borderRadius: '14px',
+                          border: isSelected 
+                            ? '2px solid var(--primary-blue)' 
+                            : isAvail 
+                              ? '1.5px solid #E2E8F0' 
+                              : '1px solid #E2E8F0',
+                          background: isSelected 
+                            ? '#F0F9FF' 
+                            : isAvail 
+                              ? '#FFFFFF' 
+                              : '#F8FAFC',
+                          boxShadow: isSelected ? '0 4px 14px rgba(2, 132, 199, 0.18)' : '0 1px 3px rgba(0,0,0,0.03)',
+                          cursor: isAvail ? 'pointer' : 'not-allowed',
+                          opacity: isAvail ? 1 : 0.6,
+                          transition: 'all 0.18s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '0.65rem'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', minWidth: 0 }}>
+                          <div style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '8px',
+                            background: isSelected ? 'var(--primary-blue)' : isAvail ? '#E0F2FE' : '#E2E8F0',
+                            color: isSelected ? '#FFFFFF' : isAvail ? 'var(--primary-blue)' : '#94A3B8',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                          }}>
+                            <Clock size={16} />
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{
+                              fontWeight: 800,
+                              fontSize: '0.9rem',
+                              color: isSelected ? '#0369A1' : isAvail ? 'var(--primary-navy)' : '#64748B',
+                              letterSpacing: '0.01em',
+                              whiteSpace: 'nowrap'
+                            }}>
+                              {item.slot}
+                            </div>
+                            <div style={{
+                              fontSize: '0.74rem',
+                              color: isAvail ? '#16A34A' : '#DC2626',
+                              fontWeight: 700,
+                              marginTop: '0.1rem',
+                              textOverflow: 'ellipsis',
+                              overflow: 'hidden',
+                              whiteSpace: 'nowrap'
+                            }}>
+                              {isAvail ? '✓ Available Window' : '🚫 Booked'}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{
+                          width: '22px',
+                          height: '22px',
+                          borderRadius: '50%',
+                          border: isSelected ? 'none' : '2px solid #CBD5E1',
+                          background: isSelected ? 'var(--primary-blue)' : '#FFFFFF',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}>
+                          {isSelected && <Check size={13} color="#FFFFFF" strokeWidth={3} />}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Informative Service Window Banner */}
+              {timeSlot && availableSlotsList.some(s => s.slot === timeSlot && s.available) && (
+                <div style={{ marginTop: '0.9rem', fontSize: '0.8rem', color: '#0369A1', background: '#F0F9FF', border: '1px solid #BAE6FD', padding: '0.6rem 0.85rem', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                  <Clock size={15} color="#0284C7" style={{ flexShrink: 0 }} />
+                  <span>Doorstep Service Window: Technician will arrive and wash vehicle between <strong>{timeSlot}</strong>.</span>
+                </div>
+              )}
+
+              {slotNotice && (
+                <div style={{ marginTop: '0.5rem', fontSize: '0.76rem', color: '#64748B', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <Compass size={13} color="var(--primary-blue)" />
+                  <span>{slotNotice}</span>
+                </div>
+              )}
             </div>
 
             {/* Coupons & Loyalty Rewards Card */}

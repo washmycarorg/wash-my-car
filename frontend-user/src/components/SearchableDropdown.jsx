@@ -43,8 +43,12 @@ const SearchableDropdown = ({
   const getDisplayLabel = () => {
     if (!value) return placeholder;
     if (value === '__OTHER__') return 'Other (Manual Entry)';
-    const found = options.find(opt => (typeof opt === 'string' ? opt === value : (opt.value || opt.name) === value));
-    if (found) return typeof found === 'string' ? found : found.label || found.name;
+    const found = options.find(opt => {
+      if (typeof opt === 'string') return opt === value;
+      const optVal = opt.value !== undefined ? opt.value : opt.name;
+      return String(optVal) === String(value);
+    });
+    if (found) return typeof found === 'string' ? found : (found.label || found.name);
     return value;
   };
 
@@ -133,9 +137,9 @@ const SearchableDropdown = ({
           {/* Options List */}
           <div style={{ overflowY: 'auto', maxHeight: '180px', display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
             {filteredOptions.map((opt, idx) => {
-              const optVal = typeof opt === 'string' ? opt : (opt.value || opt.name);
+              const optVal = typeof opt === 'string' ? opt : (opt.value !== undefined ? opt.value : opt.name);
               const optLabel = typeof opt === 'string' ? opt : (opt.label || opt.name);
-              const isSelected = value === optVal;
+              const isSelected = String(value) === String(optVal);
 
               return (
                 <div
