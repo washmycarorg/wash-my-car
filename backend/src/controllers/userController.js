@@ -31,13 +31,39 @@ export const getProfile = async (req, res) => {
       include: { carType: true, washType: true, serviceArea: true }
     });
 
+    // Referral stats
+    let referralCount = 0;
+    let completedReferralsCount = 0;
+    if (user.referralCode) {
+      referralCount = await prisma.user.count({
+        where: { referredByCode: user.referralCode }
+      });
+      completedReferralsCount = await prisma.user.count({
+        where: {
+          referredByCode: user.referralCode,
+          bookings: { some: { status: 'COMPLETED' } }
+        }
+      });
+    }
+
+    const settings = await prisma.systemSettings.findUnique({ where: { id: 1 } });
+
     res.json({
       ...user,
       stats: {
         upcomingBookings,
         totalWashes,
         savedCars: savedCarsCount,
-        rewardPoints: actualRewardPoints
+        rewardPoints: actualRewardPoints,
+        referralCount,
+        completedReferralsCount,
+        referralSettings: {
+          enabled: settings?.referralEnabled ?? true,
+          rewardPoints: settings?.referralRewardPoints ?? 50,
+          maxLimit: settings?.referralMaxLimit ?? 10,
+          streakBonus: settings?.referralStreakBonus ?? 25,
+          streakConfig: settings?.referralStreakConfig ?? null
+        }
       },
       nextBooking
     });
@@ -163,6 +189,7 @@ export const createBooking = async (req, res) => {
       saveAddress,
       carMake,
       carModel,
+      carNumber,
       addressName,
       couponCode,
       redeemPoints,
@@ -281,12 +308,34 @@ export const createBooking = async (req, res) => {
       if (offer.discountType === 'FLAT') {
         discount = offer.discountAmount;
       } else {
-        discount = (originalPrice * offer.discountPct) / 100;
+        discount = (baseWashPrice * offer.discountPct) / 100;
         if (offer.limitOption === 'UP_TO' && offer.maxDiscountAmount) {
           discount = Math.min(discount, offer.maxDiscountAmount);
         }
       }
 
+      // Addon-specific coupon discount
+      let addonDiscount = 0;
+      if (offer.freeAddonId) {
+        const freeAddonMatch = selectedAddons.find(a => a.id === offer.freeAddonId);
+        if (freeAddonMatch) {
+          addonDiscount += freeAddonMatch.price;
+        }
+      }
+      if (offer.discountAddonId) {
+        const discAddonMatch = selectedAddons.find(a => a.id === offer.discountAddonId);
+        if (discAddonMatch) {
+          if (offer.addonDiscountType === 'FREE') {
+            addonDiscount += discAddonMatch.price;
+          } else if (offer.addonDiscountType === 'FLAT') {
+            addonDiscount += Math.min(discAddonMatch.price, offer.addonDiscountValue || 0);
+          } else if (offer.addonDiscountType === 'PERCENTAGE') {
+            addonDiscount += (discAddonMatch.price * (offer.addonDiscountValue || 0)) / 100;
+          }
+        }
+      }
+
+      discount += addonDiscount;
       finalPrice = Math.max(0, originalPrice - discount);
       appliedCode = offer.code;
     }
@@ -342,7 +391,8 @@ export const createBooking = async (req, res) => {
           userId: req.user.id,
           make: carMake,
           model: carModel,
-          carTypeId: Number(carTypeId)
+          carTypeId: Number(carTypeId),
+          carNumber: carNumber ? String(carNumber).trim().toUpperCase() : null
         }
       });
       finalCarId = newCar.id;
@@ -482,13 +532,14 @@ export const getCars = async (req, res) => {
 
 export const addCar = async (req, res) => {
   try {
-    const { make, model, carTypeId } = req.body;
+    const { make, model, carTypeId, carNumber } = req.body;
     const car = await prisma.car.create({
       data: { 
         userId: req.user.id, 
         make, 
         model, 
-        carTypeId: Number(carTypeId) 
+        carTypeId: Number(carTypeId),
+        carNumber: carNumber ? String(carNumber).trim().toUpperCase() : null
       },
       include: { carType: true }
     });
@@ -646,16 +697,16 @@ export const getEligibleCoupons = async (req, res) => {
 
     for (const offer of offers) {
       // Check Car Type Eligibility
-      if (carTypeId && offer.applicableCarTypeIds) {
-        const allowedCarTypes = offer.applicableCarTypeIds.split(',').filter(Boolean).map(Number);
+      if (carTypeId && offer.applicableCarTypeIds && offer.applicableCarTypeIds.trim()) {
+        const allowedCarTypes = offer.applicableCarTypeIds.split(',').filter(Boolean).map(s => Number(s.trim()));
         if (allowedCarTypes.length > 0 && !allowedCarTypes.includes(Number(carTypeId))) {
           continue;
         }
       }
 
       // Check Wash Type Eligibility
-      if (washTypeId && offer.applicableWashTypeIds) {
-        const allowedWashTypes = offer.applicableWashTypeIds.split(',').filter(Boolean).map(Number);
+      if (washTypeId && offer.applicableWashTypeIds && offer.applicableWashTypeIds.trim()) {
+        const allowedWashTypes = offer.applicableWashTypeIds.split(',').filter(Boolean).map(s => Number(s.trim()));
         if (allowedWashTypes.length > 0 && !allowedWashTypes.includes(Number(washTypeId))) {
           continue;
         }
@@ -673,7 +724,7 @@ export const getEligibleCoupons = async (req, res) => {
       }
 
       if (offer.rotation !== 'UNLIMITED' && offer.usageLimit > 0) {
-        const bookingsWithCoupon = userBookings.filter(b => b.appliedOfferCode === offer.code);
+        const bookingsWithCoupon = userBookings.filter(b => b.appliedOfferCode === offer.code && b.status !== 'CANCELLED');
 
         if (offer.rotation === 'OVERALL') {
           if (bookingsWithCoupon.length >= offer.usageLimit) {
@@ -797,3 +848,34 @@ export const getPublicHomeContent = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// Get Public Active Coupons for Homepage & Visitors
+export const getPublicActiveCoupons = async (req, res) => {
+  try {
+    const now = new Date();
+    const offers = await prisma.offer.findMany({
+      where: {
+        active: true,
+        validUntil: { gte: now }
+      },
+      select: {
+        id: true,
+        code: true,
+        title: true,
+        description: true,
+        discountType: true,
+        discountPct: true,
+        discountAmount: true,
+        limitOption: true,
+        maxDiscountAmount: true,
+        validUntil: true,
+        userType: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(offers);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+

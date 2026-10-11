@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Calendar, Settings, Bell, Search, DollarSign, Briefcase, FileText, Tag, Menu, X, MapPin, Package, Globe } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Settings, Bell, Search, DollarSign, Briefcase, FileText, Tag, Menu, X, MapPin, Package, Globe, MessageSquare, Compass } from 'lucide-react';
 import { loginAdmin, getStats, getEmployees, toggleEmployeeStatus, updateEmployee, getServiceAreas } from './api';
 
 import Bookings from './pages/Bookings';
@@ -12,6 +12,8 @@ import Areas from './pages/Areas';
 import Inventory from './pages/Inventory';
 import SettingsPage from './pages/Settings';
 import CmsSettings from './pages/CmsSettings';
+import Inquiries from './pages/Inquiries';
+import SlotsManagement from './pages/SlotsManagement';
 import logo from './assets/wash my car.png';
 
 const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
@@ -36,7 +38,7 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
             </div>
             <div>
               <div style={{color: 'white', fontWeight: 'bold', fontSize: '1.25rem', lineHeight: 1.2}}>ADMIN</div>
-              <div style={{color: 'var(--accent-teal)', fontSize: '0.75rem', fontWeight: 600}}>WASH MY CAR</div>
+              <div style={{color: 'var(--accent-teal)', fontSize: '0.75rem', fontWeight: 600}}>WASH MY CAR ORG</div>
             </div>
           </Link>
           <button className="md-hidden text-white btn-close" onClick={() => setIsMobileOpen(false)}>
@@ -53,6 +55,12 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
           </Link>
           <Link to="/bookings" className={`sidebar-link ${isActive('/bookings')}`}>
             <Calendar size={20} /> Bookings & Slots
+          </Link>
+          <Link to="/slots-management" className={`sidebar-link ${isActive('/slots-management')}`}>
+            <Compass size={20} /> Slot Dispatch & Zones
+          </Link>
+          <Link to="/inquiries" className={`sidebar-link ${isActive('/inquiries')}`}>
+            <MessageSquare size={20} /> Enquiries & Complaints
           </Link>
           <Link to="/earnings" className={`sidebar-link ${isActive('/earnings')}`}>
             <DollarSign size={20} /> Financials
@@ -171,7 +179,7 @@ const AdminLogin = ({ setAuth }) => {
           <img src={logo} alt="Logo" style={{height: '60px'}} />
         </div>
         <h2 className="text-center" style={{marginBottom: '0.5rem'}}>Admin Portal</h2>
-        <p className="text-center text-muted" style={{marginBottom: '2rem'}}>Sign in to manage Wash My Car</p>
+        <p className="text-center text-muted" style={{marginBottom: '2rem'}}>Sign in to manage Wash My Car Org</p>
         
         {error && <div className="badge badge-danger mb-4 w-full justify-center" style={{padding: '0.75rem', marginBottom: '1rem'}}>{error}</div>}
         
@@ -284,6 +292,9 @@ const EmployeeManagement = () => {
   const [areas, setAreas] = useState([]);
   const [editProfileUpdate, setEditProfileUpdate] = useState(false);
   const [editAreaId, setEditAreaId] = useState('');
+  const [editPayType, setEditPayType] = useState('COMMISSION_ONLY');
+  const [editSalary, setEditSalary] = useState(0);
+  const [editBaseSalary, setEditBaseSalary] = useState(0);
   const [saving, setSaving] = useState(false);
   
   const fetchEmployees = () => getEmployees().then(setEmployees).catch(console.error);
@@ -297,6 +308,9 @@ const EmployeeManagement = () => {
     if (selectedEmployee) {
       setEditProfileUpdate(!!selectedEmployee.allowProfileUpdate);
       setEditAreaId(selectedEmployee.serviceAreas?.[0]?.id || '');
+      setEditPayType(selectedEmployee.payType || 'COMMISSION_ONLY');
+      setEditSalary(selectedEmployee.salary || 0);
+      setEditBaseSalary(selectedEmployee.baseSalary || 0);
     }
   }, [selectedEmployee]);
 
@@ -317,7 +331,10 @@ const EmployeeManagement = () => {
     try {
       await updateEmployee(selectedEmployee.id, {
         allowProfileUpdate: editProfileUpdate,
-        serviceAreaIds: editAreaId ? [Number(editAreaId)] : []
+        serviceAreaIds: editAreaId ? [Number(editAreaId)] : [],
+        payType: editPayType,
+        salary: Number(editSalary),
+        baseSalary: Number(editBaseSalary)
       });
       fetchEmployees();
       setSelectedEmployee(null);
@@ -372,8 +389,22 @@ const EmployeeManagement = () => {
                   </div>
                 </td>
                 <td style={{padding: '1rem 1.5rem'}}>
-                  <div style={{fontWeight: 600}}>₹{emp.earnings || 0}</div>
-                  <div style={{fontSize: '0.8rem', color: 'var(--text-muted)'}}>from completed jobs</div>
+                  <div style={{fontWeight: 700, color: 'var(--primary-navy)'}}>₹{emp.earnings || 0}</div>
+                  <div style={{fontSize: '0.75rem', marginTop: '0.2rem'}}>
+                    {emp.payType === 'FIXED_SALARY' ? (
+                      <span style={{ background: '#E0F2FE', color: '#0369A1', padding: '0.2rem 0.5rem', borderRadius: '6px', fontWeight: 700 }}>
+                        Fixed (₹{emp.salary || emp.baseSalary || 0}/mo)
+                      </span>
+                    ) : emp.payType === 'HYBRID' ? (
+                      <span style={{ background: '#EDE9FE', color: '#6D28D9', padding: '0.2rem 0.5rem', borderRadius: '6px', fontWeight: 700 }}>
+                        Hybrid (₹{emp.baseSalary || 0} + Comm)
+                      </span>
+                    ) : (
+                      <span style={{ background: '#DCFCE7', color: '#166534', padding: '0.2rem 0.5rem', borderRadius: '6px', fontWeight: 700 }}>
+                        Commission Only
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td style={{padding: '1rem 1.5rem'}}>
                   <span className={`badge ${emp.status === 'ACTIVE' ? 'badge-success' : emp.status === 'PENDING' ? 'badge-warning' : 'badge-danger'}`}>
@@ -478,6 +509,61 @@ const EmployeeManagement = () => {
                       <option key={a.id} value={a.id}>{a.name}</option>
                     ))}
                   </select>
+                </div>
+
+                {/* 3. Compensation & Pay Model (3-Tier) */}
+                <div style={{ background: '#F8FAFC', padding: '1rem', borderRadius: '12px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--primary-navy)' }}>
+                    Compensation Model (3 Pay Types)
+                  </label>
+                  <select
+                    className="form-input"
+                    value={editPayType}
+                    onChange={e => setEditPayType(e.target.value)}
+                    style={{ fontWeight: 600 }}
+                  >
+                    <option value="COMMISSION_ONLY">1. Commission Only (Full per-wash commission)</option>
+                    <option value="FIXED_SALARY">2. Fixed Salary (Fixed pay, ₹0 commission per wash)</option>
+                    <option value="HYBRID">3. Base Salary + Partial Commission (Hybrid)</option>
+                  </select>
+
+                  {editPayType === 'FIXED_SALARY' && (
+                    <div>
+                      <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '0.25rem' }}>
+                        Monthly Fixed Salary (₹)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={editSalary}
+                        onChange={e => setEditSalary(e.target.value)}
+                        className="form-input"
+                        placeholder="e.g. 18000"
+                      />
+                      <span style={{ fontSize: '0.72rem', color: '#64748B' }}>Fixed salary worker will NOT receive wash commissions.</span>
+                    </div>
+                  )}
+
+                  {editPayType === 'HYBRID' && (
+                    <div>
+                      <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '0.25rem' }}>
+                        Monthly Base Fixed Salary (₹)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={editBaseSalary}
+                        onChange={e => setEditBaseSalary(e.target.value)}
+                        className="form-input"
+                        placeholder="e.g. 10000"
+                      />
+                      <span style={{ fontSize: '0.72rem', color: '#64748B' }}>Worker receives this base salary plus partial wash commissions.</span>
+                    </div>
+                  )}
+
+                  <div style={{ fontSize: '0.75rem', color: '#0369A1', background: '#E0F2FE', padding: '0.45rem 0.65rem', borderRadius: '8px' }}>
+                    🔒 <strong>Historical Protection:</strong> Changing pay type applies immediately to future washes. Past months' completed earnings are safely preserved.
+                  </div>
                 </div>
               </div>
 
@@ -589,6 +675,8 @@ const App = () => {
         <Route path="/dashboard" element={<ProtectedAdminRoute><Dashboard /></ProtectedAdminRoute>} />
         <Route path="/employees" element={<ProtectedAdminRoute><EmployeeManagement /></ProtectedAdminRoute>} />
         <Route path="/bookings" element={<ProtectedAdminRoute><AdminLayout title="Slots Details & Assignment"><Bookings /></AdminLayout></ProtectedAdminRoute>} />
+        <Route path="/slots-management" element={<ProtectedAdminRoute><AdminLayout title="Slot Scheduling & Distance Dispatch"><SlotsManagement /></AdminLayout></ProtectedAdminRoute>} />
+        <Route path="/inquiries" element={<ProtectedAdminRoute><AdminLayout title="User Enquiries & Complaints"><Inquiries /></AdminLayout></ProtectedAdminRoute>} />
         <Route path="/earnings" element={<ProtectedAdminRoute><AdminLayout title="Earnings & Cost to Company"><Financials /></AdminLayout></ProtectedAdminRoute>} />
         <Route path="/leaves" element={<ProtectedAdminRoute><AdminLayout title="Leave Approval"><LeaveApprovals /></AdminLayout></ProtectedAdminRoute>} />
         <Route path="/services" element={<ProtectedAdminRoute><AdminLayout title="Packages & Plans"><Services /></AdminLayout></ProtectedAdminRoute>} />

@@ -1,4 +1,4 @@
-const API_URL = 'https://wash-my-car.onrender.com/api';
+const API_URL = import.meta.env.VITE_API_URL || (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'http://localhost:5001/api' : 'https://wash-my-car.onrender.com/api');
 
 export const loginAdmin = async (email, password) => {
   const res = await fetch(`${API_URL}/auth/admin/login`, {
@@ -247,21 +247,21 @@ export const getWashTypes = async () => {
   return res.json();
 };
 
-export const createWashType = async (name, description) => {
+export const createWashType = async (name, description, quickByte, fullCommission, partialCommission) => {
   const res = await fetch(`${API_URL}/admin/wash-types`, {
     method: 'POST',
     headers: getHeaders(),
-    body: JSON.stringify({ name, description })
+    body: JSON.stringify({ name, description, quickByte, fullCommission, partialCommission })
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 };
 
-export const updateWashType = async (id, name, description) => {
+export const updateWashType = async (id, name, description, quickByte, fullCommission, partialCommission) => {
   const res = await fetch(`${API_URL}/admin/wash-types/${id}`, {
     method: 'PUT',
     headers: getHeaders(),
-    body: JSON.stringify({ name, description })
+    body: JSON.stringify({ name, description, quickByte, fullCommission, partialCommission })
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
@@ -409,6 +409,54 @@ export const deleteAddon = async (id) => {
   const res = await fetch(`${API_URL}/admin/addons/${id}`, {
     method: 'DELETE',
     headers: getHeaders()
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+// Inquiries & Complaints Management
+export const getInquiries = async (params = {}) => {
+  const searchParams = new URLSearchParams();
+  if (params.status) searchParams.append('status', params.status);
+  if (params.type) searchParams.append('type', params.type);
+  if (params.search) searchParams.append('search', params.search);
+  
+  const res = await fetch(`${API_URL}/admin/inquiries?${searchParams.toString()}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const updateInquiryStatus = async (id, data) => {
+  const res = await fetch(`${API_URL}/admin/inquiries/${id}`, {
+    method: 'PUT',
+    headers: getHeaders(),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const deleteInquiry = async (id) => {
+  const res = await fetch(`${API_URL}/admin/inquiries/${id}`, {
+    method: 'DELETE',
+    headers: getHeaders()
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+// Slot Scheduling & Zone Dispatch Configuration
+export const getSlotsConfig = async () => {
+  const res = await fetch(`${API_URL}/admin/slots-config`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const updateSlotsConfig = async (data) => {
+  const res = await fetch(`${API_URL}/admin/slots-config`, {
+    method: 'PUT',
+    headers: getHeaders(),
+    body: JSON.stringify(data)
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();

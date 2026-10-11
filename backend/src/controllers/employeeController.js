@@ -27,7 +27,19 @@ export const getProfile = async (req, res) => {
       where: { employeeId: req.user.id, status: 'COMPLETED' }
     });
 
-    const earnings = allCompletedBookings.reduce((sum, b) => sum + (b.employeePayout || 0), 0);
+    const commissionEarnings = allCompletedBookings.reduce((sum, b) => sum + (b.employeePayout || 0), 0);
+    const payType = employee.payType || 'COMMISSION_ONLY';
+    let earnings = 0;
+    if (payType === 'FIXED_SALARY') {
+      earnings = employee.salary || employee.baseSalary || 0;
+    } else if (payType === 'COMMISSION_ONLY') {
+      earnings = commissionEarnings;
+    } else if (payType === 'HYBRID') {
+      earnings = (employee.baseSalary || 0) + commissionEarnings;
+    } else {
+      earnings = commissionEarnings;
+    }
+
     const recentPayouts = completedBookingsList.map(b => ({
       id: b.id,
       job: b.washType?.name || 'Wash Service',
@@ -39,6 +51,7 @@ export const getProfile = async (req, res) => {
     res.json({
       ...employee,
       earnings,
+      commissionEarnings,
       recentPayouts,
       stats: {
         completedJobs,
@@ -105,7 +118,19 @@ export const updateProfile = async (req, res) => {
       where: { employeeId: req.user.id, status: 'COMPLETED' }
     });
 
-    const earnings = allCompletedBookings.reduce((sum, b) => sum + (b.employeePayout || 0), 0);
+    const commissionEarnings = allCompletedBookings.reduce((sum, b) => sum + (b.employeePayout || 0), 0);
+    const payType = employee.payType || 'COMMISSION_ONLY';
+    let earnings = 0;
+    if (payType === 'FIXED_SALARY') {
+      earnings = employee.salary || employee.baseSalary || 0;
+    } else if (payType === 'COMMISSION_ONLY') {
+      earnings = commissionEarnings;
+    } else if (payType === 'HYBRID') {
+      earnings = (employee.baseSalary || 0) + commissionEarnings;
+    } else {
+      earnings = commissionEarnings;
+    }
+
     const recentPayouts = completedBookingsList.map(b => ({
       id: b.id,
       job: b.washType?.name || 'Wash Service',
@@ -117,6 +142,7 @@ export const updateProfile = async (req, res) => {
     res.json({
       ...employee,
       earnings,
+      commissionEarnings,
       recentPayouts,
       stats: {
         completedJobs,
@@ -205,12 +231,33 @@ export const completeBooking = async (req, res) => {
     const { id } = req.params;
     const { photo, latitude, longitude } = req.body;
     
-    const booking = await prisma.booking.findUnique({ where: { id: Number(id) } });
+    const booking = await prisma.booking.findUnique({ 
+      where: { id: Number(id) },
+      include: { washType: true }
+    });
     if (!booking) {
       return res.status(404).json({ error: 'Booking not found' });
     }
     if (booking.employeeId !== req.user.id) {
       return res.status(403).json({ error: 'Not authorized to service this booking' });
+    }
+
+    // Determine payout snapshot based on employee pay type
+    const employee = await prisma.employee.findUnique({ where: { id: req.user.id } });
+    const empPayType = employee?.payType || 'COMMISSION_ONLY';
+    let washPayout = 0;
+    if (empPayType === 'FIXED_SALARY') {
+      washPayout = 0; // Fixed salary employee receives 0 per-wash commission
+    } else if (empPayType === 'COMMISSION_ONLY') {
+      washPayout = (booking.washType?.fullCommission !== undefined && booking.washType?.fullCommission !== null)
+        ? booking.washType.fullCommission
+        : (booking.employeePayout || 100);
+    } else if (empPayType === 'HYBRID') {
+      washPayout = (booking.washType?.partialCommission !== undefined && booking.washType?.partialCommission !== null)
+        ? booking.washType.partialCommission
+        : (booking.employeePayout ? booking.employeePayout * 0.5 : 50);
+    } else {
+      washPayout = booking.employeePayout || 0;
     }
 
     const updatedBooking = await prisma.booking.update({
@@ -221,9 +268,89 @@ export const completeBooking = async (req, res) => {
         endImage: photo,
         endLatitude: latitude ? Number(latitude) : null,
         endLongitude: longitude ? Number(longitude) : null,
-        endAt: new Date()
+        endAt: new Date(),
+        employeePayout: washPayout
+      },
+      include: {
+        user: true
       }
     });
+
+    // Check and trigger referral program reward on 1st completed wash
+    try {
+      const customer = updatedBooking.user;
+      if (customer && customer.referredByCode) {
+        // Check if this is the customer's first completed wash
+        const prevCompletedCount = await prisma.booking.count({
+          where: {
+            userId: customer.id,
+            status: 'COMPLETED',
+            id: { not: updatedBooking.id }
+          }
+        });
+
+        if (prevCompletedCount === 0) {
+          const referrer = await prisma.user.findUnique({
+            where: { referralCode: customer.referredByCode }
+          });
+
+          if (referrer && referrer.id !== customer.id) {
+            const settings = await prisma.systemSettings.findUnique({ where: { id: 1 } });
+            if (settings && settings.referralEnabled === false) {
+              // Referral program is disabled by administration
+              return;
+            }
+            const basePoints = settings?.referralRewardPoints ?? 50;
+            const maxLimit = settings?.referralMaxLimit ?? 10;
+            const streakBonus = settings?.referralStreakBonus ?? 25;
+
+            // Count how many previous referrals this referrer has completed
+            const completedReferrals = await prisma.user.count({
+              where: {
+                referredByCode: referrer.referralCode,
+                bookings: { some: { status: 'COMPLETED' } }
+              }
+            });
+
+            // If maxLimit > 0 and limit is reached, do not grant further reward points
+            if (maxLimit === 0 || completedReferrals <= maxLimit) {
+              let pointsToAward = basePoints;
+
+              // Check if custom streak config exists
+              if (settings?.referralStreakConfig) {
+                try {
+                  const tiers = JSON.parse(settings.referralStreakConfig);
+                  if (Array.isArray(tiers)) {
+                    // Match tier for this referral number (1-based)
+                    const matchedTier = tiers.find(t => Number(t.count) === completedReferrals);
+                    if (matchedTier && matchedTier.points) {
+                      pointsToAward = Number(matchedTier.points);
+                    } else if (completedReferrals > 1 && streakBonus > 0) {
+                      pointsToAward = basePoints + ((completedReferrals - 1) * streakBonus);
+                    }
+                  }
+                } catch (e) {
+                  // Fallback to streak bonus calculation
+                  if (completedReferrals > 1 && streakBonus > 0) {
+                    pointsToAward = basePoints + ((completedReferrals - 1) * streakBonus);
+                  }
+                }
+              }
+
+              await prisma.user.update({
+                where: { id: referrer.id },
+                data: {
+                  points: { increment: pointsToAward }
+                }
+              });
+              console.log(`Awarded ${pointsToAward} referral points to referrer ${referrer.id} for customer ${customer.id}`);
+            }
+          }
+        }
+      }
+    } catch (refErr) {
+      console.error('Error processing referral bonus:', refErr);
+    }
 
     // Increment washesUsed on active inventory allocations
     try {

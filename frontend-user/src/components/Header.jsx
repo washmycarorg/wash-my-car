@@ -1,6 +1,7 @@
 import React from 'react';
 import { Menu } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import logo from '../assets/wash my car.png';
 
 const Header = ({ toggleSidebar, profile }) => {
   const initial = profile?.name ? profile.name.charAt(0).toUpperCase() : 'R';
@@ -9,20 +10,48 @@ const Header = ({ toggleSidebar, profile }) => {
   return (
     <header style={{
       background: 'white', 
-      padding: '1rem', 
+      padding: '0.85rem 1rem', 
       display: 'flex', 
       alignItems: 'center', 
       justifyContent: 'space-between',
-      borderBottom: '1px solid rgba(0,0,0,0.05)',
+      borderBottom: '1px solid rgba(0,0,0,0.06)',
       position: 'sticky', 
       top: 0, 
-      zIndex: 40
+      zIndex: 40,
+      boxShadow: '0 2px 8px rgba(13, 38, 80, 0.04)'
     }}>
-      <div className="flex items-center gap-3">
-        <button onClick={toggleSidebar} style={{background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.25rem'}}>
+      <div className="flex items-center gap-2 sm:gap-3">
+        <button 
+          onClick={toggleSidebar} 
+          style={{background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center'}}
+          aria-label="Open navigation menu"
+        >
           <Menu size={24} color="var(--primary-navy)" />
         </button>
-        <h2 style={{color: 'var(--primary-navy)', fontSize: '1.25rem', margin: 0, fontWeight: 600}}>Customer Portal</h2>
+
+        <Link to="/dashboard" style={{textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+          <img src={logo} alt="Wash My Car Logo" style={{height: '32px', width: 'auto', objectFit: 'contain'}} />
+          <div style={{display: 'flex', alignItems: 'baseline', gap: '0.35rem', flexWrap: 'nowrap'}}>
+            <span style={{
+              color: 'var(--primary-navy)', 
+              fontSize: '1.15rem', 
+              fontWeight: 900, 
+              letterSpacing: '0.04em',
+              lineHeight: 1
+            }}>
+              WASH MY <span style={{color: 'var(--primary-blue)'}}>CAR</span>
+            </span>
+            <span style={{
+              color: 'var(--accent-teal)',
+              fontSize: '1.05rem',
+              fontWeight: 900,
+              letterSpacing: '0.06em',
+              lineHeight: 1
+            }}>
+              ORG
+            </span>
+          </div>
+        </Link>
       </div>
 
       <div className="flex items-center gap-3">
@@ -36,7 +65,8 @@ const Header = ({ toggleSidebar, profile }) => {
           background: 'var(--primary-blue)', 
           color: 'white',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontWeight: 600, fontSize: '1.1rem', textDecoration: 'none'
+          fontWeight: 700, fontSize: '1.1rem', textDecoration: 'none',
+          boxShadow: '0 2px 6px rgba(21, 101, 192, 0.25)'
         }}>
           {initial}
         </Link>

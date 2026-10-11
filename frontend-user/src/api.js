@@ -1,4 +1,4 @@
-const API_URL = 'https://wash-my-car.onrender.com/api';
+const API_URL = import.meta.env.VITE_API_URL || (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'http://localhost:5001/api' : 'https://wash-my-car.onrender.com/api');
 
 export const loginUser = async (phone, otp) => {
   const res = await fetch(`${API_URL}/auth/user/login`, {
@@ -168,7 +168,9 @@ export const getEligibleCoupons = async (carTypeId, washTypeId) => {
 };
 
 export const getSettings = async () => {
-  const res = await fetch(`${API_URL}/users/settings`, { headers: getHeaders() });
+  const token = localStorage.getItem('userToken');
+  const headers = token ? getHeaders() : { 'Content-Type': 'application/json' };
+  const res = await fetch(`${API_URL}/users/settings`, { headers });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 };
@@ -181,6 +183,70 @@ export const getHomeContent = async () => {
 
 export const getAddons = async () => {
   const res = await fetch(`${API_URL}/users/addons`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const getActiveCoupons = async () => {
+  try {
+    const res = await fetch(`${API_URL}/users/active-coupons`);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
+  } catch (err) {
+    console.warn("Could not fetch active coupons from server, using fallback:", err);
+  }
+  return [
+    {
+      id: 1,
+      code: 'WC50',
+      title: 'Welcome Offer',
+      description: 'Flat 50% OFF for new users',
+      discountType: 'PERCENTAGE',
+      discountPct: 50,
+      discountAmount: 0,
+      active: true
+    },
+    {
+      id: 2,
+      code: 'SAVE99',
+      title: 'Monsoon Special',
+      description: 'Flat ₹99 OFF on Full Detail Wash',
+      discountType: 'FLAT',
+      discountPct: 0,
+      discountAmount: 99,
+      active: true
+    }
+  ];
+};
+
+export const submitInquiry = async (data) => {
+  const res = await fetch(`${API_URL}/users/inquiries`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const errorText = await res.text();
+    try {
+      const parsed = JSON.parse(errorText);
+      throw new Error(parsed.error || parsed.message || errorText);
+    } catch (e) {
+      throw new Error(errorText || 'Failed to submit inquiry');
+    }
+  }
+  return res.json();
+};
+
+export const getAvailableSlots = async (date, serviceAreaId, address = '', zone = '') => {
+  const params = new URLSearchParams();
+  if (date) params.append('date', date);
+  if (serviceAreaId) params.append('serviceAreaId', serviceAreaId);
+  if (address) params.append('address', address);
+  if (zone) params.append('zone', zone);
+  
+  const res = await fetch(`${API_URL}/users/available-slots?${params.toString()}`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 };

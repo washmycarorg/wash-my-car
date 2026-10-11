@@ -20,8 +20,12 @@ import {
   getPublicSettings,
   getPublicHomeContent,
   getAllWashPrices,
-  getAddons
+  getAddons,
+  getPublicActiveCoupons
 } from '../controllers/userController.js';
+
+import { submitInquiry } from '../controllers/inquiryController.js';
+import { getAvailableBookingSlots } from '../controllers/slotController.js';
 
 const router = express.Router();
 
@@ -32,6 +36,10 @@ router.get('/wash-types', getWashTypes);
 router.get('/wash-prices', getAllWashPrices);
 router.get('/car-types', getCarTypes);
 router.get('/addons', getAddons);
+router.get('/active-coupons', getPublicActiveCoupons);
+router.get('/settings', getPublicSettings);
+router.post('/inquiries', submitInquiry);
+router.get('/available-slots', getAvailableBookingSlots);
 
 router.use(verifyToken);
 
@@ -57,6 +65,5 @@ router.delete('/addresses/:id', deleteSavedAddress);
 
 // Coupon and Royalty settings
 router.get('/eligible-coupons', getEligibleCoupons);
-router.get('/settings', getPublicSettings);
 
 export default router;

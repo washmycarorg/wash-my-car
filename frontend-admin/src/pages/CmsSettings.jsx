@@ -9,7 +9,7 @@ import {
 const DEFAULT_HERO_SLIDES = [
   {
     id: 'slide-1',
-    kicker: 'WASH MY CAR • DOORSTEP CAR WASH',
+    kicker: 'WASH MY CAR ORG • DOORSTEP CAR WASH',
     title: 'WE WASH.\nYOU RELAX.',
     subtitle: 'Premium vehicle spa and car detailing at your doorstep. Save time, skip the queue, and let trained professionals care for your car.',
     image: 'https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=2200&q=95',
@@ -51,7 +51,7 @@ const DEFAULT_HERO_SLIDES = [
     image: 'https://images.unsplash.com/photo-1504215680853-026ed2a45def?auto=format&fit=crop&w=2200&q=95',
     badgeText: 'LIMITED TIME OFFER',
     ctaPrimary: 'Claim 20% Off',
-    ctaSecondary: 'Why Wash My Car',
+    ctaSecondary: 'Why Wash My Car Org',
     primaryLink: '/register',
     secondaryLink: '#why-us'
   }
@@ -68,7 +68,7 @@ const CURATED_PRESETS = [
 const CmsSettings = () => {
   const [formData, setFormData] = useState({
     heroSlides: DEFAULT_HERO_SLIDES,
-    heroKicker: 'WASH MY CAR • DOORSTEP CAR WASH',
+    heroKicker: 'WASH MY CAR ORG • DOORSTEP CAR WASH',
     heroTitle: 'WE WASH.\nYOU RELAX.',
     heroSubtitle: 'Premium vehicle spa and car detailing at your doorstep. Save time, skip the queue, and let trained professionals care for your car.',
     heroImage: 'https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=2200&q=95',
@@ -126,7 +126,7 @@ const CmsSettings = () => {
       { q: 'How do I book a doorstep car wash?', a: 'Simply select your vehicle type, pick your package & add-ons, choose a convenient date and time slot, and our trained technician will arrive with full equipment.' },
       { q: 'Do I need to provide water and electricity?', a: 'Our mobile units are equipped with water tanks and compact generators for maximum convenience, though access to a standard domestic point is welcome.' },
       { q: 'Can I book add-on services like Helmet or Bike wash?', a: 'Yes! You can add Helmet wash, 2-wheeler wash, interior steam cleaning, and engine bay cleaning directly during your car wash booking checkout.' },
-      { q: 'Where is Wash My Car currently available?', a: 'We are actively serving Visakhapatnam and surrounding neighborhoods, with expansion across Andhra Pradesh and Telangana.' }
+      { q: 'Where is Wash My Car Org currently available?', a: 'We are actively serving Visakhapatnam and surrounding neighborhoods, with expansion across Andhra Pradesh and Telangana.' }
     ]
   });
 
@@ -206,7 +206,7 @@ const CmsSettings = () => {
   const handleAddSlide = () => {
     const newSlide = {
       id: `slide-${Date.now()}`,
-      kicker: 'WASH MY CAR • DOORSTEP SPECIAL',
+      kicker: 'WASH MY CAR ORG • DOORSTEP SPECIAL',
       title: 'LUXURY VEHICLE SPA.\nRIGHT AT YOUR DOOR.',
       subtitle: 'Experience doorstep vehicle detailing with 100% RO water, snow foam treatment, and interior steam rejuvenation.',
       image: 'https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=2200&q=95',
@@ -700,7 +700,7 @@ const CmsSettings = () => {
             {activeSection === 'why' && (
               <div style={{ background: '#F8FAFC', padding: '1.25rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <h4 style={{ margin: 0, color: 'var(--primary-navy)', fontSize: '0.95rem', fontWeight: 700 }}>
-                  🛡️ The Wash My Car Difference (Why Choose Us)
+                  🛡️ The Wash My Car Org Difference (Why Choose Us)
                 </h4>
 
                 <div className="form-group" style={{ margin: 0 }}>
@@ -1129,7 +1129,7 @@ const CmsSettings = () => {
             
             {/* Header Mock */}
             <div style={{ background: '#0F172A', color: 'white', padding: '0.6rem 0.85rem', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-              <span style={{ fontWeight: 800, fontSize: '0.75rem', color: '#38BDF8' }}>WASH MY CAR</span>
+              <span style={{ fontWeight: 800, fontSize: '0.75rem', color: '#38BDF8' }}>WASH MY CAR ORG</span>
               <span style={{ background: '#0EA5E9', padding: '0.2rem 0.6rem', borderRadius: '12px', fontSize: '0.65rem', fontWeight: 700 }}>Book Doorstep</span>
             </div>
 

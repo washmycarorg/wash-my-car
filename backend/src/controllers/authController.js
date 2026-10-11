@@ -8,12 +8,54 @@ const generateToken = (payload) => {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: '30d' });
 };
 
+// Generate guaranteed unique referral code for users
+const generateUniqueReferralCode = async () => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  for (let attempt = 0; attempt < 20; attempt++) {
+    let randomPart = '';
+    for (let i = 0; i < 5; i++) {
+      randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    const candidate = 'WMC' + randomPart;
+    const existing = await prisma.user.findUnique({ where: { referralCode: candidate } });
+    if (!existing) {
+      return candidate;
+    }
+  }
+  return 'WMC' + Date.now().toString(36).slice(-5).toUpperCase();
+};
+
 export const userRegister = async (req, res) => {
   try {
-    const { phone, name } = req.body;
+    const { phone, name, referralCode: inputRefCode } = req.body;
+    const settings = await prisma.systemSettings.findUnique({ where: { id: 1 } });
+    const isReferralActive = settings ? !!settings.referralEnabled : true;
+
     let user = await prisma.user.findUnique({ where: { phone } });
     if (!user) {
-      user = await prisma.user.create({ data: { phone, name } });
+      const uniqueCode = await generateUniqueReferralCode();
+      user = await prisma.user.create({ 
+        data: { 
+          phone, 
+          name,
+          referralCode: uniqueCode,
+          referredByCode: (isReferralActive && inputRefCode) ? String(inputRefCode).trim().toUpperCase() : null
+        } 
+      });
+    } else {
+      if (!user.referralCode) {
+        const uniqueCode = await generateUniqueReferralCode();
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: { referralCode: uniqueCode }
+        });
+      }
+      if (isReferralActive && inputRefCode && !user.referredByCode) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { referredByCode: String(inputRefCode).trim().toUpperCase() }
+        });
+      }
     }
     res.json({ message: 'OTP sent (mock)', userId: user.id });
   } catch (error) {
@@ -27,6 +69,15 @@ export const userLogin = async (req, res) => {
   
   let user = await prisma.user.findUnique({ where: { phone } });
   if (!user) return res.status(404).json({ error: 'User not found' });
+
+  // Ensure user has a unique referralCode
+  if (!user.referralCode) {
+    const uniqueCode = await generateUniqueReferralCode();
+    user = await prisma.user.update({
+      where: { id: user.id },
+      data: { referralCode: uniqueCode }
+    });
+  }
   
   const token = generateToken({ id: user.id, role: 'USER' });
   res.json({ message: 'Login successful', token, user });

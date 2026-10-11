@@ -13,6 +13,8 @@ model User {
   name           String?
   email          String?
   points         Int             @default(0)
+  referralCode   String?         @unique
+  referredByCode String?
   cars           Car[]
   bookings       Booking[]
   savedAddresses SavedAddress[]
@@ -28,6 +30,8 @@ model Employee {
   status        String        @default("PENDING") // PENDING, ACTIVE, SUSPENDED
   onDuty        Boolean       @default(false)
   salary        Float         @default(0) // Monthly salary or hourly wage
+  payType       String        @default("FIXED_SALARY") // FIXED_SALARY, COMMISSION_ONLY, HYBRID
+  baseSalary    Float         @default(0) // Base monthly salary for FIXED_SALARY and HYBRID
   photo         String?       // Base64 profile/verification photo
   aadhaarNumber String?
   address       String?
@@ -58,9 +62,12 @@ model CarType {
 
 model WashType {
   id          Int         @id @default(autoincrement())
-  name        String      @unique // e.g. Basic, Premium, Full
-  description String?
-  bookings    Booking[]
+  name              String      @unique // e.g. Basic, Premium, Full
+  description       String?
+  quickByte         String?     // Quick highlight / quick byte for card preview
+  fullCommission    Float       @default(150.0) // Commission for COMMISSION_ONLY employee
+  partialCommission Float       @default(50.0)  // Commission for HYBRID employee
+  bookings          Booking[]
   prices      WashPrice[]
   createdAt   DateTime    @default(now())
 }
@@ -86,6 +93,7 @@ model Car {
   user      User      @relation(fields: [userId], references: [id])
   make      String
   model     String
+  carNumber String?   // License registration number
   carTypeId Int
   carType   CarType   @relation(fields: [carTypeId], references: [id])
   bookings  Booking[]
@@ -220,6 +228,13 @@ model Offer {
   maxDiscountAmount    Float?                                 // used if UP_TO
   applicableCarTypeIds String          @default("")           // comma-separated ids, empty = ALL
   applicableWashTypeIds String         @default("")           // comma-separated ids, empty = ALL
+  
+  // Add-on specific discount configuration
+  freeAddonId          Int?                                   // ID of add-on that becomes completely FREE with this coupon
+  discountAddonId      Int?                                   // ID of add-on with discounted price
+  addonDiscountType    String?                                // FLAT, PERCENTAGE, FREE
+  addonDiscountValue   Float?                                 // discount amount or %
+  
   userType             String          @default("ALL")        // ALL, NEW, SELECTED
   usageLimit           Int             @default(0)            // count limit (0 = unlimited)
   rotation             String          @default("UNLIMITED")  // UNLIMITED, OVERALL, MONTHLY, YEARLY
@@ -259,6 +274,42 @@ model SystemSettings {
   pointsReward        Boolean @default(true)   // Earning points reward mode ON/OFF
   pointsToCashRatio   Float   @default(4.0)   // 4 points = 1 Rs
   rewardPointsRatio   Float   @default(0.1)   // 10% points reward
+
+  // Referral Program Settings
+  referralEnabled      Boolean @default(true)   // Referral Program ON/OFF
+  referralRewardPoints Int    @default(50)     // Base points rewarded per referral
+  referralMaxLimit     Int    @default(10)     // Max referrals allowed per user (0 = unlimited)
+  referralStreakBonus  String @default("FLAT") // FLAT, TIERED
+  referralStreakConfig String @default("[{\"count\":1,\"points\":50},{\"count\":2,\"points\":75},{\"count\":3,\"points\":100}]")
+
+  // Wash Booking Terms / Water & Power Agreement Text
+  bookingTermsText    String? @default("I agree to provide domestic water & standard electrical plug access if required for the mobile detailing equipment, and grant parking permission for our doorstep van.")
+
+  // Dashboard Advertisement Banner
+  dashboardAdImage    String? @default("https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=1600&q=85")
+  dashboardAdTitle    String? @default("Special Weekend Doorstep Detail & Snow Foam Spa")
+  dashboardAdSubtitle String? @default("Get sparkling exterior foam wash & deep interior cabin sanitize with pure RO water at your doorstep.")
+  dashboardAdBadge    String? @default("PROMOTIONAL OFFER • LIMITED SLOTS")
+
+  // Dispatch & Smart Route Slot Settings
+  activeWorkers        Int     @default(1)     // Current field workers count (default 1)
+  maxTravelKm          Float   @default(15.0)  // Max allowed travel distance between consecutive slots (km)
+  configuredSlots      String  @default("[\"08:00 AM\",\"10:00 AM\",\"12:00 PM\",\"02:00 PM\",\"04:00 PM\",\"06:00 PM\"]") // Up to 6 slots
+  monthlySlotOverrides String? @default("{}")   // Date-specific overrides e.g. {"2026-10-15": ["08:00 AM", ...]}
+  zoneDistanceMatrix   String?                 // Custom distance matrix between zones
+}
+
+model Inquiry {
+  id        Int      @id @default(autoincrement())
+  name      String
+  phone     String
+  email     String?
+  service   String?
+  message   String
+  type      String   @default("INQUIRY") // INQUIRY, COMPLAINT, FRANCHISE
+  status    String   @default("PENDING") // PENDING, CONTACTED, RESOLVED
+  notes     String?
+  createdAt DateTime @default(now())
 }
 
 model CmsContent {

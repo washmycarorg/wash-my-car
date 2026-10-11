@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   getCarTypes, createCarType, deleteCarType,
-  getWashTypes, createWashType, deleteWashType,
+  getWashTypes, createWashType, updateWashType, deleteWashType,
   getWashPrices, saveWashPrice,
   getAddons, createAddon, updateAddon, deleteAddon
 } from '../api';
@@ -19,7 +19,8 @@ const Services = () => {
 
   // Form states
   const [newCarType, setNewCarType] = useState('');
-  const [newWashType, setNewWashType] = useState({ name: '', description: '' });
+  const [newWashType, setNewWashType] = useState({ name: '', description: '', quickByte: '', fullCommission: 100, partialCommission: 50 });
+  const [editingWashType, setEditingWashType] = useState(null);
   const [newAddon, setNewAddon] = useState({ name: '', price: '', description: '', active: true });
   const [editingAddon, setEditingAddon] = useState(null);
 
@@ -78,12 +79,38 @@ const Services = () => {
     e.preventDefault();
     if (!newWashType.name.trim()) return;
     try {
-      await createWashType(newWashType.name, newWashType.description);
-      setNewWashType({ name: '', description: '' });
+      await createWashType(
+        newWashType.name, 
+        newWashType.description, 
+        newWashType.quickByte,
+        Number(newWashType.fullCommission !== undefined ? newWashType.fullCommission : 100),
+        Number(newWashType.partialCommission !== undefined ? newWashType.partialCommission : 50)
+      );
+      setNewWashType({ name: '', description: '', quickByte: '', fullCommission: 100, partialCommission: 50 });
       fetchData();
     } catch (err) {
       console.error(err);
       alert('Failed to add wash type. Check if it already exists.');
+    }
+  };
+
+  const handleUpdateWashType = async (e) => {
+    e.preventDefault();
+    if (!editingWashType || !editingWashType.name.trim()) return;
+    try {
+      await updateWashType(
+        editingWashType.id, 
+        editingWashType.name, 
+        editingWashType.description, 
+        editingWashType.quickByte,
+        Number(editingWashType.fullCommission !== undefined ? editingWashType.fullCommission : 100),
+        Number(editingWashType.partialCommission !== undefined ? editingWashType.partialCommission : 50)
+      );
+      setEditingWashType(null);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to update wash type.');
     }
   };
 
@@ -472,8 +499,13 @@ const Services = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-1">
             <div className="card">
-              <h3 style={{ marginBottom: '1.25rem' }}>Add Wash Plan</h3>
-              <form onSubmit={handleAddWashType} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <h3 style={{ marginBottom: '1.25rem', color: 'var(--primary-navy)' }}>
+                {editingWashType ? 'Edit Wash Plan' : 'Add Wash Plan'}
+              </h3>
+              <form 
+                onSubmit={editingWashType ? handleUpdateWashType : handleAddWashType} 
+                style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
+              >
                 <div className="form-group" style={{ margin: 0 }}>
                   <label className="form-label">Plan Name</label>
                   <input 
@@ -481,21 +513,102 @@ const Services = () => {
                     type="text" 
                     className="form-input" 
                     placeholder="e.g. Basic Wash, Full Detail"
-                    value={newWashType.name}
-                    onChange={e => setNewWashType({ ...newWashType, name: e.target.value })}
+                    value={editingWashType ? editingWashType.name : newWashType.name}
+                    onChange={e => editingWashType 
+                      ? setEditingWashType({ ...editingWashType, name: e.target.value })
+                      : setNewWashType({ ...newWashType, name: e.target.value })
+                    }
                   />
                 </div>
                 <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">Description</label>
+                  <label className="form-label">
+                    Quick Byte Summary <span style={{ fontSize: '0.75rem', color: 'var(--primary-blue)', fontWeight: 600 }}>(Highlights for Card)</span>
+                  </label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    placeholder="e.g. 45 Mins • Pressure Foam • Glass & Tyre Dressing"
+                    value={editingWashType ? (editingWashType.quickByte || '') : (newWashType.quickByte || '')}
+                    onChange={e => editingWashType 
+                      ? setEditingWashType({ ...editingWashType, quickByte: e.target.value })
+                      : setNewWashType({ ...newWashType, quickByte: e.target.value })
+                    }
+                  />
+                  <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '0.2rem', display: 'block' }}>
+                    Quick one-line bullet or key feature shown directly on the user's booking card.
+                  </small>
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Detailed Description (Popup Details)</label>
                   <textarea 
                     className="form-input" 
-                    placeholder="Included services..."
-                    value={newWashType.description}
-                    onChange={e => setNewWashType({ ...newWashType, description: e.target.value })}
+                    placeholder="Full detailed list of services, process, chemicals used, precautions..."
+                    value={editingWashType ? (editingWashType.description || '') : newWashType.description}
+                    onChange={e => editingWashType 
+                      ? setEditingWashType({ ...editingWashType, description: e.target.value })
+                      : setNewWashType({ ...newWashType, description: e.target.value })
+                    }
                     rows={3}
                   />
                 </div>
-                <button type="submit" className="btn btn-primary">Add Wash Type</button>
+
+                {/* Simultaneous Commission Configuration for Full and Partial/Base-Salary workers */}
+                <div style={{ background: '#F8FAFC', padding: '0.85rem', borderRadius: '10px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                  <label style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--primary-navy)' }}>
+                    Technician Wash Commissions (Simultaneous Configuration)
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0369A1', display: 'block', marginBottom: '0.2rem' }}>
+                        Full Comm (₹)
+                      </label>
+                      <input 
+                        type="number" 
+                        min="0"
+                        className="form-input" 
+                        placeholder="100"
+                        value={editingWashType ? (editingWashType.fullCommission ?? '') : (newWashType.fullCommission ?? '')}
+                        onChange={e => editingWashType 
+                          ? setEditingWashType({ ...editingWashType, fullCommission: e.target.value })
+                          : setNewWashType({ ...newWashType, fullCommission: e.target.value })
+                        }
+                      />
+                      <small style={{ color: '#64748B', fontSize: '0.68rem', display: 'block' }}>Commission-Only</small>
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#6D28D9', display: 'block', marginBottom: '0.2rem' }}>
+                        Partial Comm (₹)
+                      </label>
+                      <input 
+                        type="number" 
+                        min="0"
+                        className="form-input" 
+                        placeholder="50"
+                        value={editingWashType ? (editingWashType.partialCommission ?? '') : (newWashType.partialCommission ?? '')}
+                        onChange={e => editingWashType 
+                          ? setEditingWashType({ ...editingWashType, partialCommission: e.target.value })
+                          : setNewWashType({ ...newWashType, partialCommission: e.target.value })
+                        }
+                      />
+                      <small style={{ color: '#64748B', fontSize: '0.68rem', display: 'block' }}>Base Salary + Comm</small>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
+                    {editingWashType ? 'Save Changes' : 'Add Wash Plan'}
+                  </button>
+                  {editingWashType && (
+                    <button 
+                      type="button" 
+                      onClick={() => setEditingWashType(null)} 
+                      className="btn btn-outline"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
               </form>
             </div>
           </div>
@@ -507,25 +620,74 @@ const Services = () => {
                   <div 
                     key={w.id} 
                     style={{
-                      padding: '1rem',
+                      padding: '1.1rem 1.25rem',
                       border: '1px solid #E2E8F0',
                       borderRadius: 'var(--radius-md)',
                       display: 'flex',
                       justifyContent: 'space-between',
-                      alignItems: 'center',
-                      background: 'white'
+                      alignItems: 'flex-start',
+                      background: 'white',
+                      gap: '1rem'
                     }}
                   >
-                    <div>
-                      <h4 style={{ margin: '0 0 0.25rem 0', color: 'var(--primary-navy)', fontWeight: 600 }}>{w.name}</h4>
-                      <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.85rem' }}>{w.description}</p>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <h4 style={{ margin: 0, color: 'var(--primary-navy)', fontWeight: 700, fontSize: '1.05rem' }}>{w.name}</h4>
+                        {w.quickByte && (
+                          <span style={{
+                            background: '#EFF6FF',
+                            color: '#1D4ED8',
+                            border: '1px solid #BFDBFE',
+                            padding: '0.15rem 0.55rem',
+                            borderRadius: '12px',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.25rem'
+                          }}>
+                            ⚡ {w.quickByte}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
+                        <span style={{ background: '#E0F2FE', color: '#0369A1', padding: '0.15rem 0.55rem', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700 }}>
+                          Full Comm: ₹{w.fullCommission !== undefined ? w.fullCommission : 100}
+                        </span>
+                        <span style={{ background: '#EDE9FE', color: '#6D28D9', padding: '0.15rem 0.55rem', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700 }}>
+                          Partial Comm: ₹{w.partialCommission !== undefined ? w.partialCommission : 50}
+                        </span>
+                      </div>
+                      {w.description && (
+                        <p style={{ margin: '0.4rem 0 0', color: 'var(--text-muted)', fontSize: '0.85rem', lineHeight: 1.5, whiteSpace: 'pre-line' }}>
+                          {w.description}
+                        </p>
+                      )}
                     </div>
-                    <button 
-                      onClick={() => handleDeleteWashType(w.id)}
-                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.25rem' }}
-                    >
-                      <Trash2 size={18} color="var(--danger)" />
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
+                      <button 
+                        onClick={() => setEditingWashType({ 
+                          id: w.id, 
+                          name: w.name, 
+                          description: w.description || '', 
+                          quickByte: w.quickByte || '',
+                          fullCommission: w.fullCommission ?? 100,
+                          partialCommission: w.partialCommission ?? 50
+                        })}
+                        className="btn btn-outline"
+                        style={{ padding: '0.35rem 0.6rem', borderRadius: '4px' }}
+                        title="Edit Plan"
+                      >
+                        <Edit3 size={15} color="var(--primary-blue)" />
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteWashType(w.id)}
+                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.35rem' }}
+                        title="Delete Plan"
+                      >
+                        <Trash2 size={16} color="var(--danger)" />
+                      </button>
+                    </div>
                   </div>
                 ))}
                 {washTypes.length === 0 && <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No wash types created yet.</p>}

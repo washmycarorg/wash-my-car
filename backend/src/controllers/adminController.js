@@ -46,8 +46,25 @@ export const getEmployees = async (req, res) => {
 
     const employeesWithEarnings = employees.map(emp => {
       const completedBookings = emp.bookings.filter(b => b.status === 'COMPLETED');
-      const earnings = completedBookings.reduce((sum, b) => sum + (b.employeePayout || 0), 0);
-      return { ...emp, earnings };
+      const commissionEarnings = completedBookings.reduce((sum, b) => sum + (b.employeePayout || 0), 0);
+      let totalEarnings = 0;
+      const type = emp.payType || 'COMMISSION_ONLY';
+      if (type === 'FIXED_SALARY') {
+        totalEarnings = emp.salary || emp.baseSalary || 0;
+      } else if (type === 'COMMISSION_ONLY') {
+        totalEarnings = commissionEarnings;
+      } else if (type === 'HYBRID') {
+        totalEarnings = (emp.baseSalary || 0) + commissionEarnings;
+      } else {
+        totalEarnings = commissionEarnings;
+      }
+      return { 
+        ...emp, 
+        earnings: totalEarnings, 
+        commissionEarnings,
+        baseSalary: emp.baseSalary || 0,
+        payType: type
+      };
     });
 
     res.json(employeesWithEarnings);
@@ -84,9 +101,11 @@ export const toggleEmployeeStatus = async (req, res) => {
 export const updateEmployee = async (req, res) => {
   try {
     const { id } = req.params;
-    const { salary, name, phone, email, serviceAreaIds, allowProfileUpdate } = req.body;
+    const { salary, baseSalary, payType, name, phone, email, serviceAreaIds, allowProfileUpdate } = req.body;
     const data = {};
     if (salary !== undefined) data.salary = Number(salary);
+    if (baseSalary !== undefined) data.baseSalary = Number(baseSalary);
+    if (payType !== undefined) data.payType = payType;
     if (name) data.name = name;
     if (phone) data.phone = phone;
     if (email) data.email = email;
@@ -161,6 +180,10 @@ export const createOffer = async (req, res) => {
       maxDiscountAmount,
       applicableCarTypeIds,
       applicableWashTypeIds,
+      freeAddonId,
+      discountAddonId,
+      addonDiscountType,
+      addonDiscountValue,
       validUntil, 
       active, 
       code, 
@@ -187,6 +210,10 @@ export const createOffer = async (req, res) => {
         maxDiscountAmount: maxDiscountAmount !== undefined && maxDiscountAmount !== null ? Number(maxDiscountAmount) : null,
         applicableCarTypeIds: applicableCarTypeIds || '',
         applicableWashTypeIds: applicableWashTypeIds || '',
+        freeAddonId: freeAddonId ? Number(freeAddonId) : null,
+        discountAddonId: discountAddonId ? Number(discountAddonId) : null,
+        addonDiscountType: addonDiscountType || null,
+        addonDiscountValue: addonDiscountValue !== undefined && addonDiscountValue !== null ? Number(addonDiscountValue) : null,
         validUntil: new Date(validUntil),
         active: active ?? true,
         code,
@@ -222,6 +249,10 @@ export const updateOffer = async (req, res) => {
       maxDiscountAmount,
       applicableCarTypeIds,
       applicableWashTypeIds,
+      freeAddonId,
+      discountAddonId,
+      addonDiscountType,
+      addonDiscountValue,
       validUntil, 
       active, 
       code, 
@@ -250,6 +281,10 @@ export const updateOffer = async (req, res) => {
         ...(maxDiscountAmount !== undefined && { maxDiscountAmount: maxDiscountAmount !== null ? Number(maxDiscountAmount) : null }),
         ...(applicableCarTypeIds !== undefined && { applicableCarTypeIds: applicableCarTypeIds }),
         ...(applicableWashTypeIds !== undefined && { applicableWashTypeIds: applicableWashTypeIds }),
+        ...(freeAddonId !== undefined && { freeAddonId: freeAddonId ? Number(freeAddonId) : null }),
+        ...(discountAddonId !== undefined && { discountAddonId: discountAddonId ? Number(discountAddonId) : null }),
+        ...(addonDiscountType !== undefined && { addonDiscountType: addonDiscountType || null }),
+        ...(addonDiscountValue !== undefined && { addonDiscountValue: addonDiscountValue !== null ? Number(addonDiscountValue) : null }),
         ...(validUntil && { validUntil: new Date(validUntil) }),
         ...(active !== undefined && { active }),
         ...(code && { code }),
@@ -455,8 +490,16 @@ export const getWashTypes = async (req, res) => {
 
 export const createWashType = async (req, res) => {
   try {
-    const { name, description } = req.body;
-    const type = await prisma.washType.create({ data: { name, description } });
+    const { name, description, quickByte, fullCommission, partialCommission } = req.body;
+    const type = await prisma.washType.create({ 
+      data: { 
+        name, 
+        description,
+        quickByte: quickByte ? String(quickByte).trim() : null,
+        fullCommission: fullCommission !== undefined ? Number(fullCommission) : 100.0,
+        partialCommission: partialCommission !== undefined ? Number(partialCommission) : 50.0
+      } 
+    });
     res.json(type);
   } catch (error) { 
     res.status(500).json({ error: error.message }); 
@@ -466,10 +509,16 @@ export const createWashType = async (req, res) => {
 export const updateWashType = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description } = req.body;
+    const { name, description, quickByte, fullCommission, partialCommission } = req.body;
     const type = await prisma.washType.update({
       where: { id: Number(id) },
-      data: { name, description }
+      data: { 
+        ...(name && { name }),
+        ...(description !== undefined && { description }),
+        ...(quickByte !== undefined && { quickByte: quickByte ? String(quickByte).trim() : null }),
+        ...(fullCommission !== undefined && { fullCommission: Number(fullCommission) }),
+        ...(partialCommission !== undefined && { partialCommission: Number(partialCommission) })
+      }
     });
     res.json(type);
   } catch (error) { 
@@ -833,7 +882,17 @@ export const getSystemSettings = async (req, res) => {
           pointsRedemption: true,
           pointsReward: true,
           pointsToCashRatio: 4.0,
-          rewardPointsRatio: 0.1
+          rewardPointsRatio: 0.1,
+          referralRewardPoints: 50,
+          referralMaxLimit: 10,
+          referralStreakBonus: 25,
+          referralStreakConfig: JSON.stringify([
+            { count: 1, points: 50 },
+            { count: 2, points: 75 },
+            { count: 3, points: 100 },
+            { count: 5, points: 150 }
+          ]),
+          bookingTermsText: "1. Access Requirements: Customer agrees to provide adequate water tap access and a standard electric plug point for the technician to perform the doorstep car wash service safely.\n2. Vehicle Parking: The vehicle must be parked in a well-lit area with sufficient clearance around all sides.\n3. Valuable Items: Please remove all personal belongings and valuables from inside the car prior to service commencement.\n4. Timings: Service slots are subject to local traffic and weather conditions."
         }
       });
     }
@@ -845,7 +904,23 @@ export const getSystemSettings = async (req, res) => {
 
 export const updateSystemSettings = async (req, res) => {
   try {
-    const { autoAssignment, pointsRedemption, pointsReward, pointsToCashRatio, rewardPointsRatio } = req.body;
+    const { 
+      autoAssignment, 
+      pointsRedemption, 
+      pointsReward, 
+      pointsToCashRatio, 
+      rewardPointsRatio,
+      referralEnabled,
+      referralRewardPoints,
+      referralMaxLimit,
+      referralStreakBonus,
+      referralStreakConfig,
+      bookingTermsText,
+      dashboardAdImage,
+      dashboardAdTitle,
+      dashboardAdSubtitle,
+      dashboardAdBadge
+    } = req.body;
     
     const settings = await prisma.systemSettings.upsert({
       where: { id: 1 },
@@ -854,7 +929,17 @@ export const updateSystemSettings = async (req, res) => {
         ...(pointsRedemption !== undefined && { pointsRedemption: Boolean(pointsRedemption) }),
         ...(pointsReward !== undefined && { pointsReward: Boolean(pointsReward) }),
         ...(pointsToCashRatio !== undefined && { pointsToCashRatio: Number(pointsToCashRatio) }),
-        ...(rewardPointsRatio !== undefined && { rewardPointsRatio: Number(rewardPointsRatio) })
+        ...(rewardPointsRatio !== undefined && { rewardPointsRatio: Number(rewardPointsRatio) }),
+        ...(referralEnabled !== undefined && { referralEnabled: Boolean(referralEnabled) }),
+        ...(referralRewardPoints !== undefined && { referralRewardPoints: Number(referralRewardPoints) }),
+        ...(referralMaxLimit !== undefined && { referralMaxLimit: Number(referralMaxLimit) }),
+        ...(referralStreakBonus !== undefined && { referralStreakBonus: Number(referralStreakBonus) }),
+        ...(referralStreakConfig !== undefined && { referralStreakConfig: typeof referralStreakConfig === 'object' ? JSON.stringify(referralStreakConfig) : String(referralStreakConfig) }),
+        ...(bookingTermsText !== undefined && { bookingTermsText: String(bookingTermsText) }),
+        ...(dashboardAdImage !== undefined && { dashboardAdImage: String(dashboardAdImage) }),
+        ...(dashboardAdTitle !== undefined && { dashboardAdTitle: String(dashboardAdTitle) }),
+        ...(dashboardAdSubtitle !== undefined && { dashboardAdSubtitle: String(dashboardAdSubtitle) }),
+        ...(dashboardAdBadge !== undefined && { dashboardAdBadge: String(dashboardAdBadge) })
       },
       create: {
         id: 1,
@@ -862,7 +947,21 @@ export const updateSystemSettings = async (req, res) => {
         pointsRedemption: pointsRedemption !== undefined ? Boolean(pointsRedemption) : true,
         pointsReward: pointsReward !== undefined ? Boolean(pointsReward) : true,
         pointsToCashRatio: pointsToCashRatio !== undefined ? Number(pointsToCashRatio) : 4.0,
-        rewardPointsRatio: rewardPointsRatio !== undefined ? Number(rewardPointsRatio) : 0.1
+        rewardPointsRatio: rewardPointsRatio !== undefined ? Number(rewardPointsRatio) : 0.1,
+        referralEnabled: referralEnabled !== undefined ? Boolean(referralEnabled) : true,
+        referralRewardPoints: referralRewardPoints !== undefined ? Number(referralRewardPoints) : 50,
+        referralMaxLimit: referralMaxLimit !== undefined ? Number(referralMaxLimit) : 10,
+        referralStreakBonus: referralStreakBonus !== undefined ? Number(referralStreakBonus) : 25,
+        referralStreakConfig: referralStreakConfig ? (typeof referralStreakConfig === 'object' ? JSON.stringify(referralStreakConfig) : String(referralStreakConfig)) : JSON.stringify([
+          { count: 1, points: 50 },
+          { count: 2, points: 75 },
+          { count: 3, points: 100 }
+        ]),
+        bookingTermsText: bookingTermsText || "1. Access Requirements: Customer agrees to provide adequate water tap access and a standard electric plug point for the technician to perform the doorstep car wash service safely.\n2. Vehicle Parking: The vehicle must be parked in a well-lit area with sufficient clearance around all sides.\n3. Valuable Items: Please remove all personal belongings and valuables from inside the car prior to service commencement.",
+        dashboardAdImage: dashboardAdImage || "https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=1600&q=85",
+        dashboardAdTitle: dashboardAdTitle || "Special Weekend Doorstep Detail & Snow Foam Spa",
+        dashboardAdSubtitle: dashboardAdSubtitle || "Get sparkling exterior foam wash & deep interior cabin sanitize with pure RO water at your doorstep.",
+        dashboardAdBadge: dashboardAdBadge || "PROMOTIONAL OFFER • LIMITED SLOTS"
       }
     });
     res.json(settings);

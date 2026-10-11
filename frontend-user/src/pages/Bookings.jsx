@@ -130,7 +130,7 @@ const Bookings = () => {
               <StatusBadge status={booking.status} />
             </div>
             <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-              {carLabel} &bull; {dateStr} &bull; {booking.timeSlot}
+              {carLabel} {booking.car?.carNumber && <strong style={{ color: 'var(--primary-blue)', letterSpacing: '0.05em' }}>({booking.car.carNumber})</strong>} &bull; {dateStr} &bull; {booking.timeSlot}
               {areaLabel && <> &bull; {areaLabel}</>}
             </div>
             {booking.addons && booking.addons.length > 0 && (
@@ -160,8 +160,13 @@ const Bookings = () => {
               <Car size={15} color="var(--text-muted)" style={{ marginTop: '3px', flexShrink: 0 }} />
               <div>
                 <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Vehicle</div>
-                <div style={{ fontSize: '0.9rem', color: 'var(--primary-navy)', fontWeight: 600 }}>
-                  {carLabel} {carTypeLabel ? `(${carTypeLabel})` : ''}
+                <div style={{ fontSize: '0.9rem', color: 'var(--primary-navy)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <span>{carLabel} {carTypeLabel ? `(${carTypeLabel})` : ''}</span>
+                  {booking.car?.carNumber && (
+                    <span style={{ background: '#E0F2FE', color: '#0369A1', padding: '0.1rem 0.5rem', borderRadius: '4px', fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.05em' }}>
+                      {booking.car.carNumber}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

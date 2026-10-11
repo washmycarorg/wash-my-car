@@ -5,9 +5,10 @@ import {
   Mail, Award, Clock, Menu, X, Sparkles, Star, ChevronRight, Check, 
   Compass, Shield, Tag, ChevronDown, MessageCircle, ArrowRight,
   Flame, Bike, Feather, Smartphone, ExternalLink, HelpCircle,
-  ChevronLeft, Play, Pause
+  ChevronLeft, Copy, Send, User
 } from 'lucide-react';
-import { getHomeContent, getServiceAreas, getWashTypes, getAllWashPrices, getCarTypes, getAddons } from '../api';
+import { getHomeContent, getServiceAreas, getWashTypes, getAllWashPrices, getCarTypes, getAddons, getActiveCoupons, submitInquiry, getSettings } from '../api';
+
 import logo from '../assets/wash my car.png';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
@@ -16,7 +17,7 @@ const VIZAG_COORDS = { lat: 17.7042, lng: 83.2980 };
 const DEFAULT_HERO_SLIDES = [
   {
     id: 'slide-1',
-    kicker: 'WASH MY CAR • DOORSTEP CAR WASH',
+    kicker: 'WASH MY CAR ORG • DOORSTEP CAR WASH',
     title: 'WE WASH.\nYOU RELAX.',
     subtitle: 'Premium vehicle spa and car detailing at your doorstep. Save time, skip the queue, and let trained professionals care for your car.',
     image: 'https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=2200&q=95',
@@ -58,7 +59,7 @@ const DEFAULT_HERO_SLIDES = [
     image: 'https://images.unsplash.com/photo-1504215680853-026ed2a45def?auto=format&fit=crop&w=2200&q=95',
     badgeText: 'LIMITED TIME OFFER',
     ctaPrimary: 'Claim 20% Off',
-    ctaSecondary: 'Why Wash My Car',
+    ctaSecondary: 'Why Wash My Car Org',
     primaryLink: '/register',
     secondaryLink: '#why-us'
   }
@@ -72,7 +73,7 @@ const Home = () => {
   // Dynamic CMS State with rich defaults
   const [cms, setCms] = useState({
     heroSlides: DEFAULT_HERO_SLIDES,
-    heroKicker: "WASH MY CAR • DOORSTEP CAR WASH",
+    heroKicker: "WASH MY CAR ORG • DOORSTEP CAR WASH",
     heroTitle: "WE WASH.\nYOU RELAX.",
     heroSubtitle: "Premium vehicle spa and car detailing at your doorstep. Save time, skip the queue, and let trained professionals care for your car.",
     heroImage: "https://images.unsplash.com/photo-1504215680853-026ed2a45def?auto=format&fit=crop&w=2200&q=95",
@@ -128,15 +129,30 @@ const Home = () => {
       { q: "How do I book a doorstep car wash?", a: "Simply select your vehicle type, pick your package & optional add-ons (like Helmet or Bike wash), choose a date and time slot, and our trained technician will arrive equipped with high-pressure machines and RO water." },
       { q: "Do I need to provide water and electricity?", a: "Our mobile vans carry dedicated water storage and mobile generators. A domestic plug point is helpful, but our units are fully self-sufficient." },
       { q: "Can I add add-on services like Helmet or Bike wash?", a: "Yes! While booking any car wash, you can easily attach add-on services such as Helmet wash, 2-wheeler wash, interior ozone sanitization, and engine bay steam cleaning directly into the checkout total." },
-      { q: "Where is Wash My Car currently available?", a: "We are actively serving Visakhapatnam and surrounding neighborhoods, with expanding operations across Andhra Pradesh and Telangana." },
+      { q: "Where is Wash My Car Org currently available?", a: "We are actively serving Visakhapatnam and surrounding neighborhoods, with expanding operations across Andhra Pradesh and Telangana." },
       { q: "How does employee assignment and tracking work?", a: "Once your booking is confirmed, our automated scheduling assigns an on-duty technician in your area. Technicians upload before & after service photos with verified GPS location tracking for complete peace of mind." }
     ]
   });
 
-  // Slider State (Pexa Car Care Carousel)
+  // Slider State (Pexa Car Care Carousel - Continuously Auto-scrolling)
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
-  const [isAutoplayPaused, setIsAutoplayPaused] = useState(false);
   const [touchStartX, setTouchStartX] = useState(0);
+
+  const [coupons, setCoupons] = useState([]);
+  const [copiedCoupon, setCopiedCoupon] = useState('');
+
+  // Contact Form State
+  const [contactForm, setContactForm] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    service: 'Doorstep Car Wash',
+    message: ''
+  });
+  const [contactSubmitted, setContactSubmitted] = useState(false);
+  const [contactError, setContactError] = useState('');
+  const [isSubmittingContact, setIsSubmittingContact] = useState(false);
+  const [settings, setSettings] = useState(null);
 
   const [areas, setAreas] = useState([]);
   const [washTypes, setWashTypes] = useState([]);
@@ -189,6 +205,8 @@ const Home = () => {
     getAllWashPrices().then(setWashPrices).catch(console.warn);
     getCarTypes().then(setCarTypes).catch(console.warn);
     getAddons().then(setAddons).catch(console.warn);
+    getActiveCoupons().then(setCoupons).catch(console.warn);
+    getSettings().then(setSettings).catch(console.warn);
   }, []);
 
   const slides = Array.isArray(cms.heroSlides) && cms.heroSlides.length > 0
@@ -209,14 +227,49 @@ const Home = () => {
     setCurrentSlideIndex(idx);
   };
 
-  // Carousel Autoplay (Pexa style, pauses on hover)
+  // Carousel Continuous Autoplay (automatically scrolls without pausing)
   useEffect(() => {
-    if (isAutoplayPaused || slides.length <= 1) return;
+    if (slides.length <= 1) return;
     const interval = setInterval(() => {
       setCurrentSlideIndex(prev => (prev === slides.length - 1 ? 0 : prev + 1));
-    }, 5500);
+    }, 4500);
     return () => clearInterval(interval);
-  }, [isAutoplayPaused, slides.length]);
+  }, [slides.length]);
+
+  const handleCopyCoupon = (code) => {
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(code);
+    }
+    setCopiedCoupon(code);
+    setTimeout(() => setCopiedCoupon(''), 3000);
+  };
+
+  const handleContactSubmit = async (e) => {
+    e.preventDefault();
+    if (!contactForm.name.trim() || !contactForm.phone.trim()) {
+      setContactError('Please enter your Name and Phone Number so our team can reach you.');
+      return;
+    }
+    setContactError('');
+    setIsSubmittingContact(true);
+    try {
+      await submitInquiry({
+        name: contactForm.name.trim(),
+        phone: contactForm.phone.trim(),
+        email: contactForm.email ? contactForm.email.trim() : null,
+        service: contactForm.service || 'Doorstep Car Wash',
+        message: contactForm.message ? contactForm.message.trim() : 'Inquiry submitted from home page',
+        type: contactForm.service && contactForm.service.includes('Franchise') ? 'FRANCHISE' : 'INQUIRY'
+      });
+      setContactSubmitted(true);
+    } catch (err) {
+      console.error('Failed to submit inquiry:', err);
+      setContactError(err.message || 'Could not submit inquiry. Please try again.');
+    } finally {
+      setIsSubmittingContact(false);
+    }
+  };
+
 
   // Touch Swipe for Mobile
   const handleTouchStart = (e) => {
@@ -365,7 +418,7 @@ const Home = () => {
               display: 'block',
               lineHeight: 1
             }}>
-              WASH MY CAR
+              WASH MY CAR ORG
             </span>
             <span style={{ fontSize: '0.65rem', color: '#94A3B8', fontWeight: 700, letterSpacing: '1px' }}>
               DOORSTEP CAR WASH
@@ -387,7 +440,7 @@ const Home = () => {
         {/* CTA Buttons */}
         <div className="hidden md:flex" style={{ gap: '0.85rem', alignItems: 'center' }}>
           <a 
-            href={`https://wa.me/${cleanWhatsappNumber}?text=Hi%20Wash%20My%20Car%2C%20I%20want%20to%20book%20a%20doorstep%20wash.`}
+            href={`https://wa.me/${cleanWhatsappNumber}?text=Hi%20Wash%20My%20Car%20Org%2C%20I%20want%20to%20book%20a%20doorstep%20wash.`}
             target="_blank" 
             rel="noopener noreferrer"
             style={{ 
@@ -455,8 +508,6 @@ const Home = () => {
 
       {/* 2. PEXA CAR CARE-STYLE HERO CAROUSEL (SLIDER FRONT PAGE) */}
       <header
-        onMouseEnter={() => setIsAutoplayPaused(true)}
-        onMouseLeave={() => setIsAutoplayPaused(false)}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
         style={{
@@ -782,7 +833,7 @@ const Home = () => {
                 gap: '0.5rem'
               }}>
                 <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22C55E', boxShadow: '0 0 8px #22C55E' }} />
-                WASH MY CAR • DOORSTEP DETAILING
+                WASH MY CAR ORG • DOORSTEP DETAILING
               </div>
             </div>
 
@@ -829,7 +880,7 @@ const Home = () => {
               transform: 'rotate(-4deg)'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: '#38BDF8', fontWeight: 800 }}>
-                <span>Wash My Car</span>
+                <span>Wash My Car Org</span>
                 <span>4G ●</span>
               </div>
               <div style={{ fontSize: '0.6rem', color: '#94A3B8', marginTop: '0.5rem' }}>Good Day! 👋</div>
@@ -861,28 +912,6 @@ const Home = () => {
               >
                 Instant Book →
               </button>
-            </div>
-
-            {/* Floating Rating Pill */}
-            <div style={{
-              position: 'absolute',
-              top: '20px',
-              left: '-10px',
-              background: 'rgba(255, 255, 255, 0.95)',
-              color: '#0F172A',
-              padding: '0.5rem 1rem',
-              borderRadius: '20px',
-              boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              fontSize: '0.8rem',
-              fontWeight: 800,
-              zIndex: 10
-            }}>
-              <Star size={16} fill="#F59E0B" color="#F59E0B" />
-              <span>4.9 / 5</span>
-              <span style={{ color: '#64748B', fontWeight: 600, fontSize: '0.72rem' }}>(10K+ Clean Rides)</span>
             </div>
 
           </div>
@@ -943,29 +972,6 @@ const Home = () => {
               );
             })}
           </div>
-
-          {/* Autoplay Pause / Play Toggle */}
-          <button
-            onClick={() => setIsAutoplayPaused(!isAutoplayPaused)}
-            title={isAutoplayPaused ? "Resume Autoplay" : "Pause Autoplay"}
-            style={{
-              background: 'rgba(15,23,42,0.7)',
-              backdropFilter: 'blur(8px)',
-              border: '1px solid rgba(255,255,255,0.15)',
-              color: isAutoplayPaused ? '#FACC15' : '#38BDF8',
-              padding: '0.4rem 0.75rem',
-              borderRadius: '20px',
-              fontSize: '0.72rem',
-              fontWeight: 700,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              cursor: 'pointer'
-            }}
-          >
-            {isAutoplayPaused ? <Play size={13} fill="#FACC15" /> : <Pause size={13} fill="#38BDF8" />}
-            <span>{isAutoplayPaused ? 'Paused' : 'Auto'}</span>
-          </button>
         </div>
 
         {/* 4 Bottom Benefits Strip */}
@@ -1024,53 +1030,185 @@ const Home = () => {
         </div>
       </header>
 
-      {/* 3. DYNAMIC PROMO & QUICK ANNOUNCEMENT BAR */}
+      {/* 3. DYNAMIC PROMO & ACTIVE COUPONS BAR */}
       <section style={{
-        background: '#0F172A',
+        background: 'linear-gradient(90deg, #0B132B 0%, #0F172A 50%, #091E3A 100%)',
         color: 'white',
         padding: '1.25rem 6%',
-        borderTop: '1px solid rgba(255,255,255,0.06)',
-        borderBottom: '1px solid rgba(255,255,255,0.06)'
+        borderTop: '1px solid rgba(56, 189, 248, 0.2)',
+        borderBottom: '1px solid rgba(56, 189, 248, 0.2)',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.25)'
       }}>
-        <div style={{ maxWidth: '1240px', margin: '0 auto', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+        <div style={{ 
+          maxWidth: '1240px', 
+          margin: '0 auto', 
+          display: 'flex', 
+          flexWrap: 'wrap', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          gap: '1.25rem' 
+        }}>
+          {/* Left: Live Status Badge & Column Title */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.9rem', flexWrap: 'wrap' }}>
             <span style={{ 
-              background: '#0284C7', 
+              background: 'linear-gradient(135deg, #0284C7, #0EA5E9)', 
               color: 'white', 
-              padding: '0.35rem 0.85rem', 
-              borderRadius: '20px', 
-              fontSize: '0.78rem', 
+              padding: '0.4rem 1rem', 
+              borderRadius: '25px', 
+              fontSize: '0.8rem', 
               fontWeight: 800, 
-              letterSpacing: '0.5px' 
+              letterSpacing: '0.6px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              boxShadow: '0 4px 14px rgba(14, 165, 233, 0.4)'
             }}>
-              {cms.quickBarLive}
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#4ADE80', boxShadow: '0 0 8px #4ADE80' }} />
+              LIVE DOORSTEP CAR WASH
             </span>
-            <div>
-              <strong style={{ fontSize: '0.95rem' }}>{cms.quickBarTitle}</strong>
-              <span style={{ fontSize: '0.82rem', color: '#94A3B8', marginLeft: '0.5rem' }}>{cms.quickBarSubtitle}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <Tag size={16} color="#38BDF8" />
+              <strong style={{ fontSize: '0.92rem', color: '#F8FAFC' }}>Active Coupons & Deals:</strong>
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          {/* Center: Present Active Coupons From Database - Smoothly Scrollable Rail */}
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '0.85rem', 
+            flexWrap: 'nowrap', 
+            overflowX: 'auto', 
+            WebkitOverflowScrolling: 'touch',
+            padding: '0.35rem 0.5rem',
+            maxWidth: '100%',
+            flex: 1,
+            justifyContent: 'flex-start',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none'
+          }}>
+            {coupons.length > 0 ? (
+              coupons.map((coupon) => {
+                const discountDisplay = coupon.discountType === 'PERCENTAGE' 
+                  ? `${coupon.discountPct}% OFF` 
+                  : `₹${coupon.discountAmount} FLAT OFF`;
+                const isCopied = copiedCoupon === coupon.code;
+
+                return (
+                  <div
+                    key={coupon.id || coupon.code}
+                    onClick={() => handleCopyCoupon(coupon.code)}
+                    title="Click to copy coupon code"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.06)',
+                      border: isCopied ? '1.5px solid #4ADE80' : '1.5px dashed rgba(56, 189, 248, 0.5)',
+                      borderRadius: '12px',
+                      padding: '0.4rem 0.85rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.65rem',
+                      cursor: 'pointer',
+                      backdropFilter: 'blur(8px)',
+                      flexShrink: 0,
+                      transition: 'all 0.2s ease',
+                      boxShadow: isCopied ? '0 0 12px rgba(74, 222, 128, 0.3)' : '0 2px 8px rgba(0,0,0,0.2)'
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = 'rgba(14, 165, 233, 0.15)';
+                      e.currentTarget.style.borderColor = '#38BDF8';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+                      e.currentTarget.style.borderColor = isCopied ? '#4ADE80' : 'rgba(56, 189, 248, 0.5)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    <span style={{
+                      background: 'linear-gradient(135deg, #F59E0B, #EAB308)',
+                      color: '#0F172A',
+                      padding: '0.2rem 0.55rem',
+                      borderRadius: '6px',
+                      fontSize: '0.72rem',
+                      fontWeight: 900,
+                      letterSpacing: '0.5px'
+                    }}>
+                      {discountDisplay}
+                    </span>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 800, color: 'white', letterSpacing: '0.5px' }}>
+                        USE: <strong style={{ color: '#38BDF8' }}>{coupon.code}</strong>
+                      </span>
+                      <span style={{ fontSize: '0.68rem', color: '#94A3B8' }}>
+                        {coupon.title || coupon.description}
+                      </span>
+                    </div>
+
+                    <div style={{
+                      marginLeft: '0.35rem',
+                      color: isCopied ? '#4ADE80' : '#38BDF8',
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem'
+                    }}>
+                      {isCopied ? (
+                        <>
+                          <Check size={14} color="#4ADE80" />
+                          <span style={{ color: '#4ADE80' }}>COPIED!</span>
+                        </>
+                      ) : (
+                        <Copy size={14} />
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#CBD5E1', fontSize: '0.85rem' }}>
+                <Sparkles size={16} color="#FACC15" />
+                <span>Special discounts available on first booking!</span>
+              </div>
+            )}
+          </div>
+
+          {/* Right: CTA to Book */}
+          <div>
             <button 
-              onClick={() => navigate('/register')}
+              onClick={() => navigate('/login')}
               style={{
-                background: '#FACC15',
+                background: 'linear-gradient(135deg, #FACC15, #EAB308)',
                 color: '#0F172A',
                 border: 'none',
                 padding: '0.55rem 1.4rem',
-                borderRadius: '20px',
-                fontWeight: 800,
+                borderRadius: '25px',
+                fontWeight: 900,
                 fontSize: '0.85rem',
                 cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(250, 204, 21, 0.3)'
+                boxShadow: '0 4px 14px rgba(250, 204, 21, 0.35)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                transition: 'transform 0.2s, box-shadow 0.2s'
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 6px 18px rgba(250, 204, 21, 0.5)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 14px rgba(250, 204, 21, 0.35)';
               }}
             >
-              {cms.promoText}
+              <span>Book with Coupon</span>
+              <ArrowRight size={15} />
             </button>
           </div>
         </div>
       </section>
+
 
       {/* 4. DOORSTEP WASH PACKAGES MATRIX (SERVICES) */}
       <section id="packages" style={{ padding: '5.5rem 6%', textAlign: 'center' }}>
@@ -1364,7 +1502,177 @@ const Home = () => {
         </div>
       </section>
 
-      {/* 6. THE WASH MY CAR DIFFERENCE (WHY CHOOSE US) */}
+      {/* 5.5 REFER & EARN ADVERTISEMENT BANNER (ADMIN CONFIGURED - HIDDEN IF DISABLED) */}
+      {settings?.referralEnabled !== false && (
+        <section id="refer-earn" style={{ padding: '0 6% 4.5rem', maxWidth: '1240px', margin: '0 auto' }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #0B132B 0%, #1C2541 50%, #0F172A 100%)',
+            borderRadius: '28px',
+            border: '1.5px solid rgba(56, 189, 248, 0.35)',
+            padding: '3rem 2.5rem',
+            boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.5), 0 0 35px rgba(14, 165, 233, 0.15)',
+            position: 'relative',
+            overflow: 'hidden',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+            gap: '2.5rem',
+            alignItems: 'center'
+          }}>
+            {/* Ambient background glow */}
+            <div style={{
+              position: 'absolute',
+              top: '-60px',
+              right: '-60px',
+              width: '260px',
+              height: '260px',
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(14, 165, 233, 0.25) 0%, transparent 70%)',
+              pointerEvents: 'none'
+            }} />
+            <div style={{
+              position: 'absolute',
+              bottom: '-80px',
+              left: '10%',
+              width: '300px',
+              height: '300px',
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(250, 204, 21, 0.15) 0%, transparent 70%)',
+              pointerEvents: 'none'
+            }} />
+
+            {/* Left Content */}
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(250, 204, 21, 0.15)', border: '1px solid rgba(250, 204, 21, 0.35)', padding: '0.4rem 1rem', borderRadius: '30px', color: '#FACC15', fontSize: '0.8rem', fontWeight: 900, letterSpacing: '0.5px', marginBottom: '1.25rem' }}>
+                <Sparkles size={15} />
+                OFFICIAL REFERRAL PROGRAM
+              </div>
+              <h2 style={{ fontSize: 'clamp(2rem, 3.8vw, 2.8rem)', fontWeight: 900, color: '#FFFFFF', margin: '0 0 1rem', lineHeight: 1.15, letterSpacing: '-0.5px' }}>
+                Refer Friends & Get <span style={{ background: 'linear-gradient(135deg, #38BDF8, #FACC15)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Free Doorstep Washes</span>
+              </h2>
+              <p style={{ color: '#94A3B8', fontSize: '1.02rem', lineHeight: 1.6, margin: '0 0 2rem', maxWidth: '520px' }}>
+                Share your personal code with friends & neighbors. When they complete their first wash, you both unlock reward points redeemable for 100% free doorstep car & bike washes!
+              </p>
+
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <button
+                  onClick={() => navigate('/login')}
+                  style={{
+                    background: 'linear-gradient(135deg, #0EA5E9, #0284C7)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '0.9rem 1.8rem',
+                    borderRadius: '16px',
+                    fontWeight: 800,
+                    fontSize: '0.95rem',
+                    cursor: 'pointer',
+                    boxShadow: '0 10px 25px rgba(14, 165, 233, 0.4)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    transition: 'transform 0.2s, box-shadow 0.2s'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 14px 28px rgba(14, 165, 233, 0.5)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 10px 25px rgba(14, 165, 233, 0.4)';
+                  }}
+                >
+                  <span>Start Earning Rewards</span>
+                  <ArrowRight size={17} />
+                </button>
+                <Link
+                  to="/rewards"
+                  style={{
+                    color: '#38BDF8',
+                    textDecoration: 'none',
+                    fontWeight: 700,
+                    fontSize: '0.92rem',
+                    padding: '0.8rem 1.2rem',
+                    borderRadius: '14px',
+                    background: 'rgba(56, 189, 248, 0.08)',
+                    border: '1px solid rgba(56, 189, 248, 0.2)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem'
+                  }}
+                >
+                  View Rewards & Tiers →
+                </Link>
+              </div>
+            </div>
+
+            {/* Right: Admin-Configured Program Metrics */}
+            <div style={{ position: 'relative', zIndex: 1, display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.25rem' }}>
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                backdropFilter: 'blur(10px)',
+                borderRadius: '20px',
+                padding: '1.5rem',
+                textAlign: 'left'
+              }}>
+                <div style={{ fontSize: '2.5rem', fontWeight: 900, color: '#38BDF8', lineHeight: 1 }}>
+                  +{settings?.referralRewardPoints ?? 50}
+                </div>
+                <div style={{ color: '#F8FAFC', fontWeight: 800, fontSize: '0.92rem', marginTop: '0.5rem' }}>
+                  Points Per Referral
+                </div>
+                <div style={{ color: '#94A3B8', fontSize: '0.78rem', marginTop: '0.25rem' }}>
+                  Credited on friend's 1st completed wash
+                </div>
+              </div>
+
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                backdropFilter: 'blur(10px)',
+                borderRadius: '20px',
+                padding: '1.5rem',
+                textAlign: 'left'
+              }}>
+                <div style={{ fontSize: '2.5rem', fontWeight: 900, color: '#FACC15', lineHeight: 1 }}>
+                  +{settings?.referralStreakBonus ?? 25}
+                </div>
+                <div style={{ color: '#F8FAFC', fontWeight: 800, fontSize: '0.92rem', marginTop: '0.5rem' }}>
+                  Streak Bonus
+                </div>
+                <div style={{ color: '#94A3B8', fontSize: '0.78rem', marginTop: '0.25rem' }}>
+                  Bonus points for active consecutive streaks
+                </div>
+              </div>
+
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                backdropFilter: 'blur(10px)',
+                borderRadius: '20px',
+                padding: '1.5rem',
+                textAlign: 'left',
+                gridColumn: 'span 2'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div>
+                    <span style={{ fontSize: '1rem', fontWeight: 800, color: '#FFFFFF' }}>
+                      🔥 Maximum Limit: {settings?.referralMaxLimit ? `${settings.referralMaxLimit} Referrals/Month` : 'Unlimited'}
+                    </span>
+                    <p style={{ color: '#94A3B8', fontSize: '0.8rem', margin: '0.25rem 0 0' }}>
+                      Earned points can be used at checkout for 100% cashless doorstep care!
+                    </p>
+                  </div>
+                  <span style={{ background: '#059669', color: 'white', padding: '0.35rem 0.85rem', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 800 }}>
+                    ACTIVE PROMO
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* 6. THE WASH MY CAR ORG DIFFERENCE (WHY CHOOSE US) */}
       <section id="why-us" style={{ padding: '6rem 6%', background: '#F8FAFC' }}>
         <div style={{ maxWidth: '1240px', margin: '0 auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '3rem', alignItems: 'center', marginBottom: '4rem' }}>
@@ -1381,51 +1689,207 @@ const Home = () => {
             </p>
           </div>
 
-          {/* 5-Pillar Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
-            {/* Feature Banner Card */}
+          {/* Responsive 4-Step Cards Grid */}
+          <div className="why-cards-grid">
+            
+            {/* Card 01 - Featured Mobile-Ready Hero Card */}
             <div style={{
               borderRadius: '24px',
-              padding: '3rem 2.5rem',
-              background: 'linear-gradient(135deg, #0F172A 0%, #0369A1 100%)',
+              padding: '2.25rem 2rem',
+              background: 'linear-gradient(145deg, #0B132B 0%, #0F172A 60%, #0369A1 100%)',
               color: 'white',
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'flex-end',
-              minHeight: '340px',
-              gridColumn: 'span 1'
+              justifyContent: 'space-between',
+              minHeight: '280px',
+              border: '1.5px solid rgba(56, 189, 248, 0.35)',
+              boxShadow: '0 15px 35px -5px rgba(15, 23, 42, 0.35)',
+              position: 'relative',
+              overflow: 'hidden'
             }}>
-              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#38BDF8', letterSpacing: '1px', textTransform: 'uppercase' }}>
-                01 / DOORSTEP CONVENIENCE
-              </span>
-              <h3 style={{ fontSize: '2rem', fontWeight: 900, margin: '0.5rem 0 1rem', lineHeight: 1.15 }}>
-                {cms.whyCard1Title}
-              </h3>
-              <p style={{ color: '#E2E8F0', fontSize: '0.95rem', lineHeight: 1.6, margin: 0 }}>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                  <span style={{ 
+                    fontSize: '0.75rem', 
+                    fontWeight: 800, 
+                    color: '#38BDF8', 
+                    letterSpacing: '1px', 
+                    textTransform: 'uppercase',
+                    background: 'rgba(56, 189, 248, 0.15)',
+                    padding: '0.35rem 0.75rem',
+                    borderRadius: '20px',
+                    border: '1px solid rgba(56, 189, 248, 0.3)'
+                  }}>
+                    01 • CONVENIENCE
+                  </span>
+                  <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'rgba(56, 189, 248, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38BDF8' }}>
+                    <Car size={22} />
+                  </div>
+                </div>
+
+                <h3 style={{ 
+                  fontSize: '1.45rem', 
+                  fontWeight: 900, 
+                  margin: '0 0 0.85rem', 
+                  lineHeight: 1.25, 
+                  color: '#FFFFFF' 
+                }}>
+                  {cms.whyCard1Title}
+                </h3>
+              </div>
+
+              <p style={{ color: '#E2E8F0', fontSize: '0.92rem', lineHeight: 1.6, margin: 0 }}>
                 {cms.whyCard1Text}
               </p>
             </div>
 
-            {/* 3 Secondary Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', gridColumn: 'span 2' }}>
-              <div style={{ background: 'white', padding: '2rem', borderRadius: '20px', border: '1px solid #E2E8F0', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0284C7' }}>02 / SPEED</span>
-                <h4 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0F172A', margin: '0.5rem 0 0.75rem' }}>{cms.whyCard2Title}</h4>
-                <p style={{ color: '#64748B', fontSize: '0.9rem', lineHeight: 1.6, margin: 0 }}>{cms.whyCard2Text}</p>
+            {/* Card 02 */}
+            <div style={{
+              borderRadius: '24px',
+              padding: '2.25rem 2rem',
+              background: 'white',
+              border: '1px solid #E2E8F0',
+              boxShadow: '0 8px 25px rgba(0,0,0,0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              minHeight: '280px',
+              transition: 'transform 0.2s, box-shadow 0.2s'
+            }}>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                  <span style={{ 
+                    fontSize: '0.75rem', 
+                    fontWeight: 800, 
+                    color: '#0284C7', 
+                    letterSpacing: '1px', 
+                    textTransform: 'uppercase',
+                    background: '#EFF6FF',
+                    padding: '0.35rem 0.75rem',
+                    borderRadius: '20px',
+                    border: '1px solid #BAE6FD'
+                  }}>
+                    02 • SPEED
+                  </span>
+                  <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#F0F9FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284C7' }}>
+                    <Clock size={22} />
+                  </div>
+                </div>
+
+                <h3 style={{ 
+                  fontSize: '1.35rem', 
+                  fontWeight: 800, 
+                  color: '#0F172A', 
+                  margin: '0 0 0.85rem', 
+                  lineHeight: 1.3 
+                }}>
+                  {cms.whyCard2Title}
+                </h3>
               </div>
 
-              <div style={{ background: 'white', padding: '2rem', borderRadius: '20px', border: '1px solid #E2E8F0', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0284C7' }}>03 / SPECIALISTS</span>
-                <h4 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0F172A', margin: '0.5rem 0 0.75rem' }}>{cms.whyCard3Title}</h4>
-                <p style={{ color: '#64748B', fontSize: '0.9rem', lineHeight: 1.6, margin: 0 }}>{cms.whyCard3Text}</p>
-              </div>
-
-              <div style={{ background: 'white', padding: '2rem', borderRadius: '20px', border: '1px solid #E2E8F0', boxShadow: '0 4px 15px rgba(0,0,0,0.03)', gridColumn: 'span 2' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0284C7' }}>04 / ECO-CONSCIOUS</span>
-                <h4 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0F172A', margin: '0.5rem 0 0.75rem' }}>{cms.whyCard4Title}</h4>
-                <p style={{ color: '#64748B', fontSize: '0.9rem', lineHeight: 1.6, margin: 0 }}>{cms.whyCard4Text}</p>
-              </div>
+              <p style={{ color: '#64748B', fontSize: '0.92rem', lineHeight: 1.6, margin: 0 }}>
+                {cms.whyCard2Text}
+              </p>
             </div>
+
+            {/* Card 03 */}
+            <div style={{
+              borderRadius: '24px',
+              padding: '2.25rem 2rem',
+              background: 'white',
+              border: '1px solid #E2E8F0',
+              boxShadow: '0 8px 25px rgba(0,0,0,0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              minHeight: '280px',
+              transition: 'transform 0.2s, box-shadow 0.2s'
+            }}>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                  <span style={{ 
+                    fontSize: '0.75rem', 
+                    fontWeight: 800, 
+                    color: '#0284C7', 
+                    letterSpacing: '1px', 
+                    textTransform: 'uppercase',
+                    background: '#EFF6FF',
+                    padding: '0.35rem 0.75rem',
+                    borderRadius: '20px',
+                    border: '1px solid #BAE6FD'
+                  }}>
+                    03 • SPECIALISTS
+                  </span>
+                  <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#F0F9FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284C7' }}>
+                    <Award size={22} />
+                  </div>
+                </div>
+
+                <h3 style={{ 
+                  fontSize: '1.35rem', 
+                  fontWeight: 800, 
+                  color: '#0F172A', 
+                  margin: '0 0 0.85rem', 
+                  lineHeight: 1.3 
+                }}>
+                  {cms.whyCard3Title}
+                </h3>
+              </div>
+
+              <p style={{ color: '#64748B', fontSize: '0.92rem', lineHeight: 1.6, margin: 0 }}>
+                {cms.whyCard3Text}
+              </p>
+            </div>
+
+            {/* Card 04 */}
+            <div style={{
+              borderRadius: '24px',
+              padding: '2.25rem 2rem',
+              background: 'white',
+              border: '1px solid #E2E8F0',
+              boxShadow: '0 8px 25px rgba(0,0,0,0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              minHeight: '280px',
+              transition: 'transform 0.2s, box-shadow 0.2s'
+            }}>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                  <span style={{ 
+                    fontSize: '0.75rem', 
+                    fontWeight: 800, 
+                    color: '#0284C7', 
+                    letterSpacing: '1px', 
+                    textTransform: 'uppercase',
+                    background: '#EFF6FF',
+                    padding: '0.35rem 0.75rem',
+                    borderRadius: '20px',
+                    border: '1px solid #BAE6FD'
+                  }}>
+                    04 • ECO-CONSCIOUS
+                  </span>
+                  <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#F0F9FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284C7' }}>
+                    <Droplets size={22} />
+                  </div>
+                </div>
+
+                <h3 style={{ 
+                  fontSize: '1.35rem', 
+                  fontWeight: 800, 
+                  color: '#0F172A', 
+                  margin: '0 0 0.85rem', 
+                  lineHeight: 1.3 
+                }}>
+                  {cms.whyCard4Title}
+                </h3>
+              </div>
+
+              <p style={{ color: '#64748B', fontSize: '0.92rem', lineHeight: 1.6, margin: 0 }}>
+                {cms.whyCard4Text}
+              </p>
+            </div>
+
           </div>
         </div>
       </section>
@@ -1498,7 +1962,7 @@ const Home = () => {
                 <span style={{ background: 'rgba(56, 189, 248, 0.2)', color: '#38BDF8', padding: '0.35rem 0.85rem', borderRadius: '15px', fontSize: '0.75rem', fontWeight: 800 }}>
                   MOBILE FRANCHISE
                 </span>
-                <h3 style={{ fontSize: '1.8rem', fontWeight: 900, margin: '1rem 0 0.5rem' }}>
+                <h3 style={{ fontSize: '1.8rem', fontWeight: 900, margin: '1rem 0 0.5rem', color: '#FFFFFF' }}>
                   {cms.doorstepPlanTitle}
                 </h3>
                 <div style={{ fontSize: '2.4rem', fontWeight: 900, color: '#FACC15', margin: '0.5rem 0 1.5rem' }}>
@@ -1515,7 +1979,7 @@ const Home = () => {
               </div>
 
               <a 
-                href={`https://wa.me/${cleanWhatsappNumber}?text=Hi%20Wash%20My%20Car%2C%20I%20am%20interested%20in%20the%20Doorstep%20Franchise%20Partner%20model.`}
+                href={`https://wa.me/${cleanWhatsappNumber}?text=Hi%20Wash%20My%20Car%20Org%2C%20I%20am%20interested%20in%20the%20Doorstep%20Franchise%20Partner%20model.`}
                 target="_blank" 
                 rel="noopener noreferrer"
                 style={{ 
@@ -1553,7 +2017,7 @@ const Home = () => {
                 <span style={{ background: 'rgba(255, 255, 255, 0.2)', color: 'white', padding: '0.35rem 0.85rem', borderRadius: '15px', fontSize: '0.75rem', fontWeight: 800 }}>
                   FIXED DETAILING STUDIO
                 </span>
-                <h3 style={{ fontSize: '1.8rem', fontWeight: 900, margin: '1rem 0 0.5rem' }}>
+                <h3 style={{ fontSize: '1.8rem', fontWeight: 900, margin: '1rem 0 0.5rem', color: '#FFFFFF' }}>
                   {cms.outletPlanTitle}
                 </h3>
                 <div style={{ fontSize: '2.4rem', fontWeight: 900, color: '#FACC15', margin: '0.5rem 0 1.5rem' }}>
@@ -1570,7 +2034,7 @@ const Home = () => {
               </div>
 
               <a 
-                href={`https://wa.me/${cleanWhatsappNumber}?text=Hi%20Wash%20My%20Car%2C%20I%20am%20interested%20in%20the%20Fixed%20Outlet%20Partner%20model.`}
+                href={`https://wa.me/${cleanWhatsappNumber}?text=Hi%20Wash%20My%20Car%20Org%2C%20I%20am%20interested%20in%20the%20Fixed%20Outlet%20Partner%20model.`}
                 target="_blank" 
                 rel="noopener noreferrer"
                 style={{ 
@@ -1657,100 +2121,402 @@ const Home = () => {
       </section>
 
       {/* 10. SERVING COVERAGE & CONTACT HELPDESK */}
-      <section id="contact" style={{ padding: '6rem 6%', background: 'white' }}>
+      <section id="contact" style={{ padding: '6rem 6%', background: '#F8FAFC' }}>
         <div style={{ maxWidth: '1240px', margin: '0 auto' }}>
-          <div className="grid md:grid-cols-2 gap-12 items-center">
+          <div className="grid lg:grid-cols-2 gap-12 items-start">
             
+            {/* Left Column: Direct Info & Service Areas */}
             <div>
-              <span style={{ color: '#0284C7', fontWeight: 800, fontSize: '0.85rem', letterSpacing: '1px', textTransform: 'uppercase' }}>
+              <span style={{ 
+                color: '#0284C7', 
+                fontWeight: 800, 
+                fontSize: '0.85rem', 
+                letterSpacing: '1.2px', 
+                textTransform: 'uppercase',
+                background: '#EFF6FF',
+                padding: '0.35rem 0.85rem',
+                borderRadius: '20px',
+                border: '1px solid #BAE6FD'
+              }}>
                 GET IN TOUCH
               </span>
-              <h2 style={{ fontSize: '2.4rem', fontWeight: 900, color: '#0F172A', marginTop: '0.5rem', marginBottom: '1rem' }}>
+              <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 900, color: '#0F172A', marginTop: '0.85rem', marginBottom: '1rem', lineHeight: 1.15 }}>
                 We Service Visakhapatnam & Surrounds
               </h2>
-              <p style={{ color: '#64748B', marginBottom: '2rem', lineHeight: 1.6 }}>
-                Questions about doorstep packages, fleet washes, or custom corporate subscriptions? Reach out anytime.
+              <p style={{ color: '#64748B', marginBottom: '2rem', lineHeight: 1.6, fontSize: '1.02rem' }}>
+                Questions about doorstep packages, fleet washes, special requirements, or custom corporate subscriptions? Reach out anytime.
               </p>
               
-              <div style={{ background: 'linear-gradient(135deg, #0F172A, #1E293B)', color: 'white', padding: '2rem', borderRadius: '20px', boxShadow: '0 15px 30px rgba(0,0,0,0.1)' }}>
+              <div style={{ 
+                background: 'linear-gradient(135deg, #0F172A, #1E293B)', 
+                color: 'white', 
+                padding: '2rem', 
+                borderRadius: '24px', 
+                boxShadow: '0 15px 35px rgba(15,23,42,0.15)',
+                border: '1px solid rgba(255,255,255,0.08)'
+              }}>
                 <h3 style={{ color: 'white', margin: '0 0 1.5rem 0', fontWeight: 800, fontSize: '1.25rem' }}>Help Desk Contacts</h3>
                 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <div style={{ background: 'rgba(56, 189, 248, 0.15)', padding: '0.6rem', borderRadius: '12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.35rem' }}>
+                  <a 
+                    href={`tel:${(cms.contactPhone || '+919876543210').replace(/\s+/g, '')}`} 
+                    style={{ display: 'flex', alignItems: 'center', gap: '1rem', textDecoration: 'none', color: 'white' }}
+                  >
+                    <div style={{ background: 'rgba(56, 189, 248, 0.15)', padding: '0.7rem', borderRadius: '14px', border: '1px solid rgba(56,189,248,0.3)' }}>
                       <Phone size={20} color="#38BDF8" />
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 600 }}>Helpline Hotline</div>
-                      <span style={{ fontWeight: 800, fontSize: '1.05rem', color: 'white' }}>{cms.contactPhone}</span>
+                      <div style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 600 }}>Helpline Hotline (Call anytime)</div>
+                      <span style={{ fontWeight: 800, fontSize: '1.1rem', color: 'white' }}>{cms.contactPhone}</span>
                     </div>
-                  </div>
+                  </a>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <div style={{ background: 'rgba(56, 189, 248, 0.15)', padding: '0.6rem', borderRadius: '12px' }}>
+                  <a 
+                    href={`mailto:${cms.contactEmail || 'washmycarorg@gmail.com'}`} 
+                    style={{ display: 'flex', alignItems: 'center', gap: '1rem', textDecoration: 'none', color: 'white' }}
+                  >
+                    <div style={{ background: 'rgba(56, 189, 248, 0.15)', padding: '0.7rem', borderRadius: '14px', border: '1px solid rgba(56,189,248,0.3)' }}>
                       <Mail size={20} color="#38BDF8" />
                     </div>
                     <div>
                       <div style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 600 }}>Email Support</div>
                       <span style={{ fontWeight: 800, fontSize: '1.05rem', color: 'white' }}>{cms.contactEmail}</span>
                     </div>
-                  </div>
+                  </a>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <div style={{ background: 'rgba(56, 189, 248, 0.15)', padding: '0.6rem', borderRadius: '12px' }}>
+                    <div style={{ background: 'rgba(56, 189, 248, 0.15)', padding: '0.7rem', borderRadius: '14px', border: '1px solid rgba(56,189,248,0.3)' }}>
                       <MapPin size={20} color="#38BDF8" />
                     </div>
                     <div>
                       <div style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 600 }}>Headquarters</div>
-                      <span style={{ fontWeight: 800, fontSize: '0.95rem', color: 'white' }}>{cms.contactAddress}</span>
+                      <span style={{ fontWeight: 800, fontSize: '0.98rem', color: 'white' }}>{cms.contactAddress}</span>
                     </div>
                   </div>
+                </div>
+
+                <div style={{ marginTop: '1.75rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                  <a
+                    href={`https://wa.me/${cleanWhatsappNumber}?text=Hi%20Wash%20My%20Car%20Org%2C%20I%20have%20an%20inquiry%20regarding%20car%20wash.`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      background: '#22C55E',
+                      color: 'white',
+                      padding: '0.75rem 1.25rem',
+                      borderRadius: '16px',
+                      fontWeight: 800,
+                      fontSize: '0.9rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      textDecoration: 'none',
+                      boxShadow: '0 4px 15px rgba(34, 197, 94, 0.35)',
+                      transition: 'transform 0.2s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+                    onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                  >
+                    <MessageCircle size={18} /> Chat with Us on WhatsApp Directly
+                  </a>
+                </div>
+              </div>
+
+              {/* Service Areas Coverage Pills */}
+              <div style={{ marginTop: '2rem' }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <MapPin size={15} color="#0EA5E9" /> Active Doorstep Service Zones:
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  {['Sujatha Nagar', 'MVP Colony', 'Gajuwaka', 'Madhurawada', 'Siripuram', 'Rushikonda', 'Pendurthi', 'NAD Junction', 'Akkayyapalem'].map((zone, zi) => (
+                    <span 
+                      key={zi}
+                      style={{
+                        background: 'white',
+                        border: '1px solid #CBD5E1',
+                        borderRadius: '20px',
+                        padding: '0.35rem 0.85rem',
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        color: '#334155'
+                      }}
+                    >
+                      ✓ {zone}
+                    </span>
+                  ))}
                 </div>
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <div 
-                ref={mapContainerRef} 
-                style={{ 
-                  width: '100%', 
-                  height: '280px', 
-                  borderRadius: '20px', 
-                  border: '1px solid #E2E8F0',
-                  boxShadow: '0 10px 25px rgba(0,0,0,0.08)', 
-                  marginBottom: '1.5rem',
-                  overflow: 'hidden'
-                }} 
-              />
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
-                  <input type="text" placeholder="Your Name" className="form-input" style={{ borderRadius: '10px', padding: '0.85rem 1rem', margin: 0 }} />
-                  <input type="tel" placeholder="Phone Number" className="form-input" style={{ borderRadius: '10px', padding: '0.85rem 1rem', margin: 0 }} />
-                </div>
-                <textarea placeholder="Tell us about your requirement or vehicle model..." className="form-input" style={{ height: '90px', resize: 'none', borderRadius: '10px', padding: '0.85rem 1rem', margin: 0 }}></textarea>
-                <button 
-                  onClick={() => alert("Message received! Our customer success coordinator will reach out shortly.")}
-                  style={{
-                    background: 'linear-gradient(135deg, #0EA5E9, #0284C7)',
-                    color: 'white',
-                    border: 'none',
-                    padding: '0.9rem',
-                    borderRadius: '12px',
-                    fontWeight: 800,
-                    fontSize: '0.95rem',
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 15px rgba(14,165,233,0.3)'
-                  }}
-                >
+            {/* Right Column: High-End Contact Form Card */}
+            <div style={{
+              background: 'white',
+              borderRadius: '24px',
+              border: '1px solid #E2E8F0',
+              boxShadow: '0 20px 45px -10px rgba(0,0,0,0.07)',
+              padding: '2.5rem',
+              position: 'relative'
+            }}>
+              <div style={{ marginBottom: '1.75rem' }}>
+                <h3 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0F172A', margin: '0 0 0.4rem 0' }}>
                   Send Inquiry Message
-                </button>
+                </h3>
+                <p style={{ color: '#64748B', fontSize: '0.9rem', margin: 0, lineHeight: 1.5 }}>
+                  Leave your requirement and vehicle details. Our customer success coordinator will call you back within 15 minutes.
+                </p>
               </div>
+
+              {contactSubmitted ? (
+                <div style={{
+                  background: '#F0FDF4',
+                  border: '1.5px solid #86EFAC',
+                  borderRadius: '20px',
+                  padding: '2.5rem 1.5rem',
+                  textAlign: 'center',
+                  animation: 'fadeIn 0.4s ease-out'
+                }}>
+                  <div style={{
+                    width: '60px',
+                    height: '60px',
+                    borderRadius: '50%',
+                    background: '#DCFCE7',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#16A34A',
+                    margin: '0 auto 1.25rem'
+                  }}>
+                    <CheckCircle size={32} />
+                  </div>
+                  <h4 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#166534', margin: '0 0 0.5rem 0' }}>
+                    Inquiry Received Successfully!
+                  </h4>
+                  <p style={{ color: '#15803D', fontSize: '0.95rem', lineHeight: 1.6, maxWidth: '400px', margin: '0 auto 1.5rem' }}>
+                    Thank you, <strong>{contactForm.name}</strong>! Our representative will call you at <strong>{contactForm.phone}</strong> shortly to discuss your vehicle wash requirements.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setContactSubmitted(false);
+                      setContactForm({ name: '', phone: '', email: '', service: 'Doorstep Car Wash', message: '' });
+                    }}
+                    style={{
+                      background: '#16A34A',
+                      color: 'white',
+                      border: 'none',
+                      padding: '0.65rem 1.5rem',
+                      borderRadius: '20px',
+                      fontWeight: 800,
+                      fontSize: '0.88rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Send Another Message
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleContactSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+                  {contactError && (
+                    <div style={{
+                      background: '#FEF2F2',
+                      border: '1px solid #FCA5A5',
+                      color: '#B91C1C',
+                      padding: '0.75rem 1rem',
+                      borderRadius: '12px',
+                      fontSize: '0.85rem',
+                      fontWeight: 600
+                    }}>
+                      ⚠️ {contactError}
+                    </div>
+                  )}
+
+                  {/* Name and Phone */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: '#334155', marginBottom: '0.4rem' }}>
+                        Your Name *
+                      </label>
+                      <div style={{ position: 'relative' }}>
+                        <User size={16} color="#94A3B8" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)' }} />
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Rahul Sharma"
+                          value={contactForm.name}
+                          onChange={e => setContactForm({ ...contactForm, name: e.target.value })}
+                          style={{
+                            width: '100%',
+                            padding: '0.85rem 1rem 0.85rem 2.6rem',
+                            borderRadius: '14px',
+                            border: '1.5px solid #CBD5E1',
+                            fontSize: '0.92rem',
+                            outline: 'none',
+                            boxSizing: 'border-box'
+                          }}
+                          onFocus={e => e.target.style.borderColor = '#0EA5E9'}
+                          onBlur={e => e.target.style.borderColor = '#CBD5E1'}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: '#334155', marginBottom: '0.4rem' }}>
+                        Phone Number *
+                      </label>
+                      <div style={{ position: 'relative' }}>
+                        <Phone size={16} color="#94A3B8" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)' }} />
+                        <input
+                          type="tel"
+                          required
+                          placeholder="e.g. +91 98765 43210"
+                          value={contactForm.phone}
+                          onChange={e => setContactForm({ ...contactForm, phone: e.target.value })}
+                          style={{
+                            width: '100%',
+                            padding: '0.85rem 1rem 0.85rem 2.6rem',
+                            borderRadius: '14px',
+                            border: '1.5px solid #CBD5E1',
+                            fontSize: '0.92rem',
+                            outline: 'none',
+                            boxSizing: 'border-box'
+                          }}
+                          onFocus={e => e.target.style.borderColor = '#0EA5E9'}
+                          onBlur={e => e.target.style.borderColor = '#CBD5E1'}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Email & Preferred Service */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: '#334155', marginBottom: '0.4rem' }}>
+                        Email (Optional)
+                      </label>
+                      <div style={{ position: 'relative' }}>
+                        <Mail size={16} color="#94A3B8" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)' }} />
+                        <input
+                          type="email"
+                          placeholder="e.g. rahul@gmail.com"
+                          value={contactForm.email}
+                          onChange={e => setContactForm({ ...contactForm, email: e.target.value })}
+                          style={{
+                            width: '100%',
+                            padding: '0.85rem 1rem 0.85rem 2.6rem',
+                            borderRadius: '14px',
+                            border: '1.5px solid #CBD5E1',
+                            fontSize: '0.92rem',
+                            outline: 'none',
+                            boxSizing: 'border-box'
+                          }}
+                          onFocus={e => e.target.style.borderColor = '#0EA5E9'}
+                          onBlur={e => e.target.style.borderColor = '#CBD5E1'}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: '#334155', marginBottom: '0.4rem' }}>
+                        Service Interested In
+                      </label>
+                      <select
+                        value={contactForm.service}
+                        onChange={e => setContactForm({ ...contactForm, service: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '0.85rem 1rem',
+                          borderRadius: '14px',
+                          border: '1.5px solid #CBD5E1',
+                          fontSize: '0.92rem',
+                          outline: 'none',
+                          boxSizing: 'border-box',
+                          background: 'white'
+                        }}
+                        onFocus={e => e.target.style.borderColor = '#0EA5E9'}
+                        onBlur={e => e.target.style.borderColor = '#CBD5E1'}
+                      >
+                        <option value="Doorstep Car Wash">Doorstep Car Wash</option>
+                        <option value="Deep Interior & Steam Spa">Deep Interior & Steam Spa</option>
+                        <option value="Full Vehicle Detailing Spa">Full Vehicle Detailing Spa</option>
+                        <option value="9H Ceramic & Paint Protection">9H Ceramic & Paint Protection</option>
+                        <option value="Bike & Helmet Wash Add-on">Bike & Helmet Wash Add-on</option>
+                        <option value="Franchise Partnership">Franchise Partnership</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Message / Vehicle Details */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: '#334155', marginBottom: '0.4rem' }}>
+                      Tell us about your requirement or vehicle model
+                    </label>
+                    <textarea
+                      placeholder="e.g. Hyundai Creta located at Sujatha Nagar, looking for deep interior steam and exterior foam wash this weekend..."
+                      value={contactForm.message}
+                      onChange={e => setContactForm({ ...contactForm, message: e.target.value })}
+                      style={{
+                        width: '100%',
+                        height: '110px',
+                        padding: '0.85rem 1rem',
+                        borderRadius: '14px',
+                        border: '1.5px solid #CBD5E1',
+                        fontSize: '0.92rem',
+                        outline: 'none',
+                        resize: 'none',
+                        boxSizing: 'border-box',
+                        fontFamily: 'inherit'
+                      }}
+                      onFocus={e => e.target.style.borderColor = '#0EA5E9'}
+                      onBlur={e => e.target.style.borderColor = '#CBD5E1'}
+                    />
+                  </div>
+
+                  {/* Submit Button */}
+                  <button
+                    type="submit"
+                    disabled={isSubmittingContact}
+                    style={{
+                      background: 'linear-gradient(135deg, #0EA5E9, #0284C7)',
+                      color: 'white',
+                      border: 'none',
+                      padding: '1rem',
+                      borderRadius: '16px',
+                      fontWeight: 800,
+                      fontSize: '1rem',
+                      cursor: isSubmittingContact ? 'not-allowed' : 'pointer',
+                      opacity: isSubmittingContact ? 0.7 : 1,
+                      boxShadow: '0 8px 20px rgba(14,165,233,0.35)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      marginTop: '0.5rem',
+                      transition: 'transform 0.2s, box-shadow 0.2s'
+                    }}
+                    onMouseEnter={e => {
+                      if (!isSubmittingContact) {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 12px 25px rgba(14,165,233,0.45)';
+                      }
+                    }}
+                    onMouseLeave={e => {
+                      if (!isSubmittingContact) {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 8px 20px rgba(14,165,233,0.35)';
+                      }
+                    }}
+                  >
+                    <Send size={18} />
+                    <span>{isSubmittingContact ? 'Sending Inquiry...' : 'Send Inquiry Message'}</span>
+                  </button>
+                </form>
+              )}
             </div>
 
           </div>
         </div>
       </section>
+
 
       {/* 11. PREMIUM FOOTER */}
       <footer style={{
@@ -1764,18 +2530,18 @@ const Home = () => {
             <div style={{ background: 'white', padding: '0.2rem', borderRadius: '8px', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <img src={logo} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
             </div>
-            <span style={{ fontWeight: 900, color: 'white', fontSize: '1.1rem' }}>WASH MY CAR</span>
+            <span style={{ fontWeight: 900, color: 'white', fontSize: '1.1rem' }}>WASH MY CAR ORG</span>
           </div>
 
           <div style={{ display: 'flex', gap: '1.5rem', fontWeight: 600, fontSize: '0.85rem' }}>
             <a href="#packages" style={{ color: '#CBD5E1' }}>Services</a>
-            <a href="#why-us" style={{ color: '#CBD5E1' }}>Why Wash My Car</a>
+            <a href="#why-us" style={{ color: '#CBD5E1' }}>Why Wash My Car Org</a>
             <a href="#partners" style={{ color: '#CBD5E1' }}>Franchise</a>
             <a href="#faq" style={{ color: '#CBD5E1' }}>FAQ</a>
           </div>
 
           <div style={{ fontSize: '0.82rem' }}>
-            © 2026 Wash My Car Doorstep Care. All rights reserved.
+            © 2026 Wash My Car Org Doorstep Care. All rights reserved.
           </div>
         </div>
       </footer>

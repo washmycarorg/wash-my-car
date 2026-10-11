@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { getOffers, createOffer, updateOffer, deleteOffer, getUsers, getCarTypes, getWashTypes } from '../api';
+import { getOffers, createOffer, updateOffer, deleteOffer, getUsers, getCarTypes, getWashTypes, getAddons } from '../api';
 
 const Offers = () => {
   const [offers, setOffers] = useState([]);
   const [users, setUsers] = useState([]);
   const [carTypes, setCarTypes] = useState([]);
   const [washTypes, setWashTypes] = useState([]);
+  const [addons, setAddons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
   
@@ -20,6 +21,11 @@ const Offers = () => {
     maxDiscountAmount: '',
     applicableCarTypeIds: [], // array of ids
     applicableWashTypeIds: [], // array of ids
+    addonPerkType: 'NONE', // 'NONE', 'FREE', 'DISCOUNT'
+    freeAddonId: '',
+    discountAddonId: '',
+    addonDiscountType: 'PERCENTAGE',
+    addonDiscountValue: '',
     validUntil: '',
     userType: 'ALL',
     usageLimit: 0,
@@ -32,16 +38,18 @@ const Offers = () => {
 
   const fetchData = async () => {
     try {
-      const [offersRes, usersRes, ctRes, wtRes] = await Promise.all([
+      const [offersRes, usersRes, ctRes, wtRes, addonsRes] = await Promise.all([
         getOffers(),
         getUsers(),
         getCarTypes().catch(() => []),
-        getWashTypes().catch(() => [])
+        getWashTypes().catch(() => []),
+        getAddons().catch(() => [])
       ]);
       setOffers(offersRes);
       setUsers(usersRes);
       setCarTypes(ctRes);
       setWashTypes(wtRes);
+      setAddons(addonsRes);
     } catch (err) {
       console.error(err);
     } finally {
@@ -63,6 +71,10 @@ const Offers = () => {
         maxDiscountAmount: (formData.discountType === 'PERCENTAGE' && formData.limitOption === 'UP_TO') ? Number(formData.maxDiscountAmount || 0) : null,
         applicableCarTypeIds: formData.applicableCarTypeIds.join(','),
         applicableWashTypeIds: formData.applicableWashTypeIds.join(','),
+        freeAddonId: formData.addonPerkType === 'FREE' && formData.freeAddonId ? Number(formData.freeAddonId) : null,
+        discountAddonId: formData.addonPerkType === 'DISCOUNT' && formData.discountAddonId ? Number(formData.discountAddonId) : null,
+        addonDiscountType: formData.addonPerkType === 'DISCOUNT' ? formData.addonDiscountType : null,
+        addonDiscountValue: formData.addonPerkType === 'DISCOUNT' && formData.addonDiscountValue ? Number(formData.addonDiscountValue) : null,
         usageLimit: formData.rotation === 'UNLIMITED' ? 0 : Number(formData.usageLimit),
         eligibleUserIds: formData.userType === 'SELECTED' ? formData.eligibleUserIds.map(Number) : []
       };
@@ -86,6 +98,10 @@ const Offers = () => {
 
   const handleEdit = (offer) => {
     setEditingId(offer.id);
+    let perkType = 'NONE';
+    if (offer.freeAddonId) perkType = 'FREE';
+    else if (offer.discountAddonId) perkType = 'DISCOUNT';
+
     setFormData({
       code: offer.code,
       title: offer.title,
@@ -97,6 +113,11 @@ const Offers = () => {
       maxDiscountAmount: offer.maxDiscountAmount || '',
       applicableCarTypeIds: offer.applicableCarTypeIds ? offer.applicableCarTypeIds.split(',').filter(Boolean).map(Number) : [],
       applicableWashTypeIds: offer.applicableWashTypeIds ? offer.applicableWashTypeIds.split(',').filter(Boolean).map(Number) : [],
+      addonPerkType: perkType,
+      freeAddonId: offer.freeAddonId ? String(offer.freeAddonId) : '',
+      discountAddonId: offer.discountAddonId ? String(offer.discountAddonId) : '',
+      addonDiscountType: offer.addonDiscountType || 'PERCENTAGE',
+      addonDiscountValue: offer.addonDiscountValue !== null && offer.addonDiscountValue !== undefined ? String(offer.addonDiscountValue) : '',
       validUntil: offer.validUntil.split('T')[0],
       userType: offer.userType,
       usageLimit: offer.usageLimit,
@@ -350,7 +371,101 @@ const Offers = () => {
                 })}
                 {washTypes.length === 0 && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No wash types found</span>}
               </div>
-              <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: '0.2rem', fontSize: '0.75rem' }}>Leave unchecked for no constraints.</small>
+              <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: '0.2rem', fontSize: '0.75rem' }}>Leave unchecked for no constraints (applies to any wash package).</small>
+            </div>
+
+            {/* Add-on Perks (Free or Discounted Add-on) */}
+            <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div>
+                <label className="form-label" style={{ fontWeight: 700, color: 'var(--primary-navy)', marginBottom: '0.25rem' }}>
+                  🎁 Add-on Service Perk / Bundle (Optional)
+                </label>
+                <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  Configure free or discounted add-on service with any attached car wash package.
+                </p>
+              </div>
+
+              <select
+                className="form-input"
+                style={{ margin: 0 }}
+                value={formData.addonPerkType}
+                onChange={e => setFormData({
+                  ...formData,
+                  addonPerkType: e.target.value,
+                  freeAddonId: e.target.value === 'FREE' ? (addons[0]?.id ? String(addons[0].id) : '') : '',
+                  discountAddonId: e.target.value === 'DISCOUNT' ? (addons[0]?.id ? String(addons[0].id) : '') : ''
+                })}
+              >
+                <option value="NONE">No Add-on Perk (Standard Wash Discount Only)</option>
+                <option value="FREE">Give a 100% FREE Add-on</option>
+                <option value="DISCOUNT">Give a Decreased / Discounted Price on Add-on</option>
+              </select>
+
+              {formData.addonPerkType === 'FREE' && (
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Select Free Add-on</label>
+                  <select
+                    className="form-input"
+                    value={formData.freeAddonId}
+                    onChange={e => setFormData({ ...formData, freeAddonId: e.target.value })}
+                  >
+                    <option value="">-- Choose Add-on --</option>
+                    {addons.map(a => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} (Normal: ₹{a.price})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {formData.addonPerkType === 'DISCOUNT' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Select Add-on to Discount</label>
+                    <select
+                      className="form-input"
+                      value={formData.discountAddonId}
+                      onChange={e => setFormData({ ...formData, discountAddonId: e.target.value })}
+                    >
+                      <option value="">-- Choose Add-on --</option>
+                      {addons.map(a => (
+                        <option key={a.id} value={a.id}>
+                          {a.name} (Normal: ₹{a.price})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label">Discount Type</label>
+                      <select
+                        className="form-input"
+                        value={formData.addonDiscountType}
+                        onChange={e => setFormData({ ...formData, addonDiscountType: e.target.value })}
+                      >
+                        <option value="PERCENTAGE">Percentage (%)</option>
+                        <option value="FLAT">Flat Off (₹)</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label">
+                        {formData.addonDiscountType === 'PERCENTAGE' ? 'Discount %' : 'Flat Off (₹)'}
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        className="form-input"
+                        placeholder="e.g. 50"
+                        value={formData.addonDiscountValue}
+                        onChange={e => setFormData({ ...formData, addonDiscountValue: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="form-group" style={{ margin: 0 }}>
@@ -501,6 +616,22 @@ const Offers = () => {
                       <div>🚗 <strong style={{color: 'var(--text-main)'}}>Car types:</strong> {getApplicableCarTypesStr(o.applicableCarTypeIds)}</div>
                       <div>💧 <strong style={{color: 'var(--text-main)'}}>Wash types:</strong> {getApplicableWashTypesStr(o.applicableWashTypeIds)}</div>
                     </div>
+
+                    {/* Add-on perk badge */}
+                    {o.freeAddonId && (
+                      <div style={{ marginTop: '0.35rem' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', background: '#FEF3C7', color: '#92400E', padding: '0.15rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700 }}>
+                          🎁 100% Free Add-on Included: {addons.find(a => a.id === o.freeAddonId)?.name || `Add-on #${o.freeAddonId}`}
+                        </span>
+                      </div>
+                    )}
+                    {o.discountAddonId && (
+                      <div style={{ marginTop: '0.35rem' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', background: '#EFF6FF', color: '#1E40AF', padding: '0.15rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700 }}>
+                          ✨ Add-on Discount ({o.addonDiscountType === 'PERCENTAGE' ? `${o.addonDiscountValue}% OFF` : `₹${o.addonDiscountValue} OFF`}): {addons.find(a => a.id === o.discountAddonId)?.name || `Add-on #${o.discountAddonId}`}
+                        </span>
+                      </div>
+                    )}
                   </td>
 
                   <td style={{ padding: '1rem 1.5rem', fontSize: '0.9rem' }}>

@@ -1,6 +1,8 @@
 import express from 'express';
 import { verifyToken, requireAdmin } from '../middlewares/authMiddleware.js';
 import * as adminController from '../controllers/adminController.js';
+import { getAdminInquiries, updateInquiryStatus, deleteInquiry } from '../controllers/inquiryController.js';
+import { getAdminSlotsConfig, updateAdminSlotsConfig } from '../controllers/slotController.js';
 
 const router = express.Router();
 
@@ -75,5 +77,14 @@ router.put('/settings', adminController.updateSystemSettings);
 // Homepage CMS settings
 router.get('/cms', adminController.getCmsContent);
 router.put('/cms', adminController.updateCmsContent);
+
+// Inquiries & Complaints
+router.get('/inquiries', getAdminInquiries);
+router.put('/inquiries/:id', updateInquiryStatus);
+router.delete('/inquiries/:id', deleteInquiry);
+
+// Slot Configuration & Zone Dispatch
+router.get('/slots-config', getAdminSlotsConfig);
+router.put('/slots-config', updateAdminSlotsConfig);
 
 export default router;

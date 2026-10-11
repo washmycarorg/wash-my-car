@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import FloatingDock from './FloatingDock';
 import { getProfile } from '../api';
 
 const DashboardLayout = ({ children }) => {
@@ -18,9 +19,11 @@ const DashboardLayout = ({ children }) => {
       <Header toggleSidebar={() => setIsSidebarOpen(true)} profile={profile} />
       <Sidebar isOpen={isSidebarOpen} closeSidebar={() => setIsSidebarOpen(false)} />
       
-      <main style={{flex: 1, padding: '1.5rem 1rem', overflowX: 'hidden'}}>
+      <main style={{flex: 1, padding: '1.5rem 1rem 6.5rem 1rem', overflowX: 'hidden'}}>
         {children}
       </main>
+
+      <FloatingDock onOpenMenu={() => setIsSidebarOpen(true)} />
     </div>
   );
 };

@@ -1,22 +1,40 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { User as UserIcon, Phone, ArrowLeft } from 'lucide-react';
-import { registerUser } from '../api';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { User as UserIcon, Phone, ArrowLeft, Gift } from 'lucide-react';
+import { registerUser, getSettings } from '../api';
 import logo from '../assets/wash my car.png';
 
 const Register = ({ setAuth }) => {
-  const [formData, setFormData] = useState({ name: '', phone: '' });
+  const [searchParams] = useSearchParams();
+  const refFromUrl = searchParams.get('ref') || '';
+  const [formData, setFormData] = useState({ name: '', phone: '', referralCode: refFromUrl });
+  const [referralEnabled, setReferralEnabled] = useState(true);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const navigate = useNavigate();
+
+  useEffect(() => {
+    getSettings()
+      .then(res => {
+        if (res && res.referralEnabled !== undefined) {
+          setReferralEnabled(!!res.referralEnabled);
+        }
+      })
+      .catch(console.warn);
+  }, []);
+
+  useEffect(() => {
+    if (refFromUrl) {
+      setFormData(prev => ({ ...prev, referralCode: refFromUrl }));
+    }
+  }, [refFromUrl]);
 
   const handleRegister = async (e) => {
     e.preventDefault();
     try {
       await registerUser(formData);
       setSuccessMsg('Registration successful! Please login with your phone and OTP (1234).');
-      // Clear form
-      setFormData({ name: '', phone: '' });
+      setFormData({ name: '', phone: '', referralCode: '' });
     } catch (err) {
       setError(err.response?.data?.error || 'Registration failed');
     }
@@ -87,6 +105,30 @@ const Register = ({ setAuth }) => {
                 <input type="tel" required className="form-input" style={{paddingLeft: '2.5rem'}} placeholder="+91 9876543210" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
               </div>
             </div>
+
+            {referralEnabled && (
+              <div className="form-group" style={{margin: 0}}>
+                <label className="form-label">
+                  Referral Code <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>(Optional)</span>
+                </label>
+                <div style={{position: 'relative'}}>
+                  <Gift size={18} style={{position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#0284C7'}} />
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    style={{paddingLeft: '2.5rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600}} 
+                    placeholder="e.g. WMC7X89" 
+                    value={formData.referralCode} 
+                    onChange={e => setFormData({...formData, referralCode: e.target.value.toUpperCase()})} 
+                  />
+                </div>
+                {formData.referralCode && (
+                  <small style={{ color: '#0369A1', fontSize: '0.75rem', marginTop: '0.2rem', display: 'block' }}>
+                    🎁 Referral code applied! Your friend will receive reward points upon your first wash.
+                  </small>
+                )}
+              </div>
+            )}
 
             <div className="flex items-center gap-2 mt-2 mb-4">
               <input type="checkbox" required id="terms" /> 
