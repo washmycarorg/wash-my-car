@@ -1,4 +1,5 @@
 import prisma from '../config/db.js';
+import { parseSlotTimeWindow } from './slotController.js';
 
 export const getProfile = async (req, res) => {
   try {
@@ -200,6 +201,47 @@ export const createBooking = async (req, res) => {
       return res.status(400).json({ 
         error: 'A vehicle car type and car wash package must be selected. Add-ons cannot be booked individually.' 
       });
+    }
+
+    // Validate booking date and time slot relative to current IST time
+    const now = new Date();
+    const istDateFormatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    const todayIst = istDateFormatter.format(now); // 'YYYY-MM-DD'
+
+    const bookingDateStr = String(date).split('T')[0];
+
+    if (bookingDateStr < todayIst) {
+      return res.status(400).json({ 
+        error: 'Cannot book for a past date. Please select today or a future date.' 
+      });
+    }
+
+    if (bookingDateStr === todayIst && timeSlot) {
+      const istTimeParts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Kolkata',
+        hour: 'numeric',
+        minute: 'numeric',
+        hour12: false
+      }).formatToParts(now);
+      let curH = 0;
+      let curM = 0;
+      for (const p of istTimeParts) {
+        if (p.type === 'hour') curH = parseInt(p.value, 10);
+        if (p.type === 'minute') curM = parseInt(p.value, 10);
+      }
+      const curMinutes = curH * 60 + curM;
+
+      const slotWindow = parseSlotTimeWindow(timeSlot);
+      if (slotWindow && slotWindow.startMinutes <= curMinutes) {
+        return res.status(400).json({
+          error: 'This time slot has already passed or is currently in progress for today. Please select an upcoming slot.'
+        });
+      }
     }
 
     // Validate that the slot is an approved admin-configured slot for this date

@@ -41,6 +41,14 @@ const renderAddonIcon = (iconName, isChecked = false, size = 18) => {
   return <Sparkles size={size} color={color} />;
 };
 
+const getTodayDateString = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const STEPS = [
   { id: 1, title: 'Vehicle', subtitle: 'Model & Number' },
   { id: 2, title: 'Wash Plan', subtitle: 'Select Package' },
@@ -124,10 +132,7 @@ const BookSlot = () => {
   const [addressError, setAddressError] = useState('');
 
   // STEP 6: Slot, Coupon & Review
-  const [date, setDate] = useState(() => {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
-  });
+  const [date, setDate] = useState(() => getTodayDateString());
   const [timeSlot, setTimeSlot] = useState('10:00 AM');
   const [availableSlotsList, setAvailableSlotsList] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
@@ -862,7 +867,7 @@ const BookSlot = () => {
         return;
       }
       if (!selectedSlotObj.available) {
-        alert('This arrival window is currently booked. Please select an available time window.');
+        alert(selectedSlotObj.reason || 'This arrival window is currently unavailable. Please select an available time window.');
         return;
       }
     } else if (!loadingSlots) {
@@ -2370,7 +2375,7 @@ const BookSlot = () => {
                 <input
                   type="date"
                   required
-                  min={new Date().toISOString().split('T')[0]}
+                  min={getTodayDateString()}
                   value={date}
                   onChange={e => setDate(e.target.value)}
                   className="form-input"
@@ -2450,11 +2455,12 @@ const BookSlot = () => {
                     return (
                       <div
                         key={item.slot}
+                        title={item.reason || ''}
                         onClick={() => {
                           if (isAvail) {
                             setTimeSlot(item.slot);
                           } else {
-                            alert('This arrival window is already booked. Please choose an available window.');
+                            alert(item.reason || 'This arrival window is currently unavailable. Please choose an available window.');
                           }
                         }}
                         style={{
@@ -2472,7 +2478,7 @@ const BookSlot = () => {
                               : '#F8FAFC',
                           boxShadow: isSelected ? '0 4px 14px rgba(2, 132, 199, 0.18)' : '0 1px 3px rgba(0,0,0,0.03)',
                           cursor: isAvail ? 'pointer' : 'not-allowed',
-                          opacity: isAvail ? 1 : 0.6,
+                          opacity: isAvail ? 1 : 0.65,
                           transition: 'all 0.18s ease',
                           display: 'flex',
                           alignItems: 'center',
@@ -2513,7 +2519,15 @@ const BookSlot = () => {
                               overflow: 'hidden',
                               whiteSpace: 'nowrap'
                             }}>
-                              {isAvail ? '✓ Available Window' : '🚫 Booked'}
+                              {isAvail 
+                                ? '✓ Available Window' 
+                                : (item.reason?.includes('passed') 
+                                    ? '⏳ Window Passed' 
+                                    : item.reason?.includes('progress') 
+                                      ? '⏳ In Progress' 
+                                      : item.reason?.includes('away') || item.reason?.includes('reach') || item.reason?.includes('Technician')
+                                        ? '🚫 Location Conflict'
+                                        : '🚫 Booked')}
                             </div>
                           </div>
                         </div>
@@ -2534,6 +2548,13 @@ const BookSlot = () => {
                       </div>
                     );
                   })}
+                </div>
+              )}
+
+              {!loadingSlots && availableSlotsList.length > 0 && !availableSlotsList.some(s => s.available) && (
+                <div style={{ marginTop: '0.85rem', padding: '0.75rem 1rem', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '10px', color: '#991B1B', fontSize: '0.84rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <AlertCircle size={16} color="#DC2626" style={{ flexShrink: 0 }} />
+                  <span>All arrival windows for {date === getTodayDateString() ? 'today have passed or are fully booked' : 'this date are currently unavailable'}. Please choose tomorrow or an upcoming date to schedule your wash!</span>
                 </div>
               )}
 

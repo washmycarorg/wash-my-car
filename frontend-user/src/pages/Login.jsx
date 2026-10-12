@@ -8,10 +8,14 @@ const Login = ({ setAuth }) => {
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    if (loading) return;
+    setError('');
+    setLoading(true);
     try {
       const res = await loginUser(phone, otp);
       localStorage.setItem('userToken', res.token);
@@ -19,7 +23,9 @@ const Login = ({ setAuth }) => {
       setAuth(true);
       navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed');
+      setError(err.response?.data?.message || err.message || 'Login failed');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -79,7 +85,7 @@ const Login = ({ setAuth }) => {
               <label className="form-label">Phone Number</label>
               <div style={{position: 'relative'}}>
                 <Mail size={18} style={{position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)'}} />
-                <input type="tel" required className="form-input" style={{paddingLeft: '2.5rem'}} placeholder="+91 9876543210" value={phone} onChange={e => setPhone(e.target.value)} />
+                <input type="tel" required disabled={loading} className="form-input" style={{paddingLeft: '2.5rem', opacity: loading ? 0.7 : 1}} placeholder="+91 9876543210" value={phone} onChange={e => setPhone(e.target.value)} />
               </div>
             </div>
             
@@ -87,18 +93,41 @@ const Login = ({ setAuth }) => {
               <label className="form-label">OTP (Use 1234)</label>
               <div style={{position: 'relative'}}>
                 <Lock size={18} style={{position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)'}} />
-                <input type="text" required className="form-input" style={{paddingLeft: '2.5rem'}} placeholder="1234" value={otp} onChange={e => setOtp(e.target.value)} />
+                <input type="text" required disabled={loading} className="form-input" style={{paddingLeft: '2.5rem', opacity: loading ? 0.7 : 1}} placeholder="1234" value={otp} onChange={e => setOtp(e.target.value)} />
               </div>
             </div>
 
             <div className="flex items-center justify-between mt-2 mb-4">
               <label className="flex items-center gap-2" style={{fontSize: '0.9rem', cursor: 'pointer'}}>
-                <input type="checkbox" /> Remember Me
+                <input type="checkbox" disabled={loading} /> Remember Me
               </label>
               <a href="#" className="text-blue" style={{fontSize: '0.9rem', fontWeight: 500}}>Forgot Password?</a>
             </div>
 
-            <button type="submit" className="btn btn-primary w-full" style={{padding: '1rem'}}>Login</button>
+            <button 
+              type="submit" 
+              disabled={loading} 
+              className="btn btn-primary w-full" 
+              style={{
+                padding: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.65rem',
+                opacity: loading ? 0.8 : 1,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              {loading ? (
+                <>
+                  <span className="spinner" />
+                  <span style={{ fontWeight: 600 }}>Signing In... Please wait</span>
+                </>
+              ) : (
+                <span style={{ fontWeight: 600 }}>Login</span>
+              )}
+            </button>
           </form>
 
           <p className="text-center mt-6" style={{fontSize: '0.95rem'}}>

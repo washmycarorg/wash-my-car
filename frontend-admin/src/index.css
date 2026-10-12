@@ -281,3 +281,8 @@ h3 { font-size: 1.25rem; font-weight: 600; color: var(--text-dark); }
   .grid-cols-2, .grid-cols-3 { grid-template-columns: 1fr; }
   .main-content { padding: 1rem; }
 }
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

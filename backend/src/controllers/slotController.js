@@ -18,6 +18,32 @@ export const DEFAULT_SLOTS = [
   '06:30 PM - 08:30 PM'
 ];
 
+// Helper to parse time window string into minute values from midnight
+export const parseSlotTimeWindow = (slotStr) => {
+  if (!slotStr || typeof slotStr !== 'string') return null;
+
+  const timeRegex = /(\d{1,2}):(\d{2})\s*(AM|PM)/gi;
+  const matches = [...slotStr.matchAll(timeRegex)];
+
+  if (matches.length === 0) return null;
+
+  const parseSingleTime = (match) => {
+    let hour = parseInt(match[1], 10);
+    const minute = parseInt(match[2], 10);
+    const meridiem = match[3].toUpperCase();
+
+    if (meridiem === 'PM' && hour !== 12) hour += 12;
+    if (meridiem === 'AM' && hour === 12) hour = 0;
+
+    return hour * 60 + minute;
+  };
+
+  const startMinutes = parseSingleTime(matches[0]);
+  const endMinutes = matches.length > 1 ? parseSingleTime(matches[1]) : startMinutes + 120;
+
+  return { startMinutes, endMinutes };
+};
+
 // Calculate realistic road transit distance from GPS coordinates (km)
 export const calculateCoordDistanceKm = (lat1, lon1, lat2, lon2) => {
   if (lat1 === undefined || lon1 === undefined || lat2 === undefined || lon2 === undefined ||
@@ -207,11 +233,70 @@ export const getAvailableBookingSlots = async (req, res) => {
       return getZoneDistance(bBookingItem.zone, targetZone, customMatrix);
     };
 
+    // Current IST date and time (Asia/Kolkata timezone)
+    const now = new Date();
+    const istDateFormatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    const todayIst = istDateFormatter.format(now); // 'YYYY-MM-DD'
+
+    const istTimeParts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Kolkata',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false
+    }).formatToParts(now);
+
+    let curH = 0;
+    let curM = 0;
+    for (const p of istTimeParts) {
+      if (p.type === 'hour') curH = parseInt(p.value, 10);
+      if (p.type === 'minute') curM = parseInt(p.value, 10);
+    }
+    const currentTotalMinutes = curH * 60 + curM;
+
+    const reqDateStr = String(date).split('T')[0];
+    const isPastDate = reqDateStr < todayIst;
+    const isToday = reqDateStr === todayIst;
+
     // Evaluate each configured slot
     const slotsResult = configuredSlots.map((slotTime, idx) => {
       const bookingsInThisSlot = bookingsBySlot[slotTime] || [];
 
-      // 1. Check direct capacity limit
+      // 1. If date is in the past, no slots can be booked
+      if (isPastDate) {
+        return {
+          slot: slotTime,
+          available: false,
+          reason: 'This date has already passed. Please select an upcoming date.',
+          bookedCount: bookingsInThisSlot.length,
+          capacity: activeWorkers,
+          isPastSlot: true
+        };
+      }
+
+      // 2. If date is today, customer cannot book up to current slot (past slots or current ongoing slot)
+      if (isToday) {
+        const slotWindow = parseSlotTimeWindow(slotTime);
+        if (slotWindow && slotWindow.startMinutes <= currentTotalMinutes) {
+          const isOngoing = currentTotalMinutes < slotWindow.endMinutes;
+          return {
+            slot: slotTime,
+            available: false,
+            reason: isOngoing 
+              ? 'This arrival window is currently in progress. Please select an upcoming slot.'
+              : 'This arrival window has already passed for today. Please select an upcoming slot.',
+            bookedCount: bookingsInThisSlot.length,
+            capacity: activeWorkers,
+            isPastSlot: true
+          };
+        }
+      }
+
+      // 3. Check direct capacity limit
       if (bookingsInThisSlot.length >= activeWorkers) {
         return {
           slot: slotTime,

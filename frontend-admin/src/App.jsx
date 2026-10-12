@@ -161,14 +161,20 @@ const AdminLogin = ({ setAuth }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    if (loading) return;
+    setError('');
+    setLoading(true);
     try {
       await loginAdmin(email, password);
       setAuth(true);
     } catch (err) {
       setError(err.message || 'Login failed');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -186,19 +192,49 @@ const AdminLogin = ({ setAuth }) => {
         <form className="flex-col flex gap-4" onSubmit={handleLogin}>
           <div className="form-group" style={{margin: 0}}>
             <label className="form-label">Email</label>
-            <input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="form-input" placeholder="admin@washmycar.com" required />
+            <input type="email" disabled={loading} value={email} onChange={e=>setEmail(e.target.value)} className="form-input" placeholder="admin@washmycar.com" required style={{ opacity: loading ? 0.7 : 1 }} />
           </div>
           <div className="form-group" style={{margin: 0}}>
             <label className="form-label">Password</label>
-            <input type="password" value={password} onChange={e=>setPassword(e.target.value)} className="form-input" placeholder="••••••••" required />
+            <input type="password" disabled={loading} value={password} onChange={e=>setPassword(e.target.value)} className="form-input" placeholder="••••••••" required style={{ opacity: loading ? 0.7 : 1 }} />
           </div>
           <div className="flex justify-between items-center" style={{marginTop: '-0.5rem'}}>
             <label className="flex items-center gap-2 text-sm text-muted cursor-pointer">
-              <input type="checkbox" /> Remember me
+              <input type="checkbox" disabled={loading} /> Remember me
             </label>
             <a href="#" className="text-sm text-blue" onClick={(e) => {e.preventDefault(); alert("Forgot password functionality coming soon!");}}>Forgot password?</a>
           </div>
-          <button type="submit" className="btn btn-primary w-full" style={{marginTop: '0.5rem'}}>Sign In</button>
+          <button 
+            type="submit" 
+            disabled={loading} 
+            className="btn btn-primary w-full" 
+            style={{
+              marginTop: '0.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem',
+              opacity: loading ? 0.8 : 1,
+              cursor: loading ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {loading ? (
+              <>
+                <span className="spinner" style={{
+                  width: '16px',
+                  height: '16px',
+                  border: '2px solid rgba(255,255,255,0.35)',
+                  borderTopColor: '#fff',
+                  borderRadius: '50%',
+                  display: 'inline-block',
+                  animation: 'spin 0.8s linear infinite'
+                }} />
+                <span>Signing In...</span>
+              </>
+            ) : (
+              <span>Sign In</span>
+            )}
+          </button>
         </form>
       </div>
     </div>
