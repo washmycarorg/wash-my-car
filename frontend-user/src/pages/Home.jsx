@@ -5,7 +5,7 @@ import {
   Mail, Award, Clock, Menu, X, Sparkles, Star, ChevronRight, Check, 
   Compass, Shield, Tag, ChevronDown, MessageCircle, ArrowRight,
   Flame, Bike, Feather, Smartphone, ExternalLink, HelpCircle,
-  ChevronLeft, Copy, Send, User
+  ChevronLeft, Copy, Send, User, Gift, Zap
 } from 'lucide-react';
 import { getHomeContent, getServiceAreas, getWashTypes, getAllWashPrices, getCarTypes, getAddons, getActiveCoupons, submitInquiry, getSettings } from '../api';
 
@@ -21,7 +21,7 @@ const DEFAULT_HERO_SLIDES = [
     title: 'WE WASH.\nYOU RELAX.',
     subtitle: 'Premium vehicle spa and car detailing at your doorstep. Save time, skip the queue, and let trained professionals care for your car.',
     image: 'https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=2200&q=95',
-    badgeText: 'WATER EFFICIENT & RO CARE',
+    badgeText: 'WATER EFFICIENT & SPOT-FREE CARE',
     ctaPrimary: 'Book Doorstep Wash',
     ctaSecondary: 'Explore Packages',
     primaryLink: '/login',
@@ -89,9 +89,9 @@ const Home = () => {
     servicesSubtitle: "One destination for your vehicle's everyday wash, interior deep steam, and premium shine.",
 
     whyTitle: "SMARTER CAR CARE. BUILT AROUND YOU.",
-    whySubtitle: "Convenience-first automotive detailing with professional equipment and RO water efficiency.",
+    whySubtitle: "Convenience-first automotive detailing with professional high-pressure equipment and deionized spot-free water.",
     whyCard1Title: "YOUR CAR STAYS. WE COME TO YOU.",
-    whyCard1Text: "No queues. No driving to wash centres. Our technicians arrive at your home or office with high-pressure machines and RO water.",
+    whyCard1Text: "No queues. No driving to wash centres. Our technicians arrive at your home or office with high-pressure machines and spot-free deionized water.",
     whyCard2Title: "Book in Seconds",
     whyCard2Text: "Choose your wash package, select your slot, and track everything live.",
     whyCard3Title: "Trained Specialists",
@@ -126,7 +126,7 @@ const Home = () => {
     promoText: "Claim Offer Now",
 
     faqs: [
-      { q: "How do I book a doorstep car wash?", a: "Simply select your vehicle type, pick your package & optional add-ons (like Helmet or Bike wash), choose a date and time slot, and our trained technician will arrive equipped with high-pressure machines and RO water." },
+      { q: "How do I book a doorstep car wash?", a: "Simply select your vehicle type, pick your package & optional add-ons (like Helmet or Bike wash), choose a date and time slot, and our trained technician will arrive equipped with high-pressure machines and spot-free deionized water." },
       { q: "Do I need to provide water and electricity?", a: "Our mobile vans carry dedicated water storage and mobile generators. A domestic plug point is helpful, but our units are fully self-sufficient." },
       { q: "Can I add add-on services like Helmet or Bike wash?", a: "Yes! While booking any car wash, you can easily attach add-on services such as Helmet wash, 2-wheeler wash, interior ozone sanitization, and engine bay steam cleaning directly into the checkout total." },
       { q: "Where is Wash My Car Org currently available?", a: "We are actively serving Visakhapatnam and surrounding neighborhoods, with expanding operations across Andhra Pradesh and Telangana." },
@@ -242,6 +242,45 @@ const Home = () => {
     }
     setCopiedCoupon(code);
     setTimeout(() => setCopiedCoupon(''), 3000);
+  };
+
+  const getCouponBadgeText = (coupon) => {
+    if (!coupon) return '';
+    const freeAddonObj = coupon.freeAddon || addons.find(a => Number(a.id) === Number(coupon.freeAddonId));
+    const discAddonObj = coupon.discountAddon || addons.find(a => Number(a.id) === Number(coupon.discountAddonId));
+
+    if (coupon.freeAddonId && (coupon.discountType === 'NONE' || (Number(coupon.discountAmount) <= 1 && Number(coupon.discountPct || 0) === 0))) {
+      return freeAddonObj ? `🎁 FREE ${freeAddonObj.name.toUpperCase()}` : '🎁 FREE ADD-ON';
+    }
+
+    if (coupon.discountType === 'NONE') {
+      if (coupon.freeAddonId) {
+        return freeAddonObj ? `🎁 FREE ${freeAddonObj.name.toUpperCase()}` : '🎁 FREE ADD-ON';
+      }
+      if (coupon.discountAddonId) {
+        if (coupon.addonDiscountType === 'FREE') {
+          return freeAddonObj ? `🎁 FREE ${freeAddonObj.name.toUpperCase()}` : '🎁 FREE ADD-ON';
+        }
+        if (coupon.addonDiscountType === 'FLAT') {
+          return `⚡ ₹${coupon.addonDiscountValue} OFF ${discAddonObj ? discAddonObj.name.toUpperCase() : 'ADD-ON'}`;
+        }
+        return `⚡ ${coupon.addonDiscountValue}% OFF ${discAddonObj ? discAddonObj.name.toUpperCase() : 'ADD-ON'}`;
+      }
+      return '🎁 SPECIAL OFFER';
+    }
+
+    const washDisc = coupon.discountType === 'FLAT' 
+      ? `₹${coupon.discountAmount} FLAT OFF` 
+      : `${coupon.discountPct}% OFF`;
+
+    if (coupon.freeAddonId) {
+      const addonTitle = freeAddonObj ? ` + FREE ${freeAddonObj.name.toUpperCase()}` : ' + FREE ADD-ON';
+      return `${washDisc}${addonTitle}`;
+    }
+    if (coupon.discountAddonId) {
+      return `${washDisc} + ADD-ON DEAL`;
+    }
+    return washDisc;
   };
 
   const handleContactSubmit = async (e) => {
@@ -412,13 +451,13 @@ const Home = () => {
               fontWeight: 900, 
               fontSize: '1.35rem', 
               letterSpacing: '0.8px', 
-              background: 'linear-gradient(135deg, #38BDF8, #0EA5E9)', 
-              WebkitBackgroundClip: 'text', 
-              WebkitTextFillColor: 'transparent',
               display: 'block',
               lineHeight: 1
             }}>
-              WASH MY CAR ORG
+              <span style={{ color: '#FFFFFF' }}>WASH </span>
+              <span style={{ color: '#38BDF8' }}>MY </span>
+              <span style={{ color: '#FFFFFF' }}>CAR </span>
+              <span style={{ color: '#38BDF8' }}>ORG</span>
             </span>
             <span style={{ fontSize: '0.65rem', color: '#94A3B8', fontWeight: 700, letterSpacing: '1px' }}>
               DOORSTEP CAR WASH
@@ -787,13 +826,13 @@ const Home = () => {
             {/* Trust Mini Pills */}
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '2rem' }}>
               <span style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.16)', padding: '0.4rem 0.85rem', borderRadius: '8px', fontSize: '0.78rem', color: '#E2E8F0', display: 'flex', alignItems: 'center', gap: '0.4rem', backdropFilter: 'blur(6px)' }}>
-                <CheckCircle size={14} color="#38BDF8" /> 100% RO Water Used
+                <CheckCircle size={14} color="#38BDF8" /> Spot-Free Pure Water Rinse
               </span>
               <span style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.16)', padding: '0.4rem 0.85rem', borderRadius: '8px', fontSize: '0.78rem', color: '#E2E8F0', display: 'flex', alignItems: 'center', gap: '0.4rem', backdropFilter: 'blur(6px)' }}>
                 <CheckCircle size={14} color="#38BDF8" /> Verified Specialists
               </span>
               <span style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.16)', padding: '0.4rem 0.85rem', borderRadius: '8px', fontSize: '0.78rem', color: '#E2E8F0', display: 'flex', alignItems: 'center', gap: '0.4rem', backdropFilter: 'blur(6px)' }}>
-                <CheckCircle size={14} color="#38BDF8" /> No Electricity Required
+                <CheckCircle size={14} color="#38BDF8" /> 100% Scratch-Free Care
               </span>
             </div>
           </div>
@@ -1014,7 +1053,7 @@ const Home = () => {
             </div>
             <div>
               <strong style={{ fontSize: '0.9rem', color: '#0F172A', display: 'block' }}>Water-Efficient Care</strong>
-              <span style={{ fontSize: '0.75rem', color: '#64748B' }}>100% RO filtered water & high pressure.</span>
+              <span style={{ fontSize: '0.75rem', color: '#64748B' }}>Deionized spot-free water & high pressure.</span>
             </div>
           </div>
 
@@ -1032,169 +1071,74 @@ const Home = () => {
 
       {/* 3. DYNAMIC PROMO & ACTIVE COUPONS BAR */}
       <section style={{
-        background: 'linear-gradient(90deg, #0B132B 0%, #0F172A 50%, #091E3A 100%)',
+        background: 'linear-gradient(90deg, #070F26 0%, #0B1736 50%, #06152B 100%)',
         color: 'white',
-        padding: '1.25rem 6%',
-        borderTop: '1px solid rgba(56, 189, 248, 0.2)',
-        borderBottom: '1px solid rgba(56, 189, 248, 0.2)',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.25)'
+        padding: '1rem 6%',
+        borderTop: '1px solid rgba(56, 189, 248, 0.25)',
+        borderBottom: '1px solid rgba(56, 189, 248, 0.25)',
+        boxShadow: '0 4px 25px rgba(0,0,0,0.3)'
       }}>
         <div style={{ 
           maxWidth: '1240px', 
           margin: '0 auto', 
           display: 'flex', 
-          flexWrap: 'wrap', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          gap: '1.25rem' 
+          flexDirection: 'column',
+          gap: '0.85rem'
         }}>
-          {/* Left: Live Status Badge & Column Title */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.9rem', flexWrap: 'wrap' }}>
-            <span style={{ 
-              background: 'linear-gradient(135deg, #0284C7, #0EA5E9)', 
-              color: 'white', 
-              padding: '0.4rem 1rem', 
-              borderRadius: '25px', 
-              fontSize: '0.8rem', 
-              fontWeight: 800, 
-              letterSpacing: '0.6px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              boxShadow: '0 4px 14px rgba(14, 165, 233, 0.4)'
-            }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#4ADE80', boxShadow: '0 0 8px #4ADE80' }} />
-              LIVE DOORSTEP CAR WASH
-            </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Tag size={16} color="#38BDF8" />
-              <strong style={{ fontSize: '0.92rem', color: '#F8FAFC' }}>Active Coupons & Deals:</strong>
-            </div>
-          </div>
-
-          {/* Center: Present Active Coupons From Database - Smoothly Scrollable Rail */}
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '0.85rem', 
-            flexWrap: 'nowrap', 
-            overflowX: 'auto', 
-            WebkitOverflowScrolling: 'touch',
-            padding: '0.35rem 0.5rem',
-            maxWidth: '100%',
-            flex: 1,
-            justifyContent: 'flex-start',
-            scrollbarWidth: 'none',
-            msOverflowStyle: 'none'
+          {/* Top Row: Live Status Pill & Section Title & Quick CTA */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '0.75rem'
           }}>
-            {coupons.length > 0 ? (
-              coupons.map((coupon) => {
-                const discountDisplay = coupon.discountType === 'PERCENTAGE' 
-                  ? `${coupon.discountPct}% OFF` 
-                  : `₹${coupon.discountAmount} FLAT OFF`;
-                const isCopied = copiedCoupon === coupon.code;
-
-                return (
-                  <div
-                    key={coupon.id || coupon.code}
-                    onClick={() => handleCopyCoupon(coupon.code)}
-                    title="Click to copy coupon code"
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.06)',
-                      border: isCopied ? '1.5px solid #4ADE80' : '1.5px dashed rgba(56, 189, 248, 0.5)',
-                      borderRadius: '12px',
-                      padding: '0.4rem 0.85rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.65rem',
-                      cursor: 'pointer',
-                      backdropFilter: 'blur(8px)',
-                      flexShrink: 0,
-                      transition: 'all 0.2s ease',
-                      boxShadow: isCopied ? '0 0 12px rgba(74, 222, 128, 0.3)' : '0 2px 8px rgba(0,0,0,0.2)'
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.background = 'rgba(14, 165, 233, 0.15)';
-                      e.currentTarget.style.borderColor = '#38BDF8';
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
-                      e.currentTarget.style.borderColor = isCopied ? '#4ADE80' : 'rgba(56, 189, 248, 0.5)';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                    }}
-                  >
-                    <span style={{
-                      background: 'linear-gradient(135deg, #F59E0B, #EAB308)',
-                      color: '#0F172A',
-                      padding: '0.2rem 0.55rem',
-                      borderRadius: '6px',
-                      fontSize: '0.72rem',
-                      fontWeight: 900,
-                      letterSpacing: '0.5px'
-                    }}>
-                      {discountDisplay}
-                    </span>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 800, color: 'white', letterSpacing: '0.5px' }}>
-                        USE: <strong style={{ color: '#38BDF8' }}>{coupon.code}</strong>
-                      </span>
-                      <span style={{ fontSize: '0.68rem', color: '#94A3B8' }}>
-                        {coupon.title || coupon.description}
-                      </span>
-                    </div>
-
-                    <div style={{
-                      marginLeft: '0.35rem',
-                      color: isCopied ? '#4ADE80' : '#38BDF8',
-                      fontSize: '0.72rem',
-                      fontWeight: 800,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.25rem'
-                    }}>
-                      {isCopied ? (
-                        <>
-                          <Check size={14} color="#4ADE80" />
-                          <span style={{ color: '#4ADE80' }}>COPIED!</span>
-                        </>
-                      ) : (
-                        <Copy size={14} />
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#CBD5E1', fontSize: '0.85rem' }}>
-                <Sparkles size={16} color="#FACC15" />
-                <span>Special discounts available on first booking!</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap' }}>
+              <span style={{ 
+                background: 'linear-gradient(135deg, #0284C7, #0EA5E9)', 
+                color: 'white', 
+                padding: '0.35rem 0.95rem', 
+                borderRadius: '25px', 
+                fontSize: '0.78rem', 
+                fontWeight: 800, 
+                letterSpacing: '0.6px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                boxShadow: '0 4px 14px rgba(14, 165, 233, 0.4)'
+              }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#4ADE80', boxShadow: '0 0 8px #4ADE80' }} />
+                LIVE DOORSTEP CAR WASH
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Tag size={16} color="#38BDF8" />
+                <strong style={{ fontSize: '0.92rem', color: '#F8FAFC' }}>
+                  {coupons.length === 1 ? 'Featured Active Deal:' : 'Active Coupons & Deals:'}
+                </strong>
               </div>
-            )}
-          </div>
+            </div>
 
-          {/* Right: CTA to Book */}
-          <div>
+            {/* Right Quick CTA */}
             <button 
               onClick={() => navigate('/login')}
               style={{
                 background: 'linear-gradient(135deg, #FACC15, #EAB308)',
                 color: '#0F172A',
                 border: 'none',
-                padding: '0.55rem 1.4rem',
-                borderRadius: '25px',
+                padding: '0.45rem 1.25rem',
+                borderRadius: '20px',
                 fontWeight: 900,
-                fontSize: '0.85rem',
+                fontSize: '0.82rem',
                 cursor: 'pointer',
                 boxShadow: '0 4px 14px rgba(250, 204, 21, 0.35)',
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
-                gap: '0.4rem',
-                transition: 'transform 0.2s, box-shadow 0.2s'
+                gap: '0.35rem',
+                transition: 'transform 0.2s, box-shadow 0.2s',
+                whiteSpace: 'nowrap'
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.transform = 'translateY(-1px)';
                 e.currentTarget.style.boxShadow = '0 6px 18px rgba(250, 204, 21, 0.5)';
               }}
               onMouseLeave={e => {
@@ -1206,6 +1150,188 @@ const Home = () => {
               <ArrowRight size={15} />
             </button>
           </div>
+
+          {/* Bottom Area: Dynamic Coupon Render (1 vs Multiple) */}
+          {coupons.length === 1 ? (
+            /* Single Coupon: Centered, Beautifully Sized, Complete Info */
+            (() => {
+              const coupon = coupons[0];
+              const isCopied = copiedCoupon === coupon.code;
+              const badgeText = getCouponBadgeText(coupon);
+
+              return (
+                <div
+                  onClick={() => handleCopyCoupon(coupon.code)}
+                  title="Click to copy coupon code"
+                  style={{
+                    background: isCopied ? 'rgba(74, 222, 128, 0.12)' : 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(14, 165, 233, 0.08) 100%)',
+                    border: isCopied ? '1.5px solid #4ADE80' : '1.5px dashed rgba(56, 189, 248, 0.6)',
+                    borderRadius: '16px',
+                    padding: '0.8rem 1.25rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '1rem',
+                    cursor: 'pointer',
+                    backdropFilter: 'blur(10px)',
+                    boxShadow: isCopied ? '0 0 20px rgba(74, 222, 128, 0.25)' : '0 4px 16px rgba(0,0,0,0.25)',
+                    transition: 'all 0.25s ease'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.borderColor = '#38BDF8';
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.borderColor = isCopied ? '#4ADE80' : 'rgba(56, 189, 248, 0.6)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.9rem', flexWrap: 'wrap', flex: 1, minWidth: '220px' }}>
+                    <span style={{
+                      background: 'linear-gradient(135deg, #F59E0B, #EAB308)',
+                      color: '#0F172A',
+                      padding: '0.35rem 0.85rem',
+                      borderRadius: '8px',
+                      fontSize: '0.8rem',
+                      fontWeight: 900,
+                      letterSpacing: '0.5px',
+                      boxShadow: '0 2px 10px rgba(245, 158, 11, 0.4)',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {badgeText}
+                    </span>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.25 }}>
+                      <span style={{ fontSize: '0.92rem', fontWeight: 800, color: 'white', letterSpacing: '0.5px' }}>
+                        USE COUPON: <strong style={{ color: '#38BDF8', letterSpacing: '1px' }}>{coupon.code}</strong>
+                      </span>
+                      {coupon.title && (
+                        <span style={{ fontSize: '0.8rem', color: '#CBD5E1', marginTop: '0.2rem', fontWeight: 600 }}>
+                          {coupon.title}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{
+                    color: isCopied ? '#4ADE80' : '#38BDF8',
+                    fontSize: '0.8rem',
+                    fontWeight: 800,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    background: isCopied ? 'rgba(74, 222, 128, 0.15)' : 'rgba(56, 189, 248, 0.12)',
+                    padding: '0.35rem 0.75rem',
+                    borderRadius: '8px',
+                    border: isCopied ? '1px solid #4ADE80' : '1px solid rgba(56, 189, 248, 0.3)'
+                  }}>
+                    {isCopied ? (
+                      <>
+                        <Check size={15} color="#4ADE80" />
+                        <span>COPIED TO CLIPBOARD!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={15} />
+                        <span>CLICK TO COPY CODE</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })()
+          ) : coupons.length > 1 ? (
+            /* Multiple Coupons: Smooth Continuous Auto-Scrolling Ticker (Pauses on Hover/Touch) */
+            <div className="coupon-ticker-wrap">
+              <div className="coupon-ticker-track">
+                {[...coupons, ...coupons].map((coupon, idx) => {
+                  const badgeText = getCouponBadgeText(coupon);
+                  const isCopied = copiedCoupon === coupon.code;
+
+                  return (
+                    <div
+                      key={`${coupon.id || coupon.code}-${idx}`}
+                      onClick={() => handleCopyCoupon(coupon.code)}
+                      title="Click to copy coupon code"
+                      style={{
+                        background: isCopied ? 'rgba(74, 222, 128, 0.15)' : 'rgba(255, 255, 255, 0.06)',
+                        border: isCopied ? '1.5px solid #4ADE80' : '1.5px dashed rgba(56, 189, 248, 0.5)',
+                        borderRadius: '12px',
+                        padding: '0.5rem 0.95rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.75rem',
+                        cursor: 'pointer',
+                        backdropFilter: 'blur(8px)',
+                        flexShrink: 0,
+                        transition: 'all 0.2s ease',
+                        boxShadow: isCopied ? '0 0 12px rgba(74, 222, 128, 0.3)' : '0 2px 8px rgba(0,0,0,0.2)'
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.background = 'rgba(14, 165, 233, 0.15)';
+                        e.currentTarget.style.borderColor = '#38BDF8';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.background = isCopied ? 'rgba(74, 222, 128, 0.15)' : 'rgba(255, 255, 255, 0.06)';
+                        e.currentTarget.style.borderColor = isCopied ? '#4ADE80' : 'rgba(56, 189, 248, 0.5)';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}
+                    >
+                      <span style={{
+                        background: 'linear-gradient(135deg, #F59E0B, #EAB308)',
+                        color: '#0F172A',
+                        padding: '0.25rem 0.65rem',
+                        borderRadius: '6px',
+                        fontSize: '0.74rem',
+                        fontWeight: 900,
+                        letterSpacing: '0.5px',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {badgeText}
+                      </span>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
+                        <span style={{ fontSize: '0.84rem', fontWeight: 800, color: 'white', letterSpacing: '0.5px' }}>
+                          USE: <strong style={{ color: '#38BDF8' }}>{coupon.code}</strong>
+                        </span>
+                        {coupon.title && (
+                          <span style={{ fontSize: '0.72rem', color: '#CBD5E1', whiteSpace: 'nowrap', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 600 }}>
+                            {coupon.title}
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{
+                        marginLeft: '0.35rem',
+                        color: isCopied ? '#4ADE80' : '#38BDF8',
+                        fontSize: '0.74rem',
+                        fontWeight: 800,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.25rem'
+                      }}>
+                        {isCopied ? (
+                          <>
+                            <Check size={14} color="#4ADE80" />
+                            <span style={{ color: '#4ADE80' }}>COPIED!</span>
+                          </>
+                        ) : (
+                          <Copy size={14} />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#CBD5E1', fontSize: '0.85rem', padding: '0.4rem 0' }}>
+              <Sparkles size={16} color="#FACC15" />
+              <span>Special discounts available on first booking!</span>
+            </div>
+          )}
         </div>
       </section>
 
@@ -1362,7 +1488,7 @@ const Home = () => {
                 {/* Package Body */}
                 <div style={{ padding: '1.75rem 2rem', textAlign: 'left', flex: 1, display: 'flex', flexDirection: 'column' }}>
                   <p style={{ color: '#64748B', fontSize: '0.92rem', lineHeight: 1.6, marginBottom: '1.5rem' }}>
-                    {wt.description || 'Professional doorstep vehicle spa delivered directly to your home with RO water and high-pressure steam.'}
+                    {wt.description || 'Professional doorstep vehicle spa delivered directly to your home with spot-free purified water and high-pressure steam.'}
                   </p>
 
                   <div style={{ marginBottom: '1.5rem', flex: 1 }}>
@@ -1374,7 +1500,7 @@ const Home = () => {
                         <Check size={16} color="#0EA5E9" style={{ flexShrink: 0 }} /> High-Pressure Exterior Snow Foam
                       </li>
                       <li style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.88rem', color: '#334155' }}>
-                        <Check size={16} color="#0EA5E9" style={{ flexShrink: 0 }} /> 100% RO Water Wash & Microfiber Dry
+                        <Check size={16} color="#0EA5E9" style={{ flexShrink: 0 }} /> Spot-Free Water Rinse & Microfiber Dry
                       </li>
                       <li style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.88rem', color: '#334155' }}>
                         <Check size={16} color="#0EA5E9" style={{ flexShrink: 0 }} /> Tyre & Rim Dressing & UV Protectant
@@ -1506,25 +1632,21 @@ const Home = () => {
       {settings?.referralEnabled !== false && (
         <section id="refer-earn" style={{ padding: '0 6% 4.5rem', maxWidth: '1240px', margin: '0 auto' }}>
           <div style={{
-            background: 'linear-gradient(135deg, #0B132B 0%, #1C2541 50%, #0F172A 100%)',
+            background: 'linear-gradient(135deg, #070F26 0%, #111E3D 50%, #07152E 100%)',
             borderRadius: '28px',
             border: '1.5px solid rgba(56, 189, 248, 0.35)',
             padding: '3rem 2.5rem',
             boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.5), 0 0 35px rgba(14, 165, 233, 0.15)',
             position: 'relative',
-            overflow: 'hidden',
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-            gap: '2.5rem',
-            alignItems: 'center'
+            overflow: 'hidden'
           }}>
             {/* Ambient background glow */}
             <div style={{
               position: 'absolute',
               top: '-60px',
               right: '-60px',
-              width: '260px',
-              height: '260px',
+              width: '280px',
+              height: '280px',
               borderRadius: '50%',
               background: 'radial-gradient(circle, rgba(14, 165, 233, 0.25) 0%, transparent 70%)',
               pointerEvents: 'none'
@@ -1533,138 +1655,243 @@ const Home = () => {
               position: 'absolute',
               bottom: '-80px',
               left: '10%',
-              width: '300px',
-              height: '300px',
+              width: '320px',
+              height: '320px',
               borderRadius: '50%',
               background: 'radial-gradient(circle, rgba(250, 204, 21, 0.15) 0%, transparent 70%)',
               pointerEvents: 'none'
             }} />
 
-            {/* Left Content */}
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(250, 204, 21, 0.15)', border: '1px solid rgba(250, 204, 21, 0.35)', padding: '0.4rem 1rem', borderRadius: '30px', color: '#FACC15', fontSize: '0.8rem', fontWeight: 900, letterSpacing: '0.5px', marginBottom: '1.25rem' }}>
-                <Sparkles size={15} />
-                OFFICIAL REFERRAL PROGRAM
-              </div>
-              <h2 style={{ fontSize: 'clamp(2rem, 3.8vw, 2.8rem)', fontWeight: 900, color: '#FFFFFF', margin: '0 0 1rem', lineHeight: 1.15, letterSpacing: '-0.5px' }}>
-                Refer Friends & Get <span style={{ background: 'linear-gradient(135deg, #38BDF8, #FACC15)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Free Doorstep Washes</span>
-              </h2>
-              <p style={{ color: '#94A3B8', fontSize: '1.02rem', lineHeight: 1.6, margin: '0 0 2rem', maxWidth: '520px' }}>
-                Share your personal code with friends & neighbors. When they complete their first wash, you both unlock reward points redeemable for 100% free doorstep car & bike washes!
-              </p>
+            <div className="referral-container-grid" style={{ position: 'relative', zIndex: 1 }}>
+              {/* Left Content */}
+              <div>
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  background: 'rgba(250, 204, 21, 0.12)',
+                  border: '1px solid rgba(250, 204, 21, 0.35)',
+                  padding: '0.4rem 1.1rem',
+                  borderRadius: '30px',
+                  color: '#FACC15',
+                  fontSize: '0.8rem',
+                  fontWeight: 900,
+                  letterSpacing: '0.6px',
+                  marginBottom: '1.25rem'
+                }}>
+                  <Sparkles size={15} />
+                  OFFICIAL REFERRAL PROGRAM
+                </div>
 
-              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                <button
-                  onClick={() => navigate('/login')}
-                  style={{
-                    background: 'linear-gradient(135deg, #0EA5E9, #0284C7)',
-                    color: 'white',
-                    border: 'none',
-                    padding: '0.9rem 1.8rem',
-                    borderRadius: '16px',
-                    fontWeight: 800,
-                    fontSize: '0.95rem',
-                    cursor: 'pointer',
-                    boxShadow: '0 10px 25px rgba(14, 165, 233, 0.4)',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    transition: 'transform 0.2s, box-shadow 0.2s'
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 14px 28px rgba(14, 165, 233, 0.5)';
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 10px 25px rgba(14, 165, 233, 0.4)';
-                  }}
-                >
-                  <span>Start Earning Rewards</span>
-                  <ArrowRight size={17} />
-                </button>
-                <Link
-                  to="/rewards"
-                  style={{
-                    color: '#38BDF8',
-                    textDecoration: 'none',
-                    fontWeight: 700,
-                    fontSize: '0.92rem',
-                    padding: '0.8rem 1.2rem',
-                    borderRadius: '14px',
-                    background: 'rgba(56, 189, 248, 0.08)',
-                    border: '1px solid rgba(56, 189, 248, 0.2)',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.4rem'
-                  }}
-                >
-                  View Rewards & Tiers →
-                </Link>
-              </div>
-            </div>
+                <h2 style={{
+                  fontSize: 'clamp(2rem, 3.8vw, 2.9rem)',
+                  fontWeight: 900,
+                  color: '#FFFFFF',
+                  margin: '0 0 1rem',
+                  lineHeight: 1.18,
+                  letterSpacing: '-0.5px'
+                }}>
+                  Refer Friends & Get <span style={{ background: 'linear-gradient(135deg, #38BDF8, #FACC15)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Free Doorstep Washes</span>
+                </h2>
 
-            {/* Right: Admin-Configured Program Metrics */}
-            <div style={{ position: 'relative', zIndex: 1, display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.25rem' }}>
-              <div style={{
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                backdropFilter: 'blur(10px)',
-                borderRadius: '20px',
-                padding: '1.5rem',
-                textAlign: 'left'
-              }}>
-                <div style={{ fontSize: '2.5rem', fontWeight: 900, color: '#38BDF8', lineHeight: 1 }}>
-                  +{settings?.referralRewardPoints ?? 50}
-                </div>
-                <div style={{ color: '#F8FAFC', fontWeight: 800, fontSize: '0.92rem', marginTop: '0.5rem' }}>
-                  Points Per Referral
-                </div>
-                <div style={{ color: '#94A3B8', fontSize: '0.78rem', marginTop: '0.25rem' }}>
-                  Credited on friend's 1st completed wash
-                </div>
-              </div>
+                <p style={{ color: '#94A3B8', fontSize: '1.02rem', lineHeight: 1.65, margin: '0 0 1.5rem', maxWidth: '520px' }}>
+                  Share your personal invite code with friends & neighbors. When they complete their first doorstep wash, you both unlock reward points redeemable for 100% free car & bike detailing!
+                </p>
 
-              <div style={{
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                backdropFilter: 'blur(10px)',
-                borderRadius: '20px',
-                padding: '1.5rem',
-                textAlign: 'left'
-              }}>
-                <div style={{ fontSize: '2.5rem', fontWeight: 900, color: '#FACC15', lineHeight: 1 }}>
-                  +{settings?.referralStreakBonus ?? 25}
-                </div>
-                <div style={{ color: '#F8FAFC', fontWeight: 800, fontSize: '0.92rem', marginTop: '0.5rem' }}>
-                  Streak Bonus
-                </div>
-                <div style={{ color: '#94A3B8', fontSize: '0.78rem', marginTop: '0.25rem' }}>
-                  Bonus points for active consecutive streaks
-                </div>
-              </div>
-
-              <div style={{
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                backdropFilter: 'blur(10px)',
-                borderRadius: '20px',
-                padding: '1.5rem',
-                textAlign: 'left',
-                gridColumn: 'span 2'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  <div>
-                    <span style={{ fontSize: '1rem', fontWeight: 800, color: '#FFFFFF' }}>
-                      🔥 Maximum Limit: {settings?.referralMaxLimit ? `${settings.referralMaxLimit} Referrals/Month` : 'Unlimited'}
-                    </span>
-                    <p style={{ color: '#94A3B8', fontSize: '0.8rem', margin: '0.25rem 0 0' }}>
-                      Earned points can be used at checkout for 100% cashless doorstep care!
-                    </p>
+                {/* Feature highlights checklist */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', marginBottom: '2rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#E2E8F0', fontSize: '0.88rem' }}>
+                    <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(56, 189, 248, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Check size={13} color="#38BDF8" />
+                    </div>
+                    <span>Zero cash needed — redeem points directly at checkout</span>
                   </div>
-                  <span style={{ background: '#059669', color: 'white', padding: '0.35rem 0.85rem', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 800 }}>
-                    ACTIVE PROMO
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#E2E8F0', fontSize: '0.88rem' }}>
+                    <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(56, 189, 248, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Check size={13} color="#38BDF8" />
+                    </div>
+                    <span>Instant automatic credit upon friend's first completed wash</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#E2E8F0', fontSize: '0.88rem' }}>
+                    <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(56, 189, 248, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Check size={13} color="#38BDF8" />
+                    </div>
+                    <span>Bonus streak multipliers unlocked with each active referral</span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <button
+                    onClick={() => navigate('/login')}
+                    style={{
+                      background: 'linear-gradient(135deg, #0EA5E9, #0284C7)',
+                      color: 'white',
+                      border: 'none',
+                      padding: '0.85rem 1.8rem',
+                      borderRadius: '16px',
+                      fontWeight: 800,
+                      fontSize: '0.95rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 10px 25px rgba(14, 165, 233, 0.4)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      transition: 'transform 0.2s, box-shadow 0.2s'
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 14px 28px rgba(14, 165, 233, 0.5)';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 10px 25px rgba(14, 165, 233, 0.4)';
+                    }}
+                  >
+                    <span>Start Earning Rewards</span>
+                    <ArrowRight size={17} />
+                  </button>
+                  <Link
+                    to="/rewards"
+                    style={{
+                      color: '#38BDF8',
+                      textDecoration: 'none',
+                      fontWeight: 700,
+                      fontSize: '0.92rem',
+                      padding: '0.8rem 1.25rem',
+                      borderRadius: '14px',
+                      background: 'rgba(56, 189, 248, 0.08)',
+                      border: '1px solid rgba(56, 189, 248, 0.25)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = 'rgba(56, 189, 248, 0.15)';
+                      e.currentTarget.style.borderColor = '#38BDF8';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = 'rgba(56, 189, 248, 0.08)';
+                      e.currentTarget.style.borderColor = 'rgba(56, 189, 248, 0.25)';
+                    }}
+                  >
+                    <span>View Rewards & Tiers</span>
+                    <ArrowRight size={15} />
+                  </Link>
+                </div>
+              </div>
+
+              {/* Right: Modern Aesthetic Metrics Grid */}
+              <div className="referral-stats-grid">
+                {/* Stat 1: Referral Base Points */}
+                <div className="referral-stat-card">
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                    <div style={{
+                      width: '38px',
+                      height: '38px',
+                      borderRadius: '12px',
+                      background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(14, 165, 233, 0.1))',
+                      border: '1px solid rgba(56, 189, 248, 0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#38BDF8'
+                    }}>
+                      <Gift size={20} />
+                    </div>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#38BDF8', background: 'rgba(56, 189, 248, 0.12)', padding: '0.2rem 0.55rem', borderRadius: '20px' }}>
+                      BASE PERK
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '2.4rem', fontWeight: 900, color: '#38BDF8', lineHeight: 1, letterSpacing: '-0.5px' }}>
+                    +{settings?.referralRewardPoints ?? 50}
+                  </div>
+                  <div style={{ color: '#F8FAFC', fontWeight: 800, fontSize: '0.95rem', marginTop: '0.5rem' }}>
+                    Points Per Referral
+                  </div>
+                  <div style={{ color: '#94A3B8', fontSize: '0.78rem', marginTop: '0.25rem', lineHeight: 1.4 }}>
+                    Credited on friend's 1st completed doorstep wash
+                  </div>
+                </div>
+
+                {/* Stat 2: Streak Bonus Multiplier */}
+                <div className="referral-stat-card">
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                    <div style={{
+                      width: '38px',
+                      height: '38px',
+                      borderRadius: '12px',
+                      background: 'linear-gradient(135deg, rgba(250, 204, 21, 0.2), rgba(234, 179, 8, 0.1))',
+                      border: '1px solid rgba(250, 204, 21, 0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#FACC15'
+                    }}>
+                      <Zap size={20} />
+                    </div>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#FACC15', background: 'rgba(250, 204, 21, 0.12)', padding: '0.2rem 0.55rem', borderRadius: '20px' }}>
+                      MULTIPLIER
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '2.4rem', fontWeight: 900, color: '#FACC15', lineHeight: 1, letterSpacing: '-0.5px' }}>
+                    +{Number(settings?.referralStreakBonus) > 0 ? Number(settings.referralStreakBonus) : 25}
+                  </div>
+                  <div style={{ color: '#F8FAFC', fontWeight: 800, fontSize: '0.95rem', marginTop: '0.5rem' }}>
+                    Streak Bonus Points
+                  </div>
+                  <div style={{ color: '#94A3B8', fontSize: '0.78rem', marginTop: '0.25rem', lineHeight: 1.4 }}>
+                    Bonus multiplier for active consecutive invites
+                  </div>
+                </div>
+
+                {/* Stat 3: Full Width Milestone Card */}
+                <div className="referral-stat-card referral-full-card">
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                      <div style={{
+                        width: '42px',
+                        height: '42px',
+                        borderRadius: '12px',
+                        background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(5, 150, 105, 0.15))',
+                        border: '1px solid rgba(52, 211, 153, 0.35)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#34D399',
+                        flexShrink: 0
+                      }}>
+                        <Award size={22} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.96rem', fontWeight: 800, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          <span>100% Cashless Doorstep Detailing</span>
+                          <span style={{ fontSize: '0.75rem', color: '#38BDF8', fontWeight: 700 }}>
+                            • {settings?.referralMaxLimit ? `Max ${settings.referralMaxLimit} Referrals/Month` : 'Unlimited Referrals'}
+                          </span>
+                        </div>
+                        <p style={{ color: '#94A3B8', fontSize: '0.8rem', margin: '0.2rem 0 0', lineHeight: 1.4 }}>
+                          Redeem earned wallet points at checkout for free exterior foam wash, deep steam & bike care.
+                        </p>
+                      </div>
+                    </div>
+                    <span style={{
+                      background: 'linear-gradient(135deg, #059669, #10B981)',
+                      color: 'white',
+                      padding: '0.35rem 0.85rem',
+                      borderRadius: '20px',
+                      fontSize: '0.74rem',
+                      fontWeight: 800,
+                      letterSpacing: '0.5px',
+                      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem'
+                    }}>
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#FFFFFF', animation: 'spin 2s linear infinite' }} />
+                      ACTIVE PROGRAM
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2530,7 +2757,12 @@ const Home = () => {
             <div style={{ background: 'white', padding: '0.2rem', borderRadius: '8px', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <img src={logo} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
             </div>
-            <span style={{ fontWeight: 900, color: 'white', fontSize: '1.1rem' }}>WASH MY CAR ORG</span>
+            <span style={{ fontWeight: 900, fontSize: '1.1rem' }}>
+              <span style={{ color: '#FFFFFF' }}>WASH </span>
+              <span style={{ color: '#38BDF8' }}>MY </span>
+              <span style={{ color: '#FFFFFF' }}>CAR </span>
+              <span style={{ color: '#38BDF8' }}>ORG</span>
+            </span>
           </div>
 
           <div style={{ display: 'flex', gap: '1.5rem', fontWeight: 600, fontSize: '0.85rem' }}>

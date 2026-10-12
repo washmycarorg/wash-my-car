@@ -4,7 +4,7 @@ import {
   Calendar, MapPin, Car as CarIcon, CreditCard, CheckCircle, 
   Search, Compass, AlertCircle, Tag, Sparkles, Plus, Check,
   Shield, Bike, Droplets, Feather, Flame, Info, ArrowRight,
-  ArrowLeft, ArrowDown, X, Gift, CheckSquare, Square, ChevronRight, HelpCircle,
+  ArrowLeft, ArrowDown, X, Gift, CheckSquare, Square, ChevronRight, ChevronLeft, ChevronDown, HelpCircle,
   Clock, Users, Navigation
 } from 'lucide-react';
 import { 
@@ -49,6 +49,54 @@ const getTodayDateString = () => {
   return `${year}-${month}-${day}`;
 };
 
+const generateUpcomingDays = (count = 14) => {
+  const days = [];
+  const today = new Date();
+  
+  for (let i = 0; i < count; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+    
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+    
+    const dayOfWeek = d.toLocaleDateString('en-US', { weekday: 'short' });
+    const monthName = d.toLocaleDateString('en-US', { month: 'short' });
+    const dayNum = d.getDate();
+    
+    let label = dayOfWeek;
+    if (i === 0) label = 'Today';
+    else if (i === 1) label = 'Tomorrow';
+
+    days.push({
+      dateStr,
+      label,
+      dayOfWeek,
+      dayNum,
+      monthName,
+      isToday: i === 0,
+      isTomorrow: i === 1
+    });
+  }
+  return days;
+};
+
+const formatSelectedDate = (dateString) => {
+  if (!dateString) return '';
+  try {
+    const parts = dateString.split('-');
+    if (parts.length === 3) {
+      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      return d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    }
+  } catch (e) {
+    return dateString;
+  }
+  return dateString;
+};
+
 const STEPS = [
   { id: 1, title: 'Vehicle', subtitle: 'Model & Number' },
   { id: 2, title: 'Wash Plan', subtitle: 'Select Package' },
@@ -66,8 +114,29 @@ const BookSlot = () => {
   const markerInstanceRef = useRef(null);
   const activeZoneCircleRef = useRef(null);
   const termsCheckboxRef = useRef(null);
+  const datePickerInputRef = useRef(null);
+  const calendarDropdownRef = useRef(null);
+  const [showCustomCalendar, setShowCustomCalendar] = useState(false);
+  const [viewMonth, setViewMonth] = useState(() => new Date());
   const [locating, setLocating] = useState(false);
   const [matchedZoneInfo, setMatchedZoneInfo] = useState(null);
+
+  // Close custom calendar dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (calendarDropdownRef.current && !calendarDropdownRef.current.contains(event.target)) {
+        setShowCustomCalendar(false);
+      }
+    };
+    if (showCustomCalendar) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [showCustomCalendar]);
 
   // Stepper State (1 to 6)
   const [currentStep, setCurrentStep] = useState(1);
@@ -116,6 +185,8 @@ const BookSlot = () => {
 
   // STEP 4: Add-ons States
   const [selectedAddonIds, setSelectedAddonIds] = useState([]);
+  const [autoAddedCouponAddonIds, setAutoAddedCouponAddonIds] = useState([]);
+  const [addonOfferNotice, setAddonOfferNotice] = useState('');
 
   // STEP 5: Address States
   const [addressSource, setAddressSource] = useState('saved'); // 'saved' or 'new'
@@ -142,6 +213,7 @@ const BookSlot = () => {
   const [manualCouponInput, setManualCouponInput] = useState('');
   const [couponError, setCouponError] = useState('');
   const [loadingCoupons, setLoadingCoupons] = useState(false);
+  const [infoModalCoupon, setInfoModalCoupon] = useState(null);
   const [redeemPoints, setRedeemPoints] = useState(false);
   const [loading, setLoading] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(null);
@@ -306,6 +378,11 @@ const BookSlot = () => {
           const list = Array.isArray(coupons) ? coupons : [];
           setEligibleCoupons(list);
           if (selectedCouponCode && !list.some(c => c.code === selectedCouponCode)) {
+            // If current coupon is no longer eligible, clean up any auto-added addons
+            if (autoAddedCouponAddonIds.length > 0) {
+              setSelectedAddonIds(prev => prev.filter(id => !autoAddedCouponAddonIds.includes(id)));
+              setAutoAddedCouponAddonIds([]);
+            }
             setSelectedCouponCode('');
           }
         })
@@ -329,15 +406,109 @@ const BookSlot = () => {
       setSelectedCouponCode(found.code);
       setManualCouponInput('');
       setCouponError('');
+
+      // Auto-add Free or Discounted Add-on to cart if coupon includes one
+      const newlyAutoAdded = [];
+      const addonsToEnsure = [];
+
+      if (found.freeAddonId) {
+        addonsToEnsure.push(Number(found.freeAddonId));
+      }
+      if (found.discountAddonId) {
+        addonsToEnsure.push(Number(found.discountAddonId));
+      }
+
+      if (addonsToEnsure.length > 0) {
+        setSelectedAddonIds(prev => {
+          const updated = [...prev];
+          addonsToEnsure.forEach(addonId => {
+            if (!updated.includes(addonId)) {
+              updated.push(addonId);
+              newlyAutoAdded.push(addonId);
+            }
+          });
+          return updated;
+        });
+
+        if (newlyAutoAdded.length > 0) {
+          setAutoAddedCouponAddonIds(prev => {
+            const combined = [...prev];
+            newlyAutoAdded.forEach(id => {
+              if (!combined.includes(id)) combined.push(id);
+            });
+            return combined;
+          });
+        }
+      }
     } else {
       setCouponError(`Coupon "${code}" is invalid or not eligible for this wash package.`);
     }
   };
 
   const handleRemoveCoupon = () => {
+    // If any add-on was auto-added by this coupon, remove it from cart
+    if (autoAddedCouponAddonIds.length > 0) {
+      setSelectedAddonIds(prev => prev.filter(id => !autoAddedCouponAddonIds.includes(id)));
+      setAutoAddedCouponAddonIds([]);
+    }
     setSelectedCouponCode('');
     setManualCouponInput('');
     setCouponError('');
+    setAddonOfferNotice('');
+  };
+
+  // Add-on selection toggle: checks for matching free/discounted coupon offers
+  const handleToggleAddon = (addon) => {
+    const isSelected = selectedAddonIds.includes(addon.id);
+
+    if (isSelected) {
+      setSelectedAddonIds(prev => prev.filter(id => id !== addon.id));
+      setAutoAddedCouponAddonIds(prev => prev.filter(id => id !== addon.id));
+    } else {
+      // Check if any eligible coupon provides this addon for FREE or DISCOUNTED
+      const matchingCoupon = eligibleCoupons.find(c => 
+        Number(c.freeAddonId) === Number(addon.id) || Number(c.discountAddonId) === Number(addon.id)
+      );
+
+      // If matching coupon exists and no coupon is active (or current coupon has no addon perk), auto-apply it!
+      if (matchingCoupon && (!selectedCouponCode || (selectedCouponCode !== matchingCoupon.code && (!activeCoupon?.freeAddonId && !activeCoupon?.discountAddonId)))) {
+        setSelectedCouponCode(matchingCoupon.code);
+        setCouponError('');
+
+        const updatedAddons = selectedAddonIds.includes(addon.id)
+          ? [...selectedAddonIds]
+          : [...selectedAddonIds, addon.id];
+
+        const newlyAutoAdded = [];
+        if (matchingCoupon.freeAddonId && Number(matchingCoupon.freeAddonId) !== Number(addon.id) && !updatedAddons.includes(Number(matchingCoupon.freeAddonId))) {
+          updatedAddons.push(Number(matchingCoupon.freeAddonId));
+          newlyAutoAdded.push(Number(matchingCoupon.freeAddonId));
+        }
+        if (matchingCoupon.discountAddonId && Number(matchingCoupon.discountAddonId) !== Number(addon.id) && !updatedAddons.includes(Number(matchingCoupon.discountAddonId))) {
+          updatedAddons.push(Number(matchingCoupon.discountAddonId));
+          newlyAutoAdded.push(Number(matchingCoupon.discountAddonId));
+        }
+
+        setSelectedAddonIds(updatedAddons);
+        if (newlyAutoAdded.length > 0) {
+          setAutoAddedCouponAddonIds(prev => {
+            const combined = [...prev];
+            newlyAutoAdded.forEach(id => {
+              if (!combined.includes(id)) combined.push(id);
+            });
+            return combined;
+          });
+        }
+
+        const isFree = Number(matchingCoupon.freeAddonId) === Number(addon.id) || matchingCoupon.addonDiscountType === 'FREE';
+        const msg = isFree
+          ? `🎉 Offer applied! Coupon "${matchingCoupon.code}" activated — "${addon.name}" is now ₹0 FREE!`
+          : `🎉 Offer applied! Coupon "${matchingCoupon.code}" activated — special discount applied on "${addon.name}"!`;
+        setAddonOfferNotice(msg);
+      } else {
+        setSelectedAddonIds(prev => [...prev, addon.id]);
+      }
+    }
   };
 
   // Format Car Number input: only uppercase letters, numbers, and hyphens (-)
@@ -714,7 +885,7 @@ const BookSlot = () => {
     }
   };
 
-  // Price Calculations
+  // Price Calculations & Add-on Coupon Breakdown
   const baseWashPrice = planPrices[selectedWashTypeId] || 0;
   
   const selectedAddonsList = availableAddons.filter(a => selectedAddonIds.includes(a.id));
@@ -722,47 +893,70 @@ const BookSlot = () => {
   
   // Find active coupon
   const activeCoupon = eligibleCoupons.find(c => c.code === selectedCouponCode) || null;
+
+  // Helper to determine exact pricing, discount & perk status of an add-on
+  const getAddonPricing = (addon) => {
+    if (!addon) return { originalPrice: 0, effectivePrice: 0, discount: 0, isFree: false, isDiscounted: false };
+    const orig = Number(addon.price) || 0;
+    if (!activeCoupon) {
+      return { originalPrice: orig, effectivePrice: orig, discount: 0, isFree: false, isDiscounted: false };
+    }
+
+    // 1. 100% Free Add-on Perk
+    if (activeCoupon.freeAddonId && Number(activeCoupon.freeAddonId) === Number(addon.id)) {
+      return { originalPrice: orig, effectivePrice: 0, discount: orig, isFree: true, isDiscounted: true };
+    }
+
+    // 2. Discounted Add-on Perk
+    if (activeCoupon.discountAddonId && Number(activeCoupon.discountAddonId) === Number(addon.id)) {
+      if (activeCoupon.addonDiscountType === 'FREE') {
+        return { originalPrice: orig, effectivePrice: 0, discount: orig, isFree: true, isDiscounted: true };
+      } else if (activeCoupon.addonDiscountType === 'FLAT') {
+        const disc = Math.min(orig, Number(activeCoupon.addonDiscountValue) || 0);
+        return { originalPrice: orig, effectivePrice: Math.max(0, orig - disc), discount: disc, isFree: disc >= orig, isDiscounted: disc > 0 };
+      } else if (activeCoupon.addonDiscountType === 'PERCENTAGE') {
+        const disc = (orig * (Number(activeCoupon.addonDiscountValue) || 0)) / 100;
+        return { originalPrice: orig, effectivePrice: Math.max(0, orig - disc), discount: disc, isFree: disc >= orig, isDiscounted: disc > 0 };
+      }
+    }
+
+    return { originalPrice: orig, effectivePrice: orig, discount: 0, isFree: false, isDiscounted: false };
+  };
   
-  let couponDiscount = 0;
+  let washCouponDiscount = 0;
+  let totalAddonSavings = 0;
   let freeAddonBonus = null;
   let discountedAddonBonus = null;
 
   if (activeCoupon) {
     if (activeCoupon.discountType === 'FLAT') {
-      couponDiscount = activeCoupon.discountAmount || 0;
-    } else {
-      couponDiscount = (baseWashPrice * (activeCoupon.discountPct || 0)) / 100;
+      washCouponDiscount = activeCoupon.discountAmount || 0;
+    } else if (activeCoupon.discountType === 'PERCENTAGE') {
+      washCouponDiscount = (baseWashPrice * (activeCoupon.discountPct || 0)) / 100;
       if (activeCoupon.limitOption === 'UP_TO' && activeCoupon.maxDiscountAmount) {
-        couponDiscount = Math.min(couponDiscount, activeCoupon.maxDiscountAmount);
+        washCouponDiscount = Math.min(washCouponDiscount, activeCoupon.maxDiscountAmount);
       }
+    } else {
+      washCouponDiscount = 0;
     }
 
     // Add-on perks
-    if (activeCoupon.freeAddonId) {
-      const match = selectedAddonsList.find(a => a.id === activeCoupon.freeAddonId);
-      if (match) {
-        couponDiscount += match.price;
-        freeAddonBonus = match.name;
-      }
-    }
-    if (activeCoupon.discountAddonId) {
-      const match = selectedAddonsList.find(a => a.id === activeCoupon.discountAddonId);
-      if (match) {
-        let disc = 0;
-        if (activeCoupon.addonDiscountType === 'FREE') {
-          disc = match.price;
-        } else if (activeCoupon.addonDiscountType === 'FLAT') {
-          disc = Math.min(match.price, activeCoupon.addonDiscountValue || 0);
-        } else if (activeCoupon.addonDiscountType === 'PERCENTAGE') {
-          disc = (match.price * (activeCoupon.addonDiscountValue || 0)) / 100;
+    selectedAddonsList.forEach(a => {
+      const pricing = getAddonPricing(a);
+      if (pricing.discount > 0) {
+        totalAddonSavings += pricing.discount;
+        if (pricing.isFree) {
+          freeAddonBonus = a.name;
+        } else {
+          discountedAddonBonus = a.name;
         }
-        couponDiscount += disc;
-        discountedAddonBonus = match.name;
       }
-    }
+    });
   }
 
-  const subtotalAfterCoupon = Math.max(0, (baseWashPrice + addonsTotal) - couponDiscount);
+  const totalAddonsEffective = selectedAddonsList.reduce((sum, a) => sum + getAddonPricing(a).effectivePrice, 0);
+  const couponDiscount = washCouponDiscount + totalAddonSavings;
+  const subtotalAfterCoupon = Math.max(0, (baseWashPrice - washCouponDiscount) + totalAddonsEffective);
 
   // Royalty Points Calculation
   let pointsDiscount = 0;
@@ -1767,7 +1961,7 @@ const BookSlot = () => {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'flex-start',
-            marginBottom: '1.35rem',
+            marginBottom: '1.25rem',
             gap: '0.75rem'
           }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', flex: 1, minWidth: 0 }}>
@@ -1820,38 +2014,107 @@ const BookSlot = () => {
             </button>
           </div>
 
+          {/* Add-on Promo Announcement Banner if eligible coupons offer add-on perks */}
+          {eligibleCoupons.some(c => c.freeAddonId || c.discountAddonId) && (
+            <div style={{
+              marginBottom: '1rem',
+              background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)',
+              border: '1.5px solid #6EE7B7',
+              borderRadius: '12px',
+              padding: '0.75rem 1rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.65rem'
+            }}>
+              <Sparkles size={18} color="#059669" style={{ flexShrink: 0 }} />
+              <div style={{ fontSize: '0.82rem', color: '#065F46', lineHeight: 1.4 }}>
+                <strong>Special Coupon Perks:</strong> Select any add-on marked with 🎁 or ⚡ below to instantly activate that complimentary or discounted offer!
+              </div>
+            </div>
+          )}
+
+          {/* Active Add-on Offer Notice */}
+          {addonOfferNotice && (
+            <div style={{
+              marginBottom: '1rem',
+              background: '#EFF6FF',
+              border: '1.5px solid #93C5FD',
+              borderRadius: '12px',
+              padding: '0.75rem 1rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '0.65rem',
+              color: '#1E40AF',
+              fontSize: '0.84rem',
+              fontWeight: 700,
+              boxShadow: '0 2px 6px rgba(37, 99, 235, 0.1)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Check size={18} color="#2563EB" />
+                <span>{addonOfferNotice}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAddonOfferNotice('')}
+                style={{ background: 'none', border: 'none', color: '#64748B', cursor: 'pointer', padding: '0.1rem' }}
+              >
+                <X size={15} />
+              </button>
+            </div>
+          )}
+
           {/* Addons Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.85rem', marginBottom: '1.75rem' }}>
             {availableAddons.map(addon => {
               const isSelected = selectedAddonIds.includes(addon.id);
+              const pricing = getAddonPricing(addon);
+              const matchingOffer = eligibleCoupons.find(c => 
+                Number(c.freeAddonId) === Number(addon.id) || Number(c.discountAddonId) === Number(addon.id)
+              );
+
+              const isFreeViaActiveCoupon = isSelected && pricing.isFree;
+              const isDiscountedViaActiveCoupon = isSelected && pricing.isDiscounted && !pricing.isFree;
+
+              // Border and background highlighting
+              let cardBorder = '1px solid #E2E8F0';
+              let cardBg = '#FFFFFF';
+              if (isFreeViaActiveCoupon) {
+                cardBorder = '2px solid #10B981';
+                cardBg = '#F0FDF4';
+              } else if (isDiscountedViaActiveCoupon) {
+                cardBorder = '2px solid #0284C7';
+                cardBg = '#F0F9FF';
+              } else if (isSelected) {
+                cardBorder = '2px solid #10B981';
+                cardBg = '#F0FDF4';
+              } else if (matchingOffer && !activeCoupon) {
+                cardBorder = '1.5px dashed #F59E0B';
+                cardBg = '#FFFDF5';
+              }
 
               return (
                 <div
                   key={addon.id}
-                  onClick={() => {
-                    if (isSelected) {
-                      setSelectedAddonIds(selectedAddonIds.filter(id => id !== addon.id));
-                    } else {
-                      setSelectedAddonIds([...selectedAddonIds, addon.id]);
-                    }
-                  }}
+                  onClick={() => handleToggleAddon(addon)}
                   style={{
-                    border: isSelected ? '2px solid #10B981' : '1px solid #E2E8F0',
+                    border: cardBorder,
                     borderRadius: '14px',
                     padding: '1rem',
-                    background: isSelected ? '#F0FDF4' : 'white',
+                    background: cardBg,
                     cursor: 'pointer',
                     transition: 'all 0.2s',
                     display: 'flex',
                     alignItems: 'flex-start',
-                    gap: '0.85rem'
+                    gap: '0.85rem',
+                    position: 'relative'
                   }}
                 >
                   <div style={{
                     width: '38px',
                     height: '38px',
                     borderRadius: '10px',
-                    background: isSelected ? '#DCFCE7' : '#F8FAFC',
+                    background: isSelected ? '#DCFCE7' : (matchingOffer && !activeCoupon ? '#FEF3C7' : '#F8FAFC'),
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -1860,19 +2123,108 @@ const BookSlot = () => {
                     {renderAddonIcon(addon.icon, isSelected, 18)}
                   </div>
 
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontWeight: 700, color: 'var(--primary-navy)', fontSize: '0.92rem' }}>
-                        {addon.name}
-                      </span>
-                      <span style={{ fontWeight: 800, color: isSelected ? '#15803D' : 'var(--primary-navy)', fontSize: '0.92rem' }}>
-                        +₹{addon.price}
-                      </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                      <div>
+                        <span style={{ fontWeight: 700, color: 'var(--primary-navy)', fontSize: '0.92rem', display: 'block' }}>
+                          {addon.name}
+                        </span>
+                      </div>
+
+                      {/* Add-on Pricing Badge */}
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        {isFreeViaActiveCoupon ? (
+                          <div>
+                            <span style={{ fontSize: '0.78rem', textDecoration: 'line-through', color: '#94A3B8', display: 'block' }}>
+                              ₹{pricing.originalPrice}
+                            </span>
+                            <span style={{ fontWeight: 800, color: '#16A34A', fontSize: '0.95rem' }}>
+                              ₹0 FREE
+                            </span>
+                          </div>
+                        ) : isDiscountedViaActiveCoupon ? (
+                          <div>
+                            <span style={{ fontSize: '0.78rem', textDecoration: 'line-through', color: '#94A3B8', display: 'block' }}>
+                              ₹{pricing.originalPrice}
+                            </span>
+                            <span style={{ fontWeight: 800, color: '#0284C7', fontSize: '0.95rem' }}>
+                              +₹{pricing.effectivePrice}
+                            </span>
+                          </div>
+                        ) : (
+                          <div>
+                            <span style={{ fontWeight: 800, color: isSelected ? '#15803D' : 'var(--primary-navy)', fontSize: '0.92rem' }}>
+                              +₹{addon.price}
+                            </span>
+                            {!activeCoupon && matchingOffer && (
+                              <span style={{ fontSize: '0.7rem', color: '#059669', display: 'block', fontWeight: 700 }}>
+                                (Offer Avail.)
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
+
                     {addon.description && (
                       <p style={{ margin: '0.35rem 0 0', color: 'var(--text-muted)', fontSize: '0.8rem', lineHeight: 1.4 }}>
                         {addon.description}
                       </p>
+                    )}
+
+                    {/* Promotional Badges */}
+                    {isFreeViaActiveCoupon && (
+                      <div style={{ marginTop: '0.4rem' }}>
+                        <span style={{
+                          fontSize: '0.72rem',
+                          background: '#DCFCE7',
+                          color: '#166534',
+                          padding: '0.15rem 0.5rem',
+                          borderRadius: '6px',
+                          fontWeight: 700,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.25rem'
+                        }}>
+                          🎁 100% FREE with Coupon {activeCoupon?.code}
+                        </span>
+                      </div>
+                    )}
+                    {isDiscountedViaActiveCoupon && (
+                      <div style={{ marginTop: '0.4rem' }}>
+                        <span style={{
+                          fontSize: '0.72rem',
+                          background: '#EFF6FF',
+                          color: '#1D4ED8',
+                          padding: '0.15rem 0.5rem',
+                          borderRadius: '6px',
+                          fontWeight: 700,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.25rem'
+                        }}>
+                          ⚡ Special Price with Coupon {activeCoupon?.code}
+                        </span>
+                      </div>
+                    )}
+                    {!activeCoupon && matchingOffer && (
+                      <div style={{ marginTop: '0.4rem' }}>
+                        <span style={{
+                          fontSize: '0.72rem',
+                          background: '#FEF3C7',
+                          color: '#92400E',
+                          padding: '0.15rem 0.5rem',
+                          borderRadius: '6px',
+                          fontWeight: 700,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.25rem'
+                        }}>
+                          {Number(matchingOffer.freeAddonId) === Number(addon.id) || matchingOffer.addonDiscountType === 'FREE'
+                            ? `🎁 FREE with coupon ${matchingOffer.code} (Click to apply)`
+                            : `✨ Discount with coupon ${matchingOffer.code} (Click to apply)`}
+                        </span>
+                      </div>
                     )}
                   </div>
 
@@ -2366,29 +2718,542 @@ const BookSlot = () => {
                 </div>
               </div>
 
-              {/* Booking Date Selector (Full Width & Clean) */}
-              <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.88rem', color: '#1E293B', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <span>Booking Date</span>
-                  <span style={{ color: '#EF4444' }}>*</span>
-                </label>
-                <input
-                  type="date"
-                  required
-                  min={getTodayDateString()}
-                  value={date}
-                  onChange={e => setDate(e.target.value)}
-                  className="form-input"
-                  style={{
-                    padding: '0.75rem 1rem',
-                    borderRadius: '12px',
-                    border: '1.5px solid #CBD5E1',
-                    fontSize: '0.95rem',
-                    fontWeight: 700,
-                    color: 'var(--primary-navy)',
-                    maxWidth: '320px'
-                  }}
-                />
+              {/* Modern Interactive Booking Date Selector (Horizontal Date Cards) */}
+              <div style={{ marginBottom: '1.4rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.65rem' }}>
+                  <label className="form-label" style={{ fontWeight: 700, fontSize: '0.88rem', color: '#1E293B', margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                    <span>Select Service Date</span>
+                    <span style={{ color: '#EF4444' }}>*</span>
+                    <span style={{ fontSize: '0.78rem', color: '#0284C7', fontWeight: 700, background: '#E0F2FE', padding: '0.2rem 0.6rem', borderRadius: '6px', border: '1px solid #BAE6FD' }}>
+                      {formatSelectedDate(date)}
+                    </span>
+                  </label>
+
+                  {/* Clean Pick From Calendar Action Button & Desktop Custom Dropdown */}
+                  <div style={{ position: 'relative' }} ref={calendarDropdownRef}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const isMobile = typeof window !== 'undefined' && 
+                          (('ontouchstart' in window) || navigator.maxTouchPoints > 0) && 
+                          /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+                        if (isMobile && datePickerInputRef.current && typeof datePickerInputRef.current.showPicker === 'function') {
+                          try {
+                            datePickerInputRef.current.showPicker();
+                            return;
+                          } catch (err) {
+                            // Fallback to custom dropdown if mobile native picker fails
+                          }
+                        }
+
+                        // Desktop or fallback: toggle custom styled calendar dropdown
+                        setShowCustomCalendar(prev => {
+                          const nextState = !prev;
+                          if (nextState && date) {
+                            try {
+                              const parts = date.split('-');
+                              if (parts.length === 3) {
+                                setViewMonth(new Date(Number(parts[0]), Number(parts[1]) - 1, 1));
+                              }
+                            } catch (err) {
+                              setViewMonth(new Date());
+                            }
+                          }
+                          return nextState;
+                        });
+                      }}
+                      style={{
+                        background: showCustomCalendar ? '#E0F2FE' : '#F1F5F9',
+                        border: showCustomCalendar ? '1.5px solid #0284C7' : '1px solid #CBD5E1',
+                        color: showCustomCalendar ? '#0284C7' : '#334155',
+                        fontSize: '0.76rem',
+                        fontWeight: 700,
+                        padding: '0.35rem 0.75rem',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        transition: 'all 0.2s',
+                        boxShadow: showCustomCalendar ? '0 0 0 3px rgba(2, 132, 199, 0.15)' : 'none'
+                      }}
+                      onMouseEnter={e => {
+                        if (!showCustomCalendar) {
+                          e.currentTarget.style.background = '#E2E8F0';
+                          e.currentTarget.style.borderColor = '#94A3B8';
+                        }
+                      }}
+                      onMouseLeave={e => {
+                        if (!showCustomCalendar) {
+                          e.currentTarget.style.background = '#F1F5F9';
+                          e.currentTarget.style.borderColor = '#CBD5E1';
+                        }
+                      }}
+                    >
+                      <Calendar size={13} color="#0284C7" />
+                      <span>Choose Other Date</span>
+                      <ChevronDown 
+                        size={12} 
+                        color={showCustomCalendar ? '#0284C7' : '#64748B'} 
+                        style={{ 
+                          transform: showCustomCalendar ? 'rotate(180deg)' : 'none', 
+                          transition: 'transform 0.2s ease' 
+                        }} 
+                      />
+                    </button>
+
+                    {/* Desktop Custom Styled Dropdown Calendar */}
+                    {showCustomCalendar && (() => {
+                      const currentYear = viewMonth.getFullYear();
+                      const currentMonth = viewMonth.getMonth();
+                      const monthTitle = viewMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                      const today = new Date();
+                      const todayStr = getTodayDateString();
+
+                      const isPrevDisabled = (currentYear < today.getFullYear()) || 
+                        (currentYear === today.getFullYear() && currentMonth <= today.getMonth());
+
+                      const firstDayIndex = new Date(currentYear, currentMonth, 1).getDay();
+                      const daysInCurrentMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+                      const daysInPrevMonth = new Date(currentYear, currentMonth, 0).getDate();
+
+                      const prevDays = [];
+                      for (let i = firstDayIndex - 1; i >= 0; i--) {
+                        prevDays.push(daysInPrevMonth - i);
+                      }
+
+                      const currentDays = [];
+                      for (let d = 1; d <= daysInCurrentMonth; d++) {
+                        const dStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                        currentDays.push({
+                          dayNum: d,
+                          dateStr: dStr,
+                          isPast: dStr < todayStr,
+                          isToday: dStr === todayStr,
+                          isSelected: dStr === date
+                        });
+                      }
+
+                      const totalCells = prevDays.length + currentDays.length;
+                      const nextDaysCount = (totalCells % 7 === 0) ? 0 : 7 - (totalCells % 7);
+                      const nextDays = [];
+                      for (let i = 1; i <= nextDaysCount; i++) {
+                        nextDays.push(i);
+                      }
+
+                      return (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: 'calc(100% + 8px)',
+                            right: 0,
+                            width: '310px',
+                            maxWidth: 'calc(100vw - 32px)',
+                            background: '#FFFFFF',
+                            borderRadius: '16px',
+                            boxShadow: '0 20px 45px -10px rgba(15, 23, 42, 0.22), 0 8px 16px -4px rgba(15, 23, 42, 0.08)',
+                            border: '1px solid #E2E8F0',
+                            padding: '1.1rem',
+                            zIndex: 9999,
+                            boxSizing: 'border-box'
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {/* Month Navigation Header */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.9rem' }}>
+                            <button
+                              type="button"
+                              disabled={isPrevDisabled}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setViewMonth(new Date(currentYear, currentMonth - 1, 1));
+                              }}
+                              style={{
+                                background: '#F8FAFC',
+                                border: '1px solid #E2E8F0',
+                                borderRadius: '8px',
+                                padding: '0.35rem 0.5rem',
+                                cursor: isPrevDisabled ? 'not-allowed' : 'pointer',
+                                opacity: isPrevDisabled ? 0.35 : 1,
+                                color: '#334155',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.15s'
+                              }}
+                            >
+                              <ChevronLeft size={16} />
+                            </button>
+
+                            <span style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0F172A' }}>
+                              {monthTitle}
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setViewMonth(new Date(currentYear, currentMonth + 1, 1));
+                              }}
+                              style={{
+                                background: '#F8FAFC',
+                                border: '1px solid #E2E8F0',
+                                borderRadius: '8px',
+                                padding: '0.35rem 0.5rem',
+                                cursor: 'pointer',
+                                color: '#334155',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.15s'
+                              }}
+                            >
+                              <ChevronRight size={16} />
+                            </button>
+                          </div>
+
+                          {/* Days of Week Header */}
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', textAlign: 'center', marginBottom: '0.35rem' }}>
+                            {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((wd, idx) => (
+                              <div key={idx} style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94A3B8', padding: '0.25rem 0' }}>
+                                {wd}
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Calendar Days Grid */}
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', textAlign: 'center' }}>
+                            {prevDays.map((dNum, idx) => (
+                              <div key={`prev-${idx}`} style={{
+                                fontSize: '0.78rem',
+                                color: '#CBD5E1',
+                                padding: '0.35rem 0',
+                                opacity: 0.45,
+                                userSelect: 'none'
+                              }}>
+                                {dNum}
+                              </div>
+                            ))}
+
+                            {currentDays.map((item) => {
+                              return (
+                                <button
+                                  key={item.dateStr}
+                                  type="button"
+                                  disabled={item.isPast}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDate(item.dateStr);
+                                    setShowCustomCalendar(false);
+                                  }}
+                                  style={{
+                                    fontSize: '0.82rem',
+                                    fontWeight: item.isSelected ? 800 : item.isToday ? 700 : 500,
+                                    color: item.isSelected 
+                                      ? '#FFFFFF' 
+                                      : item.isPast 
+                                        ? '#CBD5E1' 
+                                        : item.isToday 
+                                          ? '#0284C7' 
+                                          : '#1E293B',
+                                    background: item.isSelected 
+                                      ? 'linear-gradient(135deg, #0284C7 0%, #0EA5E9 100%)' 
+                                      : item.isToday 
+                                        ? '#E0F2FE' 
+                                        : 'transparent',
+                                    border: item.isToday && !item.isSelected ? '1px solid #7DD3FC' : 'none',
+                                    borderRadius: '9999px',
+                                    width: '32px',
+                                    height: '32px',
+                                    margin: '0 auto',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: item.isPast ? 'not-allowed' : 'pointer',
+                                    transition: 'all 0.15s ease',
+                                    boxShadow: item.isSelected ? '0 3px 8px rgba(14, 165, 233, 0.4)' : 'none'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    if (!item.isPast && !item.isSelected) {
+                                      e.currentTarget.style.background = '#F1F5F9';
+                                    }
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    if (!item.isPast && !item.isSelected) {
+                                      e.currentTarget.style.background = item.isToday ? '#E0F2FE' : 'transparent';
+                                    }
+                                  }}
+                                >
+                                  {item.dayNum}
+                                </button>
+                              );
+                            })}
+
+                            {nextDays.map((dNum, idx) => (
+                              <div key={`next-${idx}`} style={{
+                                fontSize: '0.78rem',
+                                color: '#CBD5E1',
+                                padding: '0.35rem 0',
+                                opacity: 0.45,
+                                userSelect: 'none'
+                              }}>
+                                {dNum}
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Footer Quick Pick Actions */}
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            marginTop: '0.85rem',
+                            paddingTop: '0.75rem',
+                            borderTop: '1px solid #F1F5F9'
+                          }}>
+                            <div style={{ display: 'flex', gap: '0.4rem' }}>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDate(todayStr);
+                                  setShowCustomCalendar(false);
+                                }}
+                                style={{
+                                  background: '#F0F9FF',
+                                  border: '1px solid #BAE6FD',
+                                  color: '#0284C7',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 700,
+                                  padding: '0.25rem 0.6rem',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Today
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const tomorrow = new Date();
+                                  tomorrow.setDate(tomorrow.getDate() + 1);
+                                  const y = tomorrow.getFullYear();
+                                  const m = String(tomorrow.getMonth() + 1).padStart(2, '0');
+                                  const d = String(tomorrow.getDate()).padStart(2, '0');
+                                  setDate(`${y}-${m}-${d}`);
+                                  setShowCustomCalendar(false);
+                                }}
+                                style={{
+                                  background: '#F8FAFC',
+                                  border: '1px solid #E2E8F0',
+                                  color: '#475569',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 600,
+                                  padding: '0.25rem 0.6rem',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Tomorrow
+                              </button>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShowCustomCalendar(false);
+                              }}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#94A3B8',
+                                fontSize: '0.74rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                padding: '0.25rem 0.5rem'
+                              }}
+                            >
+                              Close
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Native date input cleanly hidden offscreen and accessible for mobile native pickers */}
+                    <input
+                      ref={datePickerInputRef}
+                      type="date"
+                      required
+                      min={getTodayDateString()}
+                      value={date}
+                      onChange={e => setDate(e.target.value)}
+                      style={{
+                        position: 'absolute',
+                        opacity: 0,
+                        pointerEvents: 'none',
+                        bottom: 0,
+                        right: 0,
+                        width: '1px',
+                        height: '1px'
+                      }}
+                      tabIndex={-1}
+                      aria-hidden="true"
+                    />
+                  </div>
+                </div>
+
+                {/* Horizontal Date Cards Carousel */}
+                <div style={{
+                  display: 'flex',
+                  gap: '0.6rem',
+                  overflowX: 'auto',
+                  paddingBottom: '0.4rem',
+                  scrollbarWidth: 'none',
+                  msOverflowStyle: 'none',
+                  WebkitOverflowScrolling: 'touch'
+                }}>
+                  {generateUpcomingDays(14).map(item => {
+                    const isSelected = date === item.dateStr;
+                    return (
+                      <button
+                        key={item.dateStr}
+                        type="button"
+                        onClick={() => setDate(item.dateStr)}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '0.65rem 0.85rem',
+                          borderRadius: '14px',
+                          border: isSelected ? '2px solid #0284C7' : '1.5px solid #E2E8F0',
+                          background: isSelected 
+                            ? 'linear-gradient(135deg, #0284C7 0%, #0EA5E9 100%)' 
+                            : item.isToday 
+                              ? '#F0F9FF' 
+                              : '#FFFFFF',
+                          color: isSelected ? '#FFFFFF' : '#0F172A',
+                          minWidth: '68px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                          boxShadow: isSelected 
+                            ? '0 6px 16px rgba(14, 165, 233, 0.35)' 
+                            : '0 1px 3px rgba(0,0,0,0.04)',
+                          flexShrink: 0
+                        }}
+                      >
+                        <span style={{
+                          fontSize: '0.72rem',
+                          fontWeight: 800,
+                          color: isSelected 
+                            ? 'rgba(255,255,255,0.92)' 
+                            : item.isToday 
+                              ? '#0284C7' 
+                              : '#64748B',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.3px'
+                        }}>
+                          {item.label}
+                        </span>
+
+                        <span style={{
+                          fontSize: '1.25rem',
+                          fontWeight: 900,
+                          lineHeight: 1.15,
+                          margin: '0.15rem 0'
+                        }}>
+                          {item.dayNum}
+                        </span>
+
+                        <span style={{
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          color: isSelected ? 'rgba(255,255,255,0.85)' : '#94A3B8'
+                        }}>
+                          {item.monthName}
+                        </span>
+                      </button>
+                    );
+                  })}
+
+                  {/* Active Card for Custom Picked Date if Outside Upcoming 14 Days */}
+                  {(() => {
+                    const upcomingList = generateUpcomingDays(14);
+                    const isCustomOutside = date && !upcomingList.some(item => item.dateStr === date);
+                    if (!isCustomOutside) return null;
+
+                    let dayOfWeek = 'Custom';
+                    let monthName = '';
+                    let dayNum = '';
+                    try {
+                      const parts = date.split('-');
+                      if (parts.length === 3) {
+                        const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+                        dayOfWeek = d.toLocaleDateString('en-US', { weekday: 'short' });
+                        monthName = d.toLocaleDateString('en-US', { month: 'short' });
+                        dayNum = d.getDate();
+                      }
+                    } catch (e) {
+                      dayOfWeek = 'Custom';
+                    }
+
+                    return (
+                      <button
+                        key={date}
+                        type="button"
+                        onClick={() => {}}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '0.65rem 0.85rem',
+                          borderRadius: '14px',
+                          border: '2px solid #0284C7',
+                          background: 'linear-gradient(135deg, #0284C7 0%, #0EA5E9 100%)',
+                          color: '#FFFFFF',
+                          minWidth: '68px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                          boxShadow: '0 6px 16px rgba(14, 165, 233, 0.35)',
+                          flexShrink: 0
+                        }}
+                      >
+                        <span style={{
+                          fontSize: '0.72rem',
+                          fontWeight: 800,
+                          color: 'rgba(255,255,255,0.92)',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.3px'
+                        }}>
+                          {dayOfWeek}
+                        </span>
+
+                        <span style={{
+                          fontSize: '1.25rem',
+                          fontWeight: 900,
+                          lineHeight: 1.15,
+                          margin: '0.15rem 0'
+                        }}>
+                          {dayNum}
+                        </span>
+
+                        <span style={{
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          color: 'rgba(255,255,255,0.85)'
+                        }}>
+                          {monthName}
+                        </span>
+                      </button>
+                    );
+                  })()}
+                </div>
               </div>
 
               {/* Service Arrival Window Header with Prominent Dispatch Capacity */}
@@ -2735,23 +3600,39 @@ const BookSlot = () => {
                           }}>
                             APPLIED
                           </span>
+                          <button
+                            type="button"
+                            onClick={() => setInfoModalCoupon(activeCoupon)}
+                            style={{
+                              background: '#DCFCE7',
+                              border: '1px solid #86EFAC',
+                              color: '#166534',
+                              borderRadius: '6px',
+                              padding: '0.15rem 0.5rem',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.25rem'
+                            }}
+                          >
+                            <Info size={12} /> Details
+                          </button>
                         </div>
                         <div style={{ color: '#166534', fontSize: '0.85rem', fontWeight: 600, marginTop: '0.2rem' }}>
                           🎉 You save ₹{couponDiscount.toFixed(2)} with this offer!
                         </div>
-                        {activeCoupon.description && (
-                          <div style={{ color: '#15803D', fontSize: '0.78rem', marginTop: '0.15rem' }}>
-                            {activeCoupon.description}
-                          </div>
-                        )}
                         {freeAddonBonus && (
-                          <div style={{ marginTop: '0.35rem', fontWeight: 700, color: '#B45309', background: '#FEF3C7', padding: '0.25rem 0.5rem', borderRadius: '6px', fontSize: '0.78rem', width: 'fit-content' }}>
-                            🎁 Free Add-on Perk: {freeAddonBonus} is 100% Free!
+                          <div style={{ marginTop: '0.4rem', fontWeight: 700, color: '#166534', background: '#DCFCE7', border: '1px solid #86EFAC', padding: '0.35rem 0.65rem', borderRadius: '8px', fontSize: '0.8rem', width: 'fit-content', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <Check size={14} color="#16A34A" strokeWidth={3} />
+                            <span>🎁 Free Add-on Perk: <strong>"{freeAddonBonus}"</strong> was automatically added to your cart for ₹0 FREE!</span>
                           </div>
                         )}
                         {discountedAddonBonus && (
-                          <div style={{ marginTop: '0.35rem', fontWeight: 700, color: '#1E40AF', background: '#EFF6FF', padding: '0.25rem 0.5rem', borderRadius: '6px', fontSize: '0.78rem', width: 'fit-content' }}>
-                            ✨ Add-on Perk: Special discount applied on {discountedAddonBonus}!
+                          <div style={{ marginTop: '0.4rem', fontWeight: 700, color: '#1E40AF', background: '#EFF6FF', border: '1px solid #BFDBFE', padding: '0.35rem 0.65rem', borderRadius: '8px', fontSize: '0.8rem', width: 'fit-content', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <Sparkles size={14} color="#2563EB" />
+                            <span>✨ Add-on Perk: Special discount applied on <strong>"{discountedAddonBonus}"</strong>!</span>
                           </div>
                         )}
                       </div>
@@ -2813,7 +3694,9 @@ const BookSlot = () => {
                       const isApplied = selectedCouponCode === coupon.code;
                       const discountTag = coupon.discountType === 'FLAT'
                         ? `₹${coupon.discountAmount} FLAT OFF`
-                        : `${coupon.discountPct}% OFF${coupon.limitOption === 'UP_TO' && coupon.maxDiscountAmount ? ` (UP TO ₹${coupon.maxDiscountAmount})` : ''}`;
+                        : coupon.discountType === 'NONE'
+                          ? (coupon.freeAddonId ? '🎁 FREE ADD-ON' : '⚡ ADD-ON DISCOUNT')
+                          : `${coupon.discountPct}% OFF${coupon.limitOption === 'UP_TO' && coupon.maxDiscountAmount ? ` (UP TO ₹${coupon.maxDiscountAmount})` : ''}`;
 
                       return (
                         <div
@@ -2855,20 +3738,48 @@ const BookSlot = () => {
                               }}>
                                 {discountTag}
                               </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setInfoModalCoupon(coupon);
+                                }}
+                                style={{
+                                  background: '#F1F5F9',
+                                  border: '1px solid #CBD5E1',
+                                  color: '#0284C7',
+                                  padding: '0.15rem 0.5rem',
+                                  borderRadius: '6px',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.25rem'
+                                }}
+                              >
+                                <Info size={12} /> Details
+                              </button>
                             </div>
                             <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#1E293B' }}>
                               {coupon.title}
                             </div>
-                            {coupon.description && (
-                              <div style={{
-                                fontSize: '0.76rem',
-                                color: '#64748B',
-                                marginTop: '0.15rem',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap'
-                              }}>
-                                {coupon.description}
+
+                            {/* Free or Discounted Add-on Perk Indicator */}
+                            {coupon.freeAddonId && (
+                              <div style={{ marginTop: '0.3rem', fontSize: '0.74rem', color: '#047857', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                <span>🎁 Includes FREE Add-on:</span>
+                                <span style={{ textDecoration: 'underline' }}>
+                                  {availableAddons.find(a => Number(a.id) === Number(coupon.freeAddonId))?.name || 'Add-on'} (Auto-added with ₹0 value)
+                                </span>
+                              </div>
+                            )}
+                            {coupon.discountAddonId && (
+                              <div style={{ marginTop: '0.3rem', fontSize: '0.74rem', color: '#1D4ED8', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                <span>⚡ Includes Discounted Add-on:</span>
+                                <span>
+                                  {availableAddons.find(a => Number(a.id) === Number(coupon.discountAddonId))?.name || 'Add-on'} ({coupon.addonDiscountType === 'FREE' ? '100% FREE' : coupon.addonDiscountType === 'FLAT' ? `₹${coupon.addonDiscountValue} OFF` : `${coupon.addonDiscountValue}% OFF`})
+                                </span>
                               </div>
                             )}
                           </div>
@@ -3018,16 +3929,80 @@ const BookSlot = () => {
                 </div>
 
                 {selectedAddonsList.length > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#166534' }}>
-                    <span>Add-on Services ({selectedAddonsList.length})</span>
-                    <span>+₹{addonsTotal}</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#166534', fontWeight: 700 }}>
+                      <span>Add-on Services ({selectedAddonsList.length})</span>
+                      <span>+₹{totalAddonsEffective}</span>
+                    </div>
+
+                    {/* Itemized addon breakdown */}
+                    <div style={{
+                      background: 'white',
+                      border: '1px solid #E2E8F0',
+                      borderRadius: '10px',
+                      padding: '0.65rem 0.85rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.4rem'
+                    }}>
+                      {selectedAddonsList.map(addon => {
+                        const pricing = getAddonPricing(addon);
+                        return (
+                          <div key={addon.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.83rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#334155' }}>
+                              <span>• {addon.name}</span>
+                              {pricing.isFree && (
+                                <span style={{
+                                  background: '#DCFCE7',
+                                  color: '#166534',
+                                  padding: '0.1rem 0.45rem',
+                                  borderRadius: '4px',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 800
+                                }}>
+                                  🎁 FREE via {activeCoupon?.code}
+                                </span>
+                              )}
+                              {pricing.isDiscounted && !pricing.isFree && (
+                                <span style={{
+                                  background: '#EFF6FF',
+                                  color: '#1D4ED8',
+                                  padding: '0.1rem 0.45rem',
+                                  borderRadius: '4px',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 800
+                                }}>
+                                  ⚡ Deal via {activeCoupon?.code}
+                                </span>
+                              )}
+                            </div>
+
+                            <div>
+                              {pricing.isFree ? (
+                                <span>
+                                  <span style={{ textDecoration: 'line-through', color: '#94A3B8', marginRight: '0.35rem', fontSize: '0.78rem' }}>₹{pricing.originalPrice}</span>
+                                  <strong style={{ color: '#16A34A', fontSize: '0.9rem' }}>₹0</strong>
+                                </span>
+                              ) : pricing.isDiscounted ? (
+                                <span>
+                                  <span style={{ textDecoration: 'line-through', color: '#94A3B8', marginRight: '0.35rem', fontSize: '0.78rem' }}>₹{pricing.originalPrice}</span>
+                                  <strong style={{ color: '#0369A1', fontSize: '0.9rem' }}>₹{pricing.effectivePrice}</strong>
+                                </span>
+                              ) : (
+                                <span style={{ color: '#475569', fontWeight: 600 }}>+₹{pricing.originalPrice}</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 
-                {couponDiscount > 0 && (
+                {washCouponDiscount > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#059669', fontWeight: 600 }}>
-                    <span>Coupon Discount ({selectedCouponCode})</span>
-                    <span>-₹{couponDiscount.toFixed(2)}</span>
+                    <span>Coupon Package Discount ({selectedCouponCode})</span>
+                    <span>-₹{washCouponDiscount.toFixed(2)}</span>
                   </div>
                 )}
 
@@ -3091,6 +4066,220 @@ const BookSlot = () => {
 
           </div>
         </form>
+      )}
+
+      {/* Complete Coupon Details Popup Modal */}
+      {infoModalCoupon && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 1100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem'
+          }}
+          onClick={() => setInfoModalCoupon(null)}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '20px',
+              width: '100%',
+              maxWidth: '480px',
+              padding: '1.75rem',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              position: 'relative',
+              maxHeight: '90vh',
+              overflowY: 'auto'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={() => setInfoModalCoupon(null)}
+              style={{
+                position: 'absolute',
+                top: '1rem',
+                right: '1rem',
+                background: '#F1F5F9',
+                border: 'none',
+                borderRadius: '50%',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer'
+              }}
+            >
+              <X size={18} color="#64748B" />
+            </button>
+
+            {/* Header: Coupon Code + Status Tag */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '0.65rem' }}>
+              <span style={{
+                fontWeight: 900,
+                fontSize: '1.1rem',
+                color: 'var(--primary-blue)',
+                background: '#EFF6FF',
+                padding: '0.3rem 0.8rem',
+                borderRadius: '8px',
+                border: '1.5px dashed #3B82F6',
+                letterSpacing: '0.05em'
+              }}>
+                {infoModalCoupon.code}
+              </span>
+
+              {selectedCouponCode === infoModalCoupon.code ? (
+                <span style={{
+                  background: '#16A34A',
+                  color: '#FFF',
+                  fontSize: '0.76rem',
+                  fontWeight: 800,
+                  padding: '0.2rem 0.65rem',
+                  borderRadius: '8px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.3rem'
+                }}>
+                  <Check size={13} strokeWidth={3} /> APPLIED
+                </span>
+              ) : (
+                <span style={{
+                  background: '#D1FAE5',
+                  color: '#047857',
+                  fontSize: '0.76rem',
+                  fontWeight: 800,
+                  padding: '0.2rem 0.65rem',
+                  borderRadius: '8px'
+                }}>
+                  {infoModalCoupon.discountType === 'FLAT'
+                    ? `₹${infoModalCoupon.discountAmount} FLAT OFF`
+                    : infoModalCoupon.discountType === 'NONE'
+                      ? (infoModalCoupon.freeAddonId ? '🎁 FREE ADD-ON' : '⚡ ADD-ON DISCOUNT')
+                      : `${infoModalCoupon.discountPct}% OFF`}
+                </span>
+              )}
+            </div>
+
+            {/* Coupon Title */}
+            <h3 style={{ margin: '0.25rem 0 0.85rem', color: 'var(--primary-navy)', fontSize: '1.18rem', fontWeight: 800 }}>
+              {infoModalCoupon.title}
+            </h3>
+
+            {/* Perks Summary if Add-ons included */}
+            {infoModalCoupon.freeAddonId && (
+              <div style={{
+                background: '#DCFCE7',
+                border: '1px solid #86EFAC',
+                borderRadius: '10px',
+                padding: '0.65rem 0.85rem',
+                color: '#166534',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                marginBottom: '0.85rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem'
+              }}>
+                <span>🎁 Includes Free Add-on:</span>
+                <span style={{ textDecoration: 'underline' }}>
+                  {availableAddons.find(a => Number(a.id) === Number(infoModalCoupon.freeAddonId))?.name || 'Add-on'} (Auto-added with ₹0 value)
+                </span>
+              </div>
+            )}
+
+            {infoModalCoupon.discountAddonId && (
+              <div style={{
+                background: '#EFF6FF',
+                border: '1px solid #BFDBFE',
+                borderRadius: '10px',
+                padding: '0.65rem 0.85rem',
+                color: '#1E40AF',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                marginBottom: '0.85rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem'
+              }}>
+                <span>⚡ Includes Discounted Add-on:</span>
+                <span>
+                  {availableAddons.find(a => Number(a.id) === Number(infoModalCoupon.discountAddonId))?.name || 'Add-on'} ({infoModalCoupon.addonDiscountType === 'FREE' ? '100% FREE' : infoModalCoupon.addonDiscountType === 'FLAT' ? `₹${infoModalCoupon.addonDiscountValue} OFF` : `${infoModalCoupon.addonDiscountValue}% OFF`})
+                </span>
+              </div>
+            )}
+
+            {/* Complete Description and Offer Terms */}
+            <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '1rem', marginTop: '0.5rem' }}>
+              <h4 style={{ margin: '0 0 0.5rem', color: 'var(--primary-navy)', fontSize: '0.82rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Complete Offer Details & Terms
+              </h4>
+              <div style={{
+                color: '#334155',
+                fontSize: '0.88rem',
+                lineHeight: 1.65,
+                whiteSpace: 'pre-line',
+                background: '#F8FAFC',
+                padding: '0.9rem 1.1rem',
+                borderRadius: '12px',
+                border: '1px solid #E2E8F0'
+              }}>
+                {infoModalCoupon.description || 'Enjoy this exclusive promotional offer when scheduling your car wash!'}
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem', borderTop: '1px solid #F1F5F9', paddingTop: '1.15rem', marginTop: '1.25rem' }}>
+              <button
+                type="button"
+                onClick={() => setInfoModalCoupon(null)}
+                className="btn btn-outline"
+                style={{ borderRadius: '10px', padding: '0.55rem 1.15rem', fontSize: '0.85rem' }}
+              >
+                Close
+              </button>
+              {selectedCouponCode === infoModalCoupon.code ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleRemoveCoupon();
+                    setInfoModalCoupon(null);
+                  }}
+                  style={{
+                    background: '#FEE2E2',
+                    color: '#DC2626',
+                    border: '1px solid #FCA5A5',
+                    padding: '0.55rem 1.15rem',
+                    borderRadius: '10px',
+                    fontSize: '0.85rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Remove Coupon
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleApplyCoupon(infoModalCoupon.code);
+                    setInfoModalCoupon(null);
+                  }}
+                  className="btn btn-primary"
+                  style={{ borderRadius: '10px', padding: '0.55rem 1.25rem', fontSize: '0.85rem', fontWeight: 700 }}
+                >
+                  Apply This Offer
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

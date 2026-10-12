@@ -885,7 +885,7 @@ export const getSystemSettings = async (req, res) => {
           rewardPointsRatio: 0.1,
           referralRewardPoints: 50,
           referralMaxLimit: 10,
-          referralStreakBonus: 25,
+          referralStreakBonus: "25",
           referralStreakConfig: JSON.stringify([
             { count: 1, points: 50 },
             { count: 2, points: 75 },
@@ -933,7 +933,7 @@ export const updateSystemSettings = async (req, res) => {
         ...(referralEnabled !== undefined && { referralEnabled: Boolean(referralEnabled) }),
         ...(referralRewardPoints !== undefined && { referralRewardPoints: Number(referralRewardPoints) }),
         ...(referralMaxLimit !== undefined && { referralMaxLimit: Number(referralMaxLimit) }),
-        ...(referralStreakBonus !== undefined && { referralStreakBonus: Number(referralStreakBonus) }),
+        ...(referralStreakBonus !== undefined && { referralStreakBonus: String(referralStreakBonus) }),
         ...(referralStreakConfig !== undefined && { referralStreakConfig: typeof referralStreakConfig === 'object' ? JSON.stringify(referralStreakConfig) : String(referralStreakConfig) }),
         ...(bookingTermsText !== undefined && { bookingTermsText: String(bookingTermsText) }),
         ...(dashboardAdImage !== undefined && { dashboardAdImage: String(dashboardAdImage) }),
@@ -951,7 +951,7 @@ export const updateSystemSettings = async (req, res) => {
         referralEnabled: referralEnabled !== undefined ? Boolean(referralEnabled) : true,
         referralRewardPoints: referralRewardPoints !== undefined ? Number(referralRewardPoints) : 50,
         referralMaxLimit: referralMaxLimit !== undefined ? Number(referralMaxLimit) : 10,
-        referralStreakBonus: referralStreakBonus !== undefined ? Number(referralStreakBonus) : 25,
+        referralStreakBonus: referralStreakBonus !== undefined ? String(referralStreakBonus) : "25",
         referralStreakConfig: referralStreakConfig ? (typeof referralStreakConfig === 'object' ? JSON.stringify(referralStreakConfig) : String(referralStreakConfig)) : JSON.stringify([
           { count: 1, points: 50 },
           { count: 2, points: 75 },
@@ -960,7 +960,7 @@ export const updateSystemSettings = async (req, res) => {
         bookingTermsText: bookingTermsText || "1. Access Requirements: Customer agrees to provide adequate water tap access and a standard electric plug point for the technician to perform the doorstep car wash service safely.\n2. Vehicle Parking: The vehicle must be parked in a well-lit area with sufficient clearance around all sides.\n3. Valuable Items: Please remove all personal belongings and valuables from inside the car prior to service commencement.",
         dashboardAdImage: dashboardAdImage || "https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=1600&q=85",
         dashboardAdTitle: dashboardAdTitle || "Special Weekend Doorstep Detail & Snow Foam Spa",
-        dashboardAdSubtitle: dashboardAdSubtitle || "Get sparkling exterior foam wash & deep interior cabin sanitize with pure RO water at your doorstep.",
+        dashboardAdSubtitle: dashboardAdSubtitle || "Get sparkling exterior foam wash & deep interior cabin sanitize with spot-free purified water at your doorstep.",
         dashboardAdBadge: dashboardAdBadge || "PROMOTIONAL OFFER • LIMITED SLOTS"
       }
     });
@@ -1119,9 +1119,9 @@ export const getCmsContent = async (req, res) => {
           servicesTitle: "EVERYDAY CARE. PREMIUM SHINE.",
           servicesSubtitle: "One destination for your vehicle's everyday wash, interior deep steam, and premium shine.",
           whyTitle: "SMARTER CAR CARE. BUILT AROUND YOU.",
-          whySubtitle: "Convenience-first automotive detailing with professional equipment and RO water efficiency.",
+          whySubtitle: "Convenience-first automotive detailing with professional high-pressure equipment and deionized spot-free water.",
           whyCard1Title: "YOUR CAR STAYS. WE COME TO YOU.",
-          whyCard1Text: "No queues. No driving to wash centres. Our technicians arrive at your home or office with high-pressure machines and RO water.",
+          whyCard1Text: "No queues. No driving to wash centres. Our technicians arrive at your home or office with high-pressure machines and spot-free deionized water.",
           whyCard2Title: "Book in Seconds",
           whyCard2Text: "Choose your wash package, select your slot, and track everything live.",
           whyCard3Title: "Trained Specialists",

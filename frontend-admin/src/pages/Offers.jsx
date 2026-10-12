@@ -64,8 +64,14 @@ const Offers = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      if (formData.discountType === 'NONE' && formData.addonPerkType === 'NONE') {
+        alert('Please select either a Free or Discounted Add-on perk, or choose a car wash discount type.');
+        return;
+      }
+
       const payload = {
         ...formData,
+        discountType: formData.discountType,
         discountPct: formData.discountType === 'PERCENTAGE' ? Number(formData.discountPct || 0) : 0,
         discountAmount: formData.discountType === 'FLAT' ? Number(formData.discountAmount || 0) : 0,
         maxDiscountAmount: (formData.discountType === 'PERCENTAGE' && formData.limitOption === 'UP_TO') ? Number(formData.maxDiscountAmount || 0) : null,
@@ -228,11 +234,14 @@ const Offers = () => {
                   ...formData, 
                   discountType: e.target.value,
                   discountPct: e.target.value === 'PERCENTAGE' ? formData.discountPct : '',
-                  discountAmount: e.target.value === 'FLAT' ? formData.discountAmount : ''
+                  discountAmount: e.target.value === 'FLAT' ? formData.discountAmount : '',
+                  addonPerkType: e.target.value === 'NONE' && formData.addonPerkType === 'NONE' ? 'FREE' : formData.addonPerkType,
+                  freeAddonId: e.target.value === 'NONE' && !formData.freeAddonId ? (addons[0]?.id ? String(addons[0].id) : '') : formData.freeAddonId
                 })}
               >
-                <option value="PERCENTAGE">Percentage (%)</option>
-                <option value="FLAT">Flat Amount (₹)</option>
+                <option value="PERCENTAGE">Percentage Wash Discount (%)</option>
+                <option value="FLAT">Flat Wash Discount Amount (₹)</option>
+                <option value="NONE">🎁 Free / Discounted Add-On Only (No Wash Discount)</option>
               </select>
             </div>
 
@@ -284,7 +293,7 @@ const Offers = () => {
                   </div>
                 )}
               </>
-            ) : (
+            ) : formData.discountType === 'FLAT' ? (
               <div className="form-group" style={{ margin: 0 }}>
                 <label className="form-label">Flat Discount Amount (₹)</label>
                 <input 
@@ -296,6 +305,23 @@ const Offers = () => {
                   onChange={e => setFormData({ ...formData, discountAmount: e.target.value })} 
                   placeholder="e.g. 100" 
                 />
+              </div>
+            ) : (
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.08), rgba(99, 102, 241, 0.08))',
+                border: '1.5px dashed #0284C7',
+                borderRadius: '8px',
+                padding: '0.85rem 1rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.35rem'
+              }}>
+                <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0369A1', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <span>🎁 Free or Discounted Add-on Perk (Full Price Wash)</span>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.8rem', color: '#475569', lineHeight: 1.45 }}>
+                  The customer pays regular standard price for their car wash booking, but receives your chosen Free or Discounted Add-on perk (e.g., Free Bike Wash, Helmet Wash, etc.) with the booking!
+                </p>
               </div>
             )}
 
@@ -605,7 +631,9 @@ const Offers = () => {
                       <span style={{ fontWeight: 'bold', color: 'var(--accent-teal)', fontSize: '0.9rem' }}>
                         {o.discountType === 'FLAT' 
                           ? `₹${o.discountAmount} FLAT OFF` 
-                          : `${o.discountPct}% OFF${o.limitOption === 'UP_TO' ? ` (Up to ₹${o.maxDiscountAmount})` : ''}`
+                          : o.discountType === 'NONE'
+                            ? (o.freeAddonId ? '🎁 FREE ADD-ON INCLUDED' : '⚡ DISCOUNTED ADD-ON')
+                            : `${o.discountPct}% OFF${o.limitOption === 'UP_TO' ? ` (Up to ₹${o.maxDiscountAmount})` : ''}`
                         }
                       </span>
                     </div>

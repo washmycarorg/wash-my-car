@@ -34,7 +34,7 @@ const SettingsPage = () => {
     bookingTermsText: "1. Access Requirements: Customer agrees to provide adequate water tap access and a standard electric plug point for the technician to perform the doorstep car wash service safely.\n2. Vehicle Parking: The vehicle must be parked in a safe area with sufficient clearance around all sides.\n3. Valuable Items: Please remove all personal belongings and valuables from inside the car prior to service commencement.",
     dashboardAdImage: "https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=1600&q=85",
     dashboardAdTitle: "Special Weekend Doorstep Detail & Snow Foam Spa",
-    dashboardAdSubtitle: "Get sparkling exterior foam wash & deep interior cabin sanitize with pure RO water at your doorstep.",
+    dashboardAdSubtitle: "Get sparkling exterior foam wash & deep interior cabin sanitize with spot-free purified water at your doorstep.",
     dashboardAdBadge: "PROMOTIONAL OFFER • LIMITED SLOTS"
   });
 
@@ -77,7 +77,7 @@ const SettingsPage = () => {
           bookingTermsText: res.bookingTermsText || "1. Access Requirements: Customer agrees to provide adequate water tap access and a standard electric plug point for the technician to perform the doorstep car wash service safely.\n2. Vehicle Parking: The vehicle must be parked in a safe area with sufficient clearance around all sides.\n3. Valuable Items: Please remove all personal belongings and valuables from inside the car prior to service commencement.",
           dashboardAdImage: res.dashboardAdImage || "https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=1600&q=85",
           dashboardAdTitle: res.dashboardAdTitle || "Special Weekend Doorstep Detail & Snow Foam Spa",
-          dashboardAdSubtitle: res.dashboardAdSubtitle || "Get sparkling exterior foam wash & deep interior cabin sanitize with pure RO water at your doorstep.",
+          dashboardAdSubtitle: res.dashboardAdSubtitle || "Get sparkling exterior foam wash & deep interior cabin sanitize with spot-free purified water at your doorstep.",
           dashboardAdBadge: res.dashboardAdBadge || "PROMOTIONAL OFFER • LIMITED SLOTS"
         });
         setLoading(false);
@@ -193,7 +193,7 @@ const SettingsPage = () => {
         referralEnabled: settings.referralEnabled,
         referralRewardPoints: Number(settings.referralRewardPoints),
         referralMaxLimit: Number(settings.referralMaxLimit),
-        referralStreakBonus: Number(settings.referralStreakBonus),
+        referralStreakBonus: String(settings.referralStreakBonus ?? '25'),
         referralStreakConfig: tiersJson,
         bookingTermsText: settings.bookingTermsText,
         dashboardAdImage: settings.dashboardAdImage,

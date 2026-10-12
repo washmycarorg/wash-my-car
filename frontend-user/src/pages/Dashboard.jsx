@@ -224,7 +224,7 @@ const Dashboard = () => {
             lineHeight: 1.45,
             textShadow: '0 1px 2px rgba(0,0,0,0.3)'
           }}>
-            {systemSettings?.dashboardAdSubtitle || 'Book a sparkling exterior foam wash and deep interior cabin sanitize with RO water at your doorstep.'}
+            {systemSettings?.dashboardAdSubtitle || 'Book a sparkling exterior foam wash and deep interior cabin sanitize with spot-free purified water at your doorstep.'}
           </p>
 
           <div>

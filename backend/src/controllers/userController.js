@@ -294,12 +294,25 @@ export const createBooking = async (req, res) => {
     }
 
     // Fetch and calculate selected addons
+    let finalAddonIds = Array.isArray(addonIds) ? addonIds.map(Number) : [];
+    if (couponCode) {
+      const offerCheck = await prisma.offer.findUnique({ where: { code: couponCode, active: true } });
+      if (offerCheck) {
+        if (offerCheck.freeAddonId && !finalAddonIds.includes(Number(offerCheck.freeAddonId))) {
+          finalAddonIds.push(Number(offerCheck.freeAddonId));
+        }
+        if (offerCheck.discountAddonId && !finalAddonIds.includes(Number(offerCheck.discountAddonId))) {
+          finalAddonIds.push(Number(offerCheck.discountAddonId));
+        }
+      }
+    }
+
     let selectedAddons = [];
     let addonsTotal = 0;
-    if (Array.isArray(addonIds) && addonIds.length > 0) {
+    if (finalAddonIds.length > 0) {
       selectedAddons = await prisma.addon.findMany({
         where: {
-          id: { in: addonIds.map(Number) },
+          id: { in: finalAddonIds },
           active: true
         }
       });
@@ -384,11 +397,13 @@ export const createBooking = async (req, res) => {
       let discount = 0;
       if (offer.discountType === 'FLAT') {
         discount = offer.discountAmount;
-      } else {
+      } else if (offer.discountType === 'PERCENTAGE') {
         discount = (baseWashPrice * offer.discountPct) / 100;
         if (offer.limitOption === 'UP_TO' && offer.maxDiscountAmount) {
           discount = Math.min(discount, offer.maxDiscountAmount);
         }
+      } else {
+        discount = 0;
       }
 
       // Addon-specific coupon discount
@@ -886,9 +901,9 @@ export const getPublicHomeContent = async (req, res) => {
           servicesTitle: "EVERYDAY CARE. PREMIUM SHINE.",
           servicesSubtitle: "One destination for your vehicle's everyday wash, interior deep steam, and premium shine.",
           whyTitle: "SMARTER CAR CARE. BUILT AROUND YOU.",
-          whySubtitle: "Convenience-first automotive detailing with professional equipment and RO water efficiency.",
+          whySubtitle: "Convenience-first automotive detailing with professional high-pressure equipment and deionized spot-free water.",
           whyCard1Title: "YOUR CAR STAYS. WE COME TO YOU.",
-          whyCard1Text: "No queues. No driving to wash centres. Our technicians arrive at your home or office with high-pressure machines and RO water.",
+          whyCard1Text: "No queues. No driving to wash centres. Our technicians arrive at your home or office with high-pressure machines and spot-free deionized water.",
           whyCard2Title: "Book in Seconds",
           whyCard2Text: "Choose your wash package, select your slot, and track everything live.",
           whyCard3Title: "Trained Specialists",
@@ -945,12 +960,36 @@ export const getPublicActiveCoupons = async (req, res) => {
         discountAmount: true,
         limitOption: true,
         maxDiscountAmount: true,
+        freeAddonId: true,
+        discountAddonId: true,
+        addonDiscountType: true,
+        addonDiscountValue: true,
+        applicableCarTypeIds: true,
+        applicableWashTypeIds: true,
         validUntil: true,
         userType: true
       },
       orderBy: { createdAt: 'desc' }
     });
-    res.json(offers);
+
+    // Populate addon names if freeAddonId or discountAddonId exist
+    const addonIds = [...new Set(offers.flatMap(o => [o.freeAddonId, o.discountAddonId]).filter(Boolean).map(Number))];
+    let addonMap = {};
+    if (addonIds.length > 0) {
+      const addons = await prisma.addon.findMany({
+        where: { id: { in: addonIds } },
+        select: { id: true, name: true, price: true }
+      });
+      addonMap = Object.fromEntries(addons.map(a => [a.id, a]));
+    }
+
+    const enhancedOffers = offers.map(o => ({
+      ...o,
+      freeAddon: o.freeAddonId ? addonMap[o.freeAddonId] || null : null,
+      discountAddon: o.discountAddonId ? addonMap[o.discountAddonId] || null : null
+    }));
+
+    res.json(enhancedOffers);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

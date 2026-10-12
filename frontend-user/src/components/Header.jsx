@@ -33,13 +33,14 @@ const Header = ({ toggleSidebar, profile }) => {
           <img src={logo} alt="Wash My Car Logo" style={{height: '32px', width: 'auto', objectFit: 'contain'}} />
           <div style={{display: 'flex', alignItems: 'baseline', gap: '0.35rem', flexWrap: 'nowrap'}}>
             <span style={{
-              color: 'var(--primary-navy)', 
               fontSize: '1.15rem', 
               fontWeight: 900, 
               letterSpacing: '0.04em',
               lineHeight: 1
             }}>
-              WASH MY <span style={{color: 'var(--primary-blue)'}}>CAR</span>
+              <span style={{color: 'var(--primary-navy)'}}>WASH </span>
+              <span style={{color: 'var(--accent-teal)'}}>MY </span>
+              <span style={{color: 'var(--primary-navy)'}}>CAR</span>
             </span>
             <span style={{
               color: 'var(--accent-teal)',
