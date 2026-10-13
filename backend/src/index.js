@@ -1,3 +1,4 @@
+
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -11,21 +12,48 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+const allowedOrigins = [
+  'https://washmycar.org.in',
+  'https://www.washmycar.org.in',
+  'https://emp.washmycar.org.in',
+  'https://admin.washmycar.org.in',
+];
+
+const corsOptions = {
+  origin(origin, callback) {
+    // Allow requests without an Origin header, such as server-to-server calls.
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`Origin not allowed by CORS: ${origin}`));
+  },
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  optionsSuccessStatus: 204,
+};
+
+// CORS must be registered before API routes.
+app.use(cors(corsOptions));
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
-// Basic health check endpoint
+// Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Wash My Car API is running securely' });
+  res.json({
+    status: 'OK',
+    message: 'Wash My Car API is running securely',
+  });
 });
 
-// API Routes
+// API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/admin', adminRoutes);
 
-app.listen(PORT, () => {
-  console.log(`Server running securely on port ${PORT}`);
+app.listen(PORT, '127.0.0.1', () => {
+  console.log(`Server running on 127.0.0.1:${PORT}`);
 });
