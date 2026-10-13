@@ -727,6 +727,7 @@ export const createBooking = async (req, res) => {
     });
 
     return res.json({
+      success: true,
       requiresPayment: true,
       bookingId: booking.id,
       razorpayOrderId: rzpOrder.id,
@@ -734,6 +735,12 @@ export const createBooking = async (req, res) => {
       currency: rzpOrder.currency,
       keyId: process.env.RAZORPAY_KEY_ID || '',
       finalPayable: finalPrice,
+      rzpOrder: {
+        id: rzpOrder.id,
+        amount: rzpOrder.amount,
+        currency: rzpOrder.currency,
+        key: process.env.RAZORPAY_KEY_ID || ''
+      },
       booking
     });
 

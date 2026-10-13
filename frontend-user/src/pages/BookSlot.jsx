@@ -1119,11 +1119,29 @@ const BookSlot = () => {
       const res = await createBooking(payload);
 
       // Check if online Razorpay payment is required
-      if (res.requiresPayment && res.rzpOrder) {
+      const isOnlinePayment = res.requiresPayment && (res.rzpOrder || res.razorpayOrderId);
+      if (isOnlinePayment) {
+        const orderId = res.rzpOrder?.id || res.razorpayOrderId;
+        const orderAmount = res.rzpOrder?.amount || res.amount;
+        const orderCurrency = res.rzpOrder?.currency || res.currency || 'INR';
+        const keyId = res.rzpOrder?.key || res.keyId || import.meta.env.VITE_RAZORPAY_KEY_ID;
+        const targetBookingId = res.booking?.id || res.bookingId;
+
+        // Dynamically load Razorpay SDK if not already in window
+        if (!window.Razorpay) {
+          await new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+            script.onload = resolve;
+            script.onerror = reject;
+            document.body.appendChild(script);
+          }).catch(() => null);
+        }
+
         if (!window.Razorpay) {
           alert('Razorpay payment gateway script not loaded. Please refresh the page and try again.');
           try {
-            await cancelPendingPayment(res.booking.id, 'RAZORPAY_SCRIPT_UNAVAILABLE');
+            await cancelPendingPayment(targetBookingId, 'RAZORPAY_SCRIPT_UNAVAILABLE');
           } catch (e) {}
           refreshSlots();
           setLoading(false);
@@ -1131,12 +1149,12 @@ const BookSlot = () => {
         }
 
         const rzpOptions = {
-          key: res.rzpOrder.key || import.meta.env.VITE_RAZORPAY_KEY_ID,
-          amount: res.rzpOrder.amount,
-          currency: res.rzpOrder.currency || 'INR',
+          key: keyId,
+          amount: orderAmount,
+          currency: orderCurrency,
           name: 'Wash My Car',
           description: `Doorstep Car Wash (${selectedWashTypeObj?.name || 'Package'})`,
-          order_id: res.rzpOrder.id,
+          order_id: orderId,
           prefill: {
             name: userProfile?.name || '',
             email: userProfile?.email || '',
@@ -1149,7 +1167,7 @@ const BookSlot = () => {
             ondismiss: async function () {
               // Customer dismissed / timed out on Razorpay checkout without completing payment
               try {
-                await cancelPendingPayment(res.booking.id, 'PAYMENT_ABANDONED_OR_TIMEOUT');
+                await cancelPendingPayment(targetBookingId, 'PAYMENT_ABANDONED_OR_TIMEOUT');
               } catch (e) {
                 console.warn('Slot unlock notice:', e);
               }
@@ -1162,7 +1180,7 @@ const BookSlot = () => {
             try {
               setLoading(true);
               const verifyRes = await verifyBookingPayment({
-                bookingId: res.booking.id,
+                bookingId: targetBookingId,
                 razorpayOrderId: paymentResponse.razorpay_order_id,
                 razorpayPaymentId: paymentResponse.razorpay_payment_id,
                 razorpaySignature: paymentResponse.razorpay_signature
@@ -1181,7 +1199,7 @@ const BookSlot = () => {
         const rzpInstance = new window.Razorpay(rzpOptions);
         rzpInstance.on('payment.failed', async function (failedResp) {
           try {
-            await cancelPendingPayment(res.booking.id, failedResp.error?.description || 'PAYMENT_FAILED');
+            await cancelPendingPayment(targetBookingId, failedResp.error?.description || 'PAYMENT_FAILED');
           } catch (e) {}
           refreshSlots();
           setLoading(false);

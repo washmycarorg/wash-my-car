@@ -17,6 +17,10 @@ const allowedOrigins = [
   'https://www.washmycar.org.in',
   'https://emp.washmycar.org.in',
   'https://admin.washmycar.org.in',
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5175',
+  'http://localhost:5176',
 ];
 
 const corsOptions = {
