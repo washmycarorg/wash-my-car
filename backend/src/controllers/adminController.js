@@ -1,6 +1,7 @@
 import prisma from '../config/db.js';
 import { getRazorpayInstance } from '../config/razorpay.js';
 import { computeEmployeePayout } from '../utils/payoutHelper.js';
+import { sendCancellationRefundSms } from '../services/smsService.js';
 
 export const getDashboardStats = async (req, res) => {
   try {
@@ -798,6 +799,11 @@ export const cancelBookingByAdmin = async (req, res) => {
       },
       include: { employee: true, user: true, washType: true, carType: true }
     });
+
+    // Send cancellation and refund initiation SMS to the customer
+    if (booking.user?.phone) {
+      sendCancellationRefundSms(booking.user.phone, updatedBooking, refundDetails).catch(err => console.error('[SMS Admin Cancel error]:', err));
+    }
 
     res.json({
       message: refundDetails.refundStatus === 'PROCESSED'

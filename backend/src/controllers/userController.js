@@ -2,6 +2,7 @@ import prisma from '../config/db.js';
 import { parseSlotTimeWindow, cleanupExpiredSlotLocks } from './slotController.js';
 import { getRazorpayInstance, verifyRazorpaySignature } from '../config/razorpay.js';
 import { computeEmployeePayout } from '../utils/payoutHelper.js';
+import { sendBookingConfirmationSms, sendCancellationRefundSms } from '../services/smsService.js';
 
 export const getProfile = async (req, res) => {
   try {
@@ -643,18 +644,15 @@ export const createBooking = async (req, res) => {
               employeeId: chosenEmployee.id,
               status: 'ASSIGNED',
               employeePayout: calculatedPayout
-            },
-            include: {
-              employee: true,
-              addons: { include: { addon: true } },
-              washType: true,
-              carType: true
             }
           });
-          return res.json({ requiresPayment: false, booking: updatedBooking });
+          const confirmedBkg = updatedBooking;
+          sendBookingConfirmationSms(user.phone, confirmedBkg).catch(err => console.error('[SMS Booking Confirmation error]:', err));
+          return res.json({ requiresPayment: false, booking: confirmedBkg });
         }
       }
 
+      sendBookingConfirmationSms(user.phone, booking).catch(err => console.error('[SMS Booking Confirmation error]:', err));
       return res.json({ requiresPayment: false, booking });
     }
 
@@ -862,6 +860,9 @@ export const verifyBookingPayment = async (req, res) => {
       }
     });
 
+    // Send Booking Confirmation SMS with booking details & Payment ID
+    sendBookingConfirmationSms(user.phone, updatedBooking).catch(err => console.error('[SMS Booking Confirmation error]:', err));
+
     res.json({ message: 'Payment verified and booking confirmed successfully', booking: updatedBooking });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1001,6 +1002,11 @@ export const cancelBooking = async (req, res) => {
         carType: true
       }
     });
+
+    // Send Cancellation & Refund Initiation SMS to user
+    if (booking.user?.phone) {
+      sendCancellationRefundSms(booking.user.phone, updatedBooking, refundDetails).catch(err => console.error('[SMS Cancel/Refund error]:', err));
+    }
 
     res.json({
       message: refundDetails.refundStatus === 'PROCESSED'

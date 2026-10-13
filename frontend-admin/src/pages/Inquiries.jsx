@@ -1,6 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { getInquiries, updateInquiryStatus, deleteInquiry } from '../api';
-import { MessageSquare, AlertCircle, Phone, Mail, CheckCircle, Clock, Trash2, Edit3, Search, Filter, ShieldAlert, Sparkles, UserCheck } from 'lucide-react';
+import { MessageSquare, AlertCircle, Phone, Mail, CheckCircle, Clock, Trash2, Edit3, Search, Filter, ShieldAlert, Sparkles, UserCheck, Image, Eye, ExternalLink, X } from 'lucide-react';
+
+const parseInquiryImages = (imagesData) => {
+  if (!imagesData) return [];
+  if (Array.isArray(imagesData)) return imagesData;
+  try {
+    const parsed = JSON.parse(imagesData);
+    if (Array.isArray(parsed)) return parsed;
+  } catch (e) {
+    if (typeof imagesData === 'string' && (imagesData.startsWith('data:image') || imagesData.startsWith('http'))) {
+      return [imagesData];
+    }
+  }
+  return [];
+};
 
 const Inquiries = () => {
   const [inquiries, setInquiries] = useState([]);
@@ -10,6 +24,7 @@ const Inquiries = () => {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [search, setSearch] = useState('');
   const [activeInquiryModal, setActiveInquiryModal] = useState(null);
+  const [previewImage, setPreviewImage] = useState(null);
   const [notesInput, setNotesInput] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
 
@@ -269,6 +284,24 @@ const Inquiries = () => {
                         <div style={{ fontSize: '0.85rem', color: '#334155', lineHeight: 1.4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {inq.message}
                         </div>
+                        {parseInquiryImages(inq.images).length > 0 && (
+                          <div style={{ marginTop: '0.25rem' }}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                              background: '#EFF6FF',
+                              color: '#1D4ED8',
+                              border: '1px solid #BFDBFE',
+                              padding: '0.12rem 0.45rem',
+                              borderRadius: '6px',
+                              fontSize: '0.72rem',
+                              fontWeight: 700
+                            }}>
+                              <Image size={12} /> {parseInquiryImages(inq.images).length} Photo{parseInquiryImages(inq.images).length > 1 ? 's' : ''} Attached
+                            </span>
+                          </div>
+                        )}
                         {inq.notes && (
                           <div style={{ fontSize: '0.75rem', color: '#059669', marginTop: '0.25rem', fontWeight: 600 }}>
                             📝 Note: {inq.notes}
@@ -394,6 +427,60 @@ const Inquiries = () => {
                 </div>
               </div>
 
+              {/* Customer Attached Images Gallery */}
+              {(() => {
+                const attachedImages = parseInquiryImages(activeInquiryModal.images);
+                if (!attachedImages || attachedImages.length === 0) return null;
+
+                return (
+                  <div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: 800, color: 'var(--primary-navy)', marginBottom: '0.45rem' }}>
+                      <Image size={16} color="var(--primary-blue)" />
+                      Customer Attached Photos ({attachedImages.length}/3)
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.75rem' }}>
+                      {attachedImages.map((imgUrl, i) => (
+                        <div
+                          key={i}
+                          onClick={() => setPreviewImage(imgUrl)}
+                          style={{
+                            position: 'relative',
+                            borderRadius: '12px',
+                            overflow: 'hidden',
+                            border: '1.5px solid #CBD5E1',
+                            height: '110px',
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+                            transition: 'all 0.2s',
+                            background: '#F8FAFC'
+                          }}
+                          title="Click to view full image"
+                        >
+                          <img src={imgUrl} alt={`Attachment ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <div style={{
+                            position: 'absolute',
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            background: 'rgba(15, 23, 42, 0.75)',
+                            padding: '0.2rem 0.4rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'white',
+                            fontSize: '0.7rem',
+                            fontWeight: 700,
+                            gap: '0.25rem'
+                          }}>
+                            <Eye size={12} /> View Photo
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Status Selector */}
               <div>
                 <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 800, color: '#475569', marginBottom: '0.35rem' }}>
@@ -449,6 +536,53 @@ const Inquiries = () => {
               </div>
 
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Full Image Zoom Preview Modal */}
+      {previewImage && (
+        <div
+          onClick={() => setPreviewImage(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.85)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2000,
+            padding: '2rem'
+          }}
+        >
+          <div style={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }} onClick={e => e.stopPropagation()}>
+            <img
+              src={previewImage}
+              alt="Enlarged attachment"
+              style={{ maxWidth: '100%', maxHeight: '85vh', objectFit: 'contain', borderRadius: '12px', boxShadow: '0 25px 50px rgba(0,0,0,0.5)' }}
+            />
+            <button
+              onClick={() => setPreviewImage(null)}
+              style={{
+                position: 'absolute',
+                top: '-15px',
+                right: '-15px',
+                background: 'white',
+                color: '#0F172A',
+                border: 'none',
+                borderRadius: '50%',
+                width: '36px',
+                height: '36px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+              }}
+            >
+              <X size={20} />
+            </button>
           </div>
         </div>
       )}

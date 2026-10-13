@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getBookings, assignSlot, autoAssignSlot, cancelBookingByAdmin, getEmployees, getEmployeesWorkload, getCarTypes, getWashTypes, getSettings, updateSettings } from '../api';
-import { Calendar, User, Car, MapPin, Compass, Image, Eye, RefreshCw, CheckCircle, Navigation, AlertCircle, Search, X, Zap, Sparkles, ChevronDown } from 'lucide-react';
+import { Calendar, User, Car, MapPin, Compass, Image, Eye, RefreshCw, CheckCircle, Navigation, AlertCircle, Search, X, Zap, Sparkles, ChevronDown, CreditCard, Clock, RotateCcw } from 'lucide-react';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
@@ -308,6 +308,7 @@ const Bookings = () => {
   const [filterWashTypeId, setFilterWashTypeId] = useState('');
   const [filterCarTypeId, setFilterCarTypeId] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [filterPaymentStatus, setFilterPaymentStatus] = useState('');
 
   const fetchWorkload = async (date, timeSlot) => {
     const key = `${date}_${timeSlot}`;
@@ -455,8 +456,24 @@ const Bookings = () => {
 
   const filteredBookings = bookings.filter((b) => {
     if (searchPhone) {
-      const userPhone = b.user?.phone || '';
-      if (!userPhone.includes(searchPhone)) return false;
+      const q = searchPhone.trim().toLowerCase();
+      const userPhone = (b.user?.phone || '').toLowerCase();
+      const userName = (b.user?.name || '').toLowerCase();
+      const carPlate = (b.carNumber || b.car?.carNumber || '').toLowerCase();
+      const carModel = (b.car ? `${b.car.make} ${b.car.model}` : `${b.carMake || ''} ${b.carModel || ''}`).toLowerCase();
+      const bookingId = String(b.id);
+      const razorpayId = (b.razorpayPaymentId || b.razorpayOrderId || '').toLowerCase();
+
+      const matches = 
+        userPhone.includes(q) || 
+        userName.includes(q) || 
+        carPlate.includes(q) || 
+        carModel.includes(q) || 
+        bookingId === q || 
+        (`#${b.id}`).includes(q) || 
+        razorpayId.includes(q);
+
+      if (!matches) return false;
     }
     if (filterDate) {
       const bookingDate = new Date(b.date).toISOString().split('T')[0];
@@ -471,6 +488,10 @@ const Bookings = () => {
     if (filterStatus) {
       if (b.status !== filterStatus) return false;
     }
+    if (filterPaymentStatus) {
+      const actualPayStatus = (b.paymentStatus || (b.razorpayPaymentId ? 'PAID' : (b.refundStatus === 'PROCESSED' ? 'REFUNDED' : 'PENDING'))).toUpperCase();
+      if (actualPayStatus !== filterPaymentStatus.toUpperCase()) return false;
+    }
     return true;
   });
 
@@ -480,6 +501,7 @@ const Bookings = () => {
     setFilterWashTypeId('');
     setFilterCarTypeId('');
     setFilterStatus('');
+    setFilterPaymentStatus('');
   };
 
   if (loading) return <div style={{ textAlign: 'center', padding: '3rem' }}>Loading bookings...</div>;
@@ -491,16 +513,16 @@ const Bookings = () => {
       <div className="card" style={{ padding: '1.5rem' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', alignItems: 'end' }}>
           
-          {/* Phone Search */}
+          {/* Phone / Text Search */}
           <div className="form-group" style={{ margin: 0 }}>
-            <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>Search Phone Number</label>
+            <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>Search Booking</label>
             <div style={{ position: 'relative', marginTop: '0.25rem' }}>
               <input
                 type="text"
                 className="form-input"
-                placeholder="e.g. 9876543210"
+                placeholder="Phone, name, car #, ID..."
                 value={searchPhone}
-                onChange={e => setSearchPhone(e.target.value.replace(/\D/g, ''))}
+                onChange={e => setSearchPhone(e.target.value)}
                 style={{ paddingLeft: '2.25rem', marginBottom: 0 }}
               />
               <Search size={16} style={{ position: 'absolute', left: '10px', top: '11px', color: 'var(--text-muted)' }} />
@@ -551,9 +573,9 @@ const Bookings = () => {
             </select>
           </div>
 
-          {/* Status Filter */}
+          {/* Service Status Filter */}
           <div className="form-group" style={{ margin: 0 }}>
-            <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>Status</label>
+            <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>Service Status</label>
             <select
               className="form-input"
               value={filterStatus}
@@ -569,8 +591,25 @@ const Bookings = () => {
             </select>
           </div>
 
+          {/* Payment Status Filter */}
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>Payment</label>
+            <select
+              className="form-input"
+              value={filterPaymentStatus}
+              onChange={e => setFilterPaymentStatus(e.target.value)}
+              style={{ marginTop: '0.25rem', marginBottom: 0 }}
+            >
+              <option value="">All Payments</option>
+              <option value="PAID">PAID</option>
+              <option value="PENDING">PENDING</option>
+              <option value="REFUNDED">REFUNDED</option>
+              <option value="FAILED">FAILED</option>
+            </select>
+          </div>
+
           {/* Reset Filters button */}
-          {(searchPhone || filterDate || filterWashTypeId || filterCarTypeId || filterStatus) && (
+          {(searchPhone || filterDate || filterWashTypeId || filterCarTypeId || filterStatus || filterPaymentStatus) && (
             <button
               type="button"
               onClick={handleResetFilters}
@@ -694,16 +733,17 @@ const Bookings = () => {
           </button>
         </div>
         
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '1000px' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '1150px' }}>
           <thead style={{ background: '#F8FAFC' }}>
             <tr>
-              <th style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem', textTransform: 'uppercase' }}>Booking ID</th>
-              <th style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem', textTransform: 'uppercase' }}>Customer & Car</th>
-            <th style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem', textTransform: 'uppercase' }}>Wash & Area</th>
-            <th style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem', textTransform: 'uppercase' }}>Date & Price</th>
-            <th style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem', textTransform: 'uppercase' }}>Status</th>
-            <th style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem', textTransform: 'uppercase' }}>Assignment Actions</th>
-            <th style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem', textTransform: 'uppercase' }}>Service Pics</th>
+              <th style={{ padding: '1rem 1.25rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.82rem', textTransform: 'uppercase' }}>Booking ID</th>
+              <th style={{ padding: '1rem 1.25rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.82rem', textTransform: 'uppercase' }}>Customer & Car</th>
+              <th style={{ padding: '1rem 1.25rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.82rem', textTransform: 'uppercase' }}>Wash & Area</th>
+              <th style={{ padding: '1rem 1.25rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.82rem', textTransform: 'uppercase' }}>Schedule</th>
+              <th style={{ padding: '1rem 1.25rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.82rem', textTransform: 'uppercase' }}>Payment Details</th>
+              <th style={{ padding: '1rem 1.25rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.82rem', textTransform: 'uppercase' }}>Status</th>
+              <th style={{ padding: '1rem 1.25rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.82rem', textTransform: 'uppercase' }}>Assignment Actions</th>
+              <th style={{ padding: '1rem 1.25rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.82rem', textTransform: 'uppercase' }}>Service Pics</th>
           </tr>
         </thead>
         <tbody>
@@ -719,19 +759,37 @@ const Bookings = () => {
               <tr key={b.id} style={{ borderBottom: '1px solid #F1F5F9' }} className="hover:bg-gray-50">
                 
                 {/* ID */}
-                <td style={{ padding: '1.25rem 1.5rem', fontWeight: 600 }}>#{b.id}</td>
+                <td style={{ padding: '1.25rem 1.25rem', fontWeight: 700, color: 'var(--primary-navy)' }}>#{b.id}</td>
                 
-                {/* Customer Details */}
-                <td style={{ padding: '1.25rem 1.5rem' }}>
+                {/* Customer Details & Car */}
+                <td style={{ padding: '1.25rem 1.25rem' }}>
                   <div style={{ fontWeight: 600, color: 'var(--primary-navy)' }}>{b.user?.name || 'User'}</div>
                   <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{b.user?.phone}</div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--primary-blue)', display: 'flex', alignItems: 'center', gap: '0.2rem', marginTop: '0.2rem' }}>
-                    <Car size={12} /> {b.car ? `${b.car.make} ${b.car.model}` : 'Generic Vehicle'}
+                  <div style={{ fontSize: '0.8rem', color: 'var(--primary-blue)', display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.2rem' }}>
+                    <Car size={13} /> {b.car ? `${b.car.make} ${b.car.model}` : (b.carMake || b.carModel ? `${b.carMake || ''} ${b.carModel || ''}` : 'Vehicle')}
                   </div>
+                  {(b.carNumber || b.car?.carNumber) && (
+                    <div style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      background: '#FEF08A',
+                      border: '1.5px solid #CA8A04',
+                      borderRadius: '4px',
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      color: '#713F12',
+                      padding: '0.1rem 0.4rem',
+                      marginTop: '0.35rem',
+                      letterSpacing: '0.5px'
+                    }}>
+                      <span style={{ background: '#1E3A8A', color: 'white', padding: '0 3px', borderRadius: '2px', fontSize: '0.6rem', marginRight: '4px' }}>IND</span>
+                      {b.carNumber || b.car?.carNumber}
+                    </div>
+                  )}
                 </td>
                 
                 {/* Wash and Area details */}
-                <td style={{ padding: '1.25rem 1.5rem' }}>
+                <td style={{ padding: '1.25rem 1.25rem' }}>
                   <div style={{ fontWeight: 600, color: 'var(--primary-navy)' }}>{b.washType?.name}</div>
                   <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Type: {b.carType?.name}</div>
                   <span style={{ fontSize: '0.75rem', background: 'var(--accent-teal-light)', color: 'var(--primary-navy)', padding: '0.2rem 0.5rem', borderRadius: '4px', display: 'inline-block', marginTop: '0.25rem', fontWeight: 600 }}>
@@ -753,20 +811,161 @@ const Bookings = () => {
                   )}
                 </td>
                 
-                {/* Date & Price */}
-                <td style={{ padding: '1.25rem 1.5rem' }}>
-                  <div style={{ fontWeight: 600 }}>{new Date(b.date).toLocaleDateString()}</div>
-                  <div className="text-xs text-muted" style={{ marginBottom: '0.25rem' }}>{b.timeSlot}</div>
-                  <div style={{ fontWeight: 800, color: 'var(--primary-blue)', fontSize: '1.05rem' }}>₹{b.price}</div>
-                  {b.addonsTotal > 0 && (
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                      (Incl. ₹{b.addonsTotal} add-ons)
+                {/* Schedule */}
+                <td style={{ padding: '1.25rem 1.25rem', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontWeight: 600, color: 'var(--primary-navy)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <Calendar size={13} color="var(--primary-blue)" /> {new Date(b.date).toLocaleDateString()}
+                  </div>
+                  <div className="text-xs text-muted" style={{ marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <Clock size={12} /> {b.timeSlot}
+                  </div>
+                </td>
+
+                {/* Payment Details */}
+                <td style={{ padding: '1.25rem 1.25rem', minWidth: '175px' }}>
+                  {/* Total Price */}
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.35rem' }}>
+                    <span style={{ fontWeight: 800, color: 'var(--primary-blue)', fontSize: '1.15rem' }}>₹{b.price}</span>
+                    {b.addonsTotal > 0 && (
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                        (+₹{b.addonsTotal} add-ons)
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Payment Status Badge */}
+                  <div style={{ marginTop: '0.3rem' }}>
+                    {b.paymentStatus === 'PAID' || (!b.paymentStatus && b.razorpayPaymentId) ? (
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                        background: '#DCFCE7',
+                        color: '#15803D',
+                        border: '1px solid #86EFAC',
+                        padding: '0.15rem 0.5rem',
+                        borderRadius: '20px',
+                        fontSize: '0.72rem',
+                        fontWeight: 700
+                      }}>
+                        <CheckCircle size={11} /> PAID
+                      </span>
+                    ) : (b.paymentStatus === 'REFUNDED' || b.refundStatus === 'PROCESSED') ? (
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                        background: '#F3E8FF',
+                        color: '#7E22CE',
+                        border: '1px solid #D8B4FE',
+                        padding: '0.15rem 0.5rem',
+                        borderRadius: '20px',
+                        fontSize: '0.72rem',
+                        fontWeight: 700
+                      }}>
+                        <RotateCcw size={11} /> REFUNDED
+                      </span>
+                    ) : b.paymentStatus === 'FAILED' ? (
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                        background: '#FEE2E2',
+                        color: '#DC2626',
+                        border: '1px solid #FCA5A5',
+                        padding: '0.15rem 0.5rem',
+                        borderRadius: '20px',
+                        fontSize: '0.72rem',
+                        fontWeight: 700
+                      }}>
+                        <AlertCircle size={11} /> FAILED
+                      </span>
+                    ) : (
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                        background: '#FEF3C7',
+                        color: '#B45309',
+                        border: '1px solid #FDE68A',
+                        padding: '0.15rem 0.5rem',
+                        borderRadius: '20px',
+                        fontSize: '0.72rem',
+                        fontWeight: 700
+                      }}>
+                        <Clock size={11} /> PENDING
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Payment Method */}
+                  <div style={{ fontSize: '0.75rem', color: '#64748B', display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.25rem' }}>
+                    <CreditCard size={11} /> {b.paymentMethod || (b.razorpayPaymentId ? 'Razorpay (Online)' : 'Online')}
+                  </div>
+
+                  {/* Razorpay Payment ID */}
+                  {b.razorpayPaymentId && (
+                    <div 
+                      title={`Razorpay Payment ID: ${b.razorpayPaymentId}`}
+                      style={{ 
+                        fontSize: '0.68rem', 
+                        color: '#1E293B', 
+                        fontFamily: 'monospace', 
+                        background: '#F1F5F9', 
+                        border: '1px solid #E2E8F0', 
+                        padding: '0.12rem 0.35rem', 
+                        borderRadius: '4px', 
+                        marginTop: '0.25rem', 
+                        maxWidth: '160px', 
+                        overflow: 'hidden', 
+                        textOverflow: 'ellipsis', 
+                        whiteSpace: 'nowrap' 
+                      }}
+                    >
+                      ID: {b.razorpayPaymentId}
+                    </div>
+                  )}
+
+                  {/* Razorpay Order ID (if no payment ID yet) */}
+                  {!b.razorpayPaymentId && b.razorpayOrderId && (
+                    <div 
+                      title={`Razorpay Order ID: ${b.razorpayOrderId}`}
+                      style={{ 
+                        fontSize: '0.68rem', 
+                        color: '#64748B', 
+                        fontFamily: 'monospace', 
+                        background: '#F8FAFC', 
+                        border: '1px solid #E2E8F0', 
+                        padding: '0.12rem 0.35rem', 
+                        borderRadius: '4px', 
+                        marginTop: '0.25rem', 
+                        maxWidth: '160px', 
+                        overflow: 'hidden', 
+                        textOverflow: 'ellipsis', 
+                        whiteSpace: 'nowrap' 
+                      }}
+                    >
+                      Ord: {b.razorpayOrderId}
+                    </div>
+                  )}
+
+                  {/* Refund Details */}
+                  {(b.refundStatus === 'PROCESSED' || b.refundId || b.refundAmount) && (
+                    <div style={{ marginTop: '0.35rem', background: '#FAF5FF', border: '1px solid #E9D5FF', borderRadius: '5px', padding: '0.25rem 0.4rem', fontSize: '0.7rem' }}>
+                      <div style={{ color: '#7E22CE', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                        <RotateCcw size={10} /> Refund: ₹{b.refundAmount || b.price}
+                      </div>
+                      {b.refundId && (
+                        <div style={{ color: '#9333EA', fontFamily: 'monospace', fontSize: '0.64rem', marginTop: '0.1rem', wordBreak: 'break-all' }}>
+                          ID: {b.refundId}
+                        </div>
+                      )}
                     </div>
                   )}
                 </td>
                 
                 {/* Status */}
-                <td style={{ padding: '1.25rem 1.5rem' }}>
+                <td style={{ padding: '1.25rem 1.25rem' }}>
                   <span className={`badge ${b.status === 'COMPLETED' ? 'badge-success' : b.status === 'STARTED' ? 'badge-warning' : b.status === 'CANCELLED' ? 'badge-danger' : 'badge-primary'}`} style={{
                     background: b.status === 'CANCELLED' ? '#FEE2E2' : undefined,
                     color: b.status === 'CANCELLED' ? '#DC2626' : undefined,
@@ -777,11 +976,6 @@ const Bookings = () => {
                   {b.cancellationReason && (
                     <div style={{ fontSize: '0.72rem', color: '#991B1B', marginTop: '0.25rem', maxWidth: '140px', lineHeight: 1.25 }}>
                       {b.cancellationReason}
-                    </div>
-                  )}
-                  {b.refundStatus === 'PROCESSED' && (
-                    <div style={{ fontSize: '0.7rem', color: '#166534', background: '#DCFCE7', padding: '0.15rem 0.4rem', borderRadius: '4px', marginTop: '0.25rem', fontWeight: 600 }}>
-                      Refunded ₹{b.refundAmount || b.price}
                     </div>
                   )}
                 </td>
@@ -1102,9 +1296,22 @@ const Bookings = () => {
 
             {adminCancelModal.price > 0 && (
               <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '10px', padding: '0.75rem 1rem', marginBottom: '1rem', color: '#065F46', fontSize: '0.85rem' }}>
-                <strong>💳 Automatic Razorpay Refund:</strong>
-                <div style={{ marginTop: '0.2rem' }}>
-                  If paid online via Razorpay, a refund of <strong>₹{adminCancelModal.price}</strong> will be processed immediately. If points were used, they will be credited back.
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                  <strong>💳 Payment & Refund Information:</strong>
+                  <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#065F46' }}>₹{adminCancelModal.price}</span>
+                </div>
+                <div style={{ fontSize: '0.8rem', color: '#047857' }}>
+                  Payment Method: <strong>{adminCancelModal.paymentMethod || (adminCancelModal.razorpayPaymentId ? 'Razorpay (Online)' : 'Online')}</strong>
+                </div>
+                {adminCancelModal.razorpayPaymentId && (
+                  <div style={{ fontSize: '0.74rem', fontFamily: 'monospace', color: '#065F46', marginTop: '0.15rem' }}>
+                    Payment ID: {adminCancelModal.razorpayPaymentId}
+                  </div>
+                )}
+                <div style={{ marginTop: '0.4rem', fontSize: '0.78rem', color: '#047857', borderTop: '1px dashed #A7F3D0', paddingTop: '0.4rem', lineHeight: 1.45 }}>
+                  {adminCancelModal.razorpayPaymentId 
+                    ? `✨ An automated refund of ₹${adminCancelModal.price} will be triggered to the customer via Razorpay. Refund will credit to customer's bank account within 7 business days. If not credited within 7 days, customer can email washmycarorg@gmail.com or contact through the website Contact section.` 
+                    : 'Booking will be marked cancelled with reason recorded.'}
                 </div>
               </div>
             )}

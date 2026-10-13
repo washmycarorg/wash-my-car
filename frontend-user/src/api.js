@@ -1,27 +1,47 @@
 const RAW_URL = import.meta.env.VITE_API_URL || (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'http://localhost:5001/api' : 'https://api.washmycar.org.in/api');
 const API_URL = RAW_URL.endsWith('/api') ? RAW_URL : `${RAW_URL.replace(/\/$/, '')}/api`;
 
+export const sendUserOtp = async (phone, purpose = 'LOGIN') => {
+  const res = await fetch(`${API_URL}/auth/user/send-otp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone, purpose })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || data.message || 'Failed to send OTP');
+  }
+  return data;
+};
+
 export const loginUser = async (phone, otp) => {
   const res = await fetch(`${API_URL}/auth/user/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ phone, otp })
   });
-  if (!res.ok) throw new Error(await res.text());
-  const data = await res.json();
-  localStorage.setItem('userToken', data.token);
-  localStorage.setItem('userInfo', JSON.stringify(data.user));
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || data.message || 'Login failed');
+  }
+  if (data.token) localStorage.setItem('userToken', data.token);
+  if (data.user) localStorage.setItem('userInfo', JSON.stringify(data.user));
   return data;
 };
 
-export const registerUser = async (data) => {
+export const registerUser = async (formData) => {
   const res = await fetch(`${API_URL}/auth/user/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
+    body: JSON.stringify(formData)
   });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || data.message || 'Registration failed');
+  }
+  if (data.token) localStorage.setItem('userToken', data.token);
+  if (data.user) localStorage.setItem('userInfo', JSON.stringify(data.user));
+  return data;
 };
 
 const getHeaders = () => ({

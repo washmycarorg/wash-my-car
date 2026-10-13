@@ -5,7 +5,7 @@ import {
   Mail, Award, Clock, Menu, X, Sparkles, Star, ChevronRight, Check, 
   Compass, Shield, Tag, ChevronDown, MessageCircle, ArrowRight,
   Flame, Bike, Feather, Smartphone, ExternalLink, HelpCircle,
-  ChevronLeft, Copy, Send, User, Gift, Zap
+  ChevronLeft, Copy, Send, User, Gift, Zap, Image, Upload, Trash2
 } from 'lucide-react';
 import { getHomeContent, getServiceAreas, getWashTypes, getAllWashPrices, getCarTypes, getAddons, getActiveCoupons, submitInquiry, getSettings } from '../api';
 
@@ -149,6 +149,7 @@ const Home = () => {
     service: 'Doorstep Car Wash',
     message: ''
   });
+  const [selectedImages, setSelectedImages] = useState([]);
   const [contactSubmitted, setContactSubmitted] = useState(false);
   const [contactError, setContactError] = useState('');
   const [isSubmittingContact, setIsSubmittingContact] = useState(false);
@@ -283,6 +284,40 @@ const Home = () => {
     return washDisc;
   };
 
+  const handleImageUpload = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    if (selectedImages.length + files.length > 3) {
+      alert('You can upload a maximum of 3 images.');
+      return;
+    }
+
+    files.forEach(file => {
+      if (!file.type.startsWith('image/')) {
+        alert('Only image files (JPG, PNG, WEBP, etc.) are allowed.');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Each image must be under 5MB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (loadEvt) => {
+        setSelectedImages(prev => {
+          if (prev.length >= 3) return prev;
+          return [...prev, loadEvt.target.result];
+        });
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = '';
+  };
+
+  const handleRemoveImage = (indexToRemove) => {
+    setSelectedImages(prev => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
   const handleContactSubmit = async (e) => {
     e.preventDefault();
     if (!contactForm.name.trim() || !contactForm.phone.trim()) {
@@ -298,6 +333,7 @@ const Home = () => {
         email: contactForm.email ? contactForm.email.trim() : null,
         service: contactForm.service || 'Doorstep Car Wash',
         message: contactForm.message ? contactForm.message.trim() : 'Inquiry submitted from home page',
+        images: selectedImages,
         type: contactForm.service && contactForm.service.includes('Franchise') ? 'FRANCHISE' : 'INQUIRY'
       });
       setContactSubmitted(true);
@@ -2526,6 +2562,7 @@ const Home = () => {
                     onClick={() => {
                       setContactSubmitted(false);
                       setContactForm({ name: '', phone: '', email: '', service: 'Doorstep Car Wash', message: '' });
+                      setSelectedImages([]);
                     }}
                     style={{
                       background: '#16A34A',
@@ -2696,6 +2733,94 @@ const Home = () => {
                       onFocus={e => e.target.style.borderColor = '#0EA5E9'}
                       onBlur={e => e.target.style.borderColor = '#CBD5E1'}
                     />
+                  </div>
+
+                  {/* Image Attachments Upload (Images Only, Max 3) */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem' }}>
+                      <label style={{ fontSize: '0.8rem', fontWeight: 800, color: '#334155', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <Image size={15} color="#0EA5E9" />
+                        Attach Photos (Optional - Max 3 Images)
+                      </label>
+                      <span style={{ fontSize: '0.74rem', color: selectedImages.length >= 3 ? '#DC2626' : '#64748B', fontWeight: 700 }}>
+                        {selectedImages.length}/3 photos added
+                      </span>
+                    </div>
+
+                    {/* Previews Grid */}
+                    {selectedImages.length > 0 && (
+                      <div style={{ display: 'flex', gap: '0.65rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+                        {selectedImages.map((img, idx) => (
+                          <div key={idx} style={{ position: 'relative', width: '80px', height: '80px', borderRadius: '12px', overflow: 'hidden', border: '1.5px solid #CBD5E1', boxShadow: '0 2px 6px rgba(0,0,0,0.08)' }}>
+                            <img src={img} alt={`Upload ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveImage(idx)}
+                              style={{
+                                position: 'absolute',
+                                top: '4px',
+                                right: '4px',
+                                background: 'rgba(220, 38, 38, 0.9)',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '50%',
+                                width: '20px',
+                                height: '20px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                padding: 0
+                              }}
+                              title="Remove image"
+                            >
+                              <X size={13} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Upload Trigger Button if under 3 images */}
+                    {selectedImages.length < 3 && (
+                      <label style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.5rem',
+                        padding: '0.75rem 1rem',
+                        borderRadius: '12px',
+                        border: '1.5px dashed #94A3B8',
+                        background: '#F8FAFC',
+                        color: '#475569',
+                        fontSize: '0.85rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        boxSizing: 'border-box'
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.borderColor = '#0EA5E9';
+                        e.currentTarget.style.background = '#F0F9FF';
+                        e.currentTarget.style.color = '#0284C7';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.borderColor = '#94A3B8';
+                        e.currentTarget.style.background = '#F8FAFC';
+                        e.currentTarget.style.color = '#475569';
+                      }}
+                      >
+                        <Upload size={16} />
+                        <span>Upload photo / screenshot (Images only, max 3)</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={handleImageUpload}
+                          style={{ display: 'none' }}
+                        />
+                      </label>
+                    )}
                   </div>
 
                   {/* Submit Button */}

@@ -3,10 +3,19 @@ import prisma from '../config/db.js';
 // Public: Submit inquiry or complaint
 export const submitInquiry = async (req, res) => {
   try {
-    const { name, phone, email, service, message, type = 'INQUIRY' } = req.body;
+    const { name, phone, email, service, message, images, type = 'INQUIRY' } = req.body;
     
     if (!name || !phone) {
       return res.status(400).json({ error: 'Name and Phone number are required' });
+    }
+
+    let imagesData = null;
+    if (images) {
+      if (Array.isArray(images)) {
+        imagesData = JSON.stringify(images.slice(0, 3));
+      } else if (typeof images === 'string') {
+        imagesData = images;
+      }
     }
 
     const inquiry = await prisma.inquiry.create({
@@ -16,6 +25,7 @@ export const submitInquiry = async (req, res) => {
         email: email ? email.trim() : null,
         service: service || 'General Doorstep Wash',
         message: message ? message.trim() : 'Inquiry submitted from website',
+        images: imagesData,
         type: type.toUpperCase(), // INQUIRY, COMPLAINT, FRANCHISE
         status: 'PENDING'
       }

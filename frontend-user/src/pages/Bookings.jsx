@@ -311,18 +311,36 @@ const Bookings = () => {
                 )}
                 <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #FCA5A5' }}>
                   {booking.refundStatus === 'PROCESSED' ? (
-                    <div style={{ background: '#DCFCE7', color: '#166534', padding: '0.45rem 0.65rem', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <CheckCircle size={15} color="#16A34A" />
-                      <span>Automatic Refund of <strong>₹{booking.refundAmount || booking.price}</strong> processed via Razorpay (Refund ID: {booking.refundId || 'N/A'}). Amount will credit back within 5-7 business days.</span>
+                    <div style={{ background: '#DCFCE7', color: '#166534', padding: '0.65rem 0.85rem', borderRadius: '8px', fontSize: '0.82rem', lineHeight: 1.5 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}>
+                        <CheckCircle size={15} color="#16A34A" />
+                        <span>Automatic Refund of <strong>₹{booking.refundAmount || booking.price}</strong> initiated via Razorpay</span>
+                      </div>
+                      {booking.refundId && (
+                        <div style={{ fontSize: '0.74rem', fontFamily: 'monospace', color: '#15803D', marginTop: '0.2rem' }}>
+                          Refund ID: {booking.refundId}
+                        </div>
+                      )}
+                      <div style={{ marginTop: '0.45rem', fontSize: '0.8rem', color: '#14532D', background: '#F0FDF4', padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid #BBF7D0' }}>
+                        ⏱️ <strong>Refund Timeline Note:</strong> Refund will be credited to your bank account within <strong>7 business days</strong>. If not credited within 7 days, please email us on <a href="mailto:washmycarorg@gmail.com" style={{ color: '#047857', fontWeight: 700, textDecoration: 'underline' }}>washmycarorg@gmail.com</a> or contact us through our <a href="/#contact" target="_blank" rel="noopener noreferrer" style={{ color: '#047857', fontWeight: 700, textDecoration: 'underline' }}>Home page Contact section</a>.
+                      </div>
                     </div>
                   ) : booking.refundStatus === 'FAILED' ? (
-                    <div style={{ background: '#FFFBEB', color: '#B45309', padding: '0.45rem 0.65rem', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <AlertCircle size={15} color="#D97706" />
-                      <span>Automatic gateway refund encountered an issue. Customer care will process manual refund.</span>
+                    <div style={{ background: '#FFFBEB', color: '#B45309', padding: '0.65rem 0.85rem', borderRadius: '8px', fontSize: '0.82rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}>
+                        <AlertCircle size={15} color="#D97706" />
+                        <span>Automatic gateway refund encountered an issue. Our support team is processing it.</span>
+                      </div>
+                      <div style={{ marginTop: '0.35rem', fontSize: '0.8rem' }}>
+                        If not credited to your bank within 7 days, please email us on <a href="mailto:washmycarorg@gmail.com" style={{ color: '#92400E', fontWeight: 700, textDecoration: 'underline' }}>washmycarorg@gmail.com</a> or contact us through our <a href="/#contact" target="_blank" rel="noopener noreferrer" style={{ color: '#92400E', fontWeight: 700, textDecoration: 'underline' }}>Home page Contact section</a>.
+                      </div>
                     </div>
                   ) : booking.razorpayPaymentId ? (
-                    <div style={{ fontSize: '0.8rem', color: '#991B1B', fontWeight: 600 }}>
-                      Automatic Refund: Processing via Razorpay...
+                    <div style={{ background: '#EFF6FF', color: '#1E40AF', padding: '0.65rem 0.85rem', borderRadius: '8px', fontSize: '0.82rem' }}>
+                      <div style={{ fontWeight: 700 }}>Automatic Refund: Processing via Razorpay...</div>
+                      <div style={{ marginTop: '0.35rem', fontSize: '0.8rem' }}>
+                        Refund will be credited to your bank within 7 days. If not credited within 7 days, please email us on <a href="mailto:washmycarorg@gmail.com" style={{ color: '#1D4ED8', fontWeight: 700, textDecoration: 'underline' }}>washmycarorg@gmail.com</a> or contact us through our <a href="/#contact" target="_blank" rel="noopener noreferrer" style={{ color: '#1D4ED8', fontWeight: 700, textDecoration: 'underline' }}>Home page Contact section</a>.
+                      </div>
                     </div>
                   ) : (
                     <div style={{ fontSize: '0.8rem', color: '#64748B' }}>
@@ -514,10 +532,16 @@ const Bookings = () => {
             </p>
 
             {cancellingBooking.price > 0 && (
-              <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '10px', padding: '0.75rem 1rem', marginBottom: '1rem', color: '#065F46', fontSize: '0.85rem' }}>
-                <strong>💳 Automatic Razorpay Refund:</strong>
-                <div style={{ marginTop: '0.2rem' }}>
+              <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '12px', padding: '0.85rem 1rem', marginBottom: '1rem', color: '#065F46', fontSize: '0.85rem', lineHeight: 1.5 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                  <strong>💳 Automatic Razorpay Refund:</strong>
+                  <span style={{ background: '#D1FAE5', color: '#065F46', padding: '0.15rem 0.5rem', borderRadius: '12px', fontWeight: 800, fontSize: '0.88rem' }}>₹{cancellingBooking.price}</span>
+                </div>
+                <div>
                   A refund of <strong>₹{cancellingBooking.price}</strong> will be initiated automatically to your original payment account. Any redeemed loyalty points will also be restored.
+                </div>
+                <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px dashed #A7F3D0', fontSize: '0.8rem', color: '#047857' }}>
+                  ⏱️ <strong>Refund Timeline Note:</strong> Refund will be credited to your bank account within <strong>7 business days</strong>. If not credited within 7 days, please email us on <a href="mailto:washmycarorg@gmail.com" style={{ color: '#047857', fontWeight: 700, textDecoration: 'underline' }}>washmycarorg@gmail.com</a> or contact us through our <a href="/#contact" target="_blank" rel="noopener noreferrer" style={{ color: '#047857', fontWeight: 700, textDecoration: 'underline' }}>Home page Contact section</a>.
                 </div>
               </div>
             )}

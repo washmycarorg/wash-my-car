@@ -322,6 +322,7 @@ model Inquiry {
   email     String?
   service   String?
   message   String
+  images    String?  // JSON stringified array of up to 3 image URLs / data URLs
   type      String   @default("INQUIRY") // INQUIRY, COMPLAINT, FRANCHISE
   status    String   @default("PENDING") // PENDING, CONTACTED, RESOLVED
   notes     String?
@@ -394,5 +395,17 @@ model CmsContent {
   promoText               String   @default("Claim Offer Now")
 
   // FAQs JSON string
-  faqs                    String   @default("[{\"q\":\"How do I book a doorstep car wash?\",\"a\":\"Simply select your vehicle type, pick your package & add-ons, choose a convenient date and time slot, and our trained technician will arrive with full equipment.\"},{\"q\":\"Do I need to provide water and electricity?\",\"a\":\"Our mobile units are equipped with water tanks and compact generators for maximum convenience, though access to a standard domestic point is welcome.\"},{\"q\":\"Can I book add-on services like Helmet or Bike wash?\",\"a\":\"Yes! You can add Helmet wash, 2-wheeler wash, interior steam cleaning, and engine bay cleaning directly during your car wash booking checkout.\"},{\"q\":\"Where is Wash My Car currently available?\",\"a\":\"We are actively serving Visakhapatnam and surrounding neighborhoods, with expansion across Andhra Pradesh and Telangana.\"}]")
+  faqs                    String   @default("[{\"q\":\"How do I book a doorstep car wash?\",\"a\":\"Simply select your vehicle type, pick your package & add-ons, choose a convenient date and time slot, and our trained technician will arrive with full equipment.\"},{\"q\":\"Do I need to provide water and electricity?\",\"a\":\"Our mobile units are equipped with water tanks and compact generators for maximum convenience, practical access to a standard domestic point is welcome.\"},{\"q\":\"Can I book add-on services like Helmet or Bike wash?\",\"a\":\"Yes! You can add Helmet wash, 2-wheeler wash, interior steam cleaning, and engine bay cleaning directly during your car wash booking checkout.\"},{\"q\":\"Where is Wash My Car currently available?\",\"a\":\"We are actively serving Visakhapatnam and surrounding neighborhoods, with expansion across Andhra Pradesh and Telangana.\"}]")
 }
+
+model OtpVerification {
+  id        Int      @id @default(autoincrement())
+  phone     String
+  otp       String
+  purpose   String   @default("LOGIN") // LOGIN or REGISTER
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([phone, purpose])
+}
+
