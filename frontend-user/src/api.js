@@ -47,7 +47,49 @@ export const createBooking = async (data) => {
     headers: getHeaders(),
     body: JSON.stringify(data)
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.error || errorBody.message || await res.text().catch(() => 'Booking failed'));
+  }
+  return res.json();
+};
+
+export const verifyBookingPayment = async (data) => {
+  const res = await fetch(`${API_URL}/users/bookings/verify-payment`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.error || errorBody.message || 'Payment verification failed');
+  }
+  return res.json();
+};
+
+export const cancelPendingPayment = async (bookingId, reason = 'PAYMENT_ABANDONED') => {
+  const res = await fetch(`${API_URL}/users/bookings/${bookingId}/cancel-payment`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ reason })
+  });
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.error || 'Failed to release slot');
+  }
+  return res.json();
+};
+
+export const cancelBooking = async (bookingId, reason) => {
+  const res = await fetch(`${API_URL}/users/bookings/${bookingId}/cancel`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ reason })
+  });
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.error || errorBody.message || 'Failed to cancel booking');
+  }
   return res.json();
 };
 

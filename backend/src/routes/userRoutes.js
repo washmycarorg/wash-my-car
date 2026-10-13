@@ -21,7 +21,10 @@ import {
   getPublicHomeContent,
   getAllWashPrices,
   getAddons,
-  getPublicActiveCoupons
+  getPublicActiveCoupons,
+  verifyBookingPayment,
+  cancelPendingPayment,
+  cancelBooking
 } from '../controllers/userController.js';
 
 import { submitInquiry } from '../controllers/inquiryController.js';
@@ -47,6 +50,9 @@ router.get('/profile', getProfile);
 router.put('/profile', updateProfile);
 router.get('/bookings', getBookings);
 router.post('/bookings', createBooking);
+router.post('/bookings/verify-payment', verifyBookingPayment);
+router.post('/bookings/:id/cancel-payment', cancelPendingPayment);
+router.post('/bookings/:id/cancel', cancelBooking);
 
 router.get('/cars', getCars);
 router.post('/cars', addCar);

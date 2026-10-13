@@ -1,5 +1,27 @@
 import prisma from '../config/db.js';
 
+// Clean up expired slot payment locks (>10 mins unpaid)
+export const cleanupExpiredSlotLocks = async () => {
+  try {
+    const now = new Date();
+    await prisma.booking.updateMany({
+      where: {
+        paymentStatus: 'PENDING',
+        status: { in: ['PENDING', 'PENDING_PAYMENT'] },
+        paymentLockExpiresAt: {
+          lt: now
+        }
+      },
+      data: {
+        status: 'CANCELLED',
+        cancellationReason: 'Payment session expired / timed out'
+      }
+    });
+  } catch (err) {
+    console.warn('Error cleaning up expired slot locks:', err);
+  }
+};
+
 // Distance matrix between Visakhapatnam primary zones (in km)
 export const DEFAULT_ZONE_DISTANCES = {
   'NAD':          { 'NAD': 0, 'GAJUWAKA': 10, 'PENDURTHI': 10, 'MADDILAPALEM': 10, 'MADHURAWADA': 20 },
@@ -175,11 +197,15 @@ export const getAvailableBookingSlots = async (req, res) => {
       targetZone = normalizeToZone(address);
     }
 
-    // Query all existing non-cancelled bookings for this date
+    // Auto-release any expired payment locks before querying slot availability
+    await cleanupExpiredSlotLocks();
+
+    // Query all active bookings for this date (confirmed or valid unexpired lock)
     const startOfDay = new Date(`${date}T00:00:00.000Z`);
     const endOfDay = new Date(`${date}T23:59:59.999Z`);
+    const nowTime = new Date();
 
-    const existingBookings = await prisma.booking.findMany({
+    const rawBookings = await prisma.booking.findMany({
       where: {
         date: {
           gte: startOfDay,
@@ -190,6 +216,17 @@ export const getAvailableBookingSlots = async (req, res) => {
       include: {
         serviceArea: true
       }
+    });
+
+    // Only count bookings that are paid, or currently within unexpired payment lock window
+    const existingBookings = rawBookings.filter(b => {
+      if (b.status === 'CANCELLED') return false;
+      if (b.paymentStatus === 'PAID') return true;
+      if (b.paymentStatus === 'PENDING') {
+        if (!b.paymentLockExpiresAt) return true;
+        return new Date(b.paymentLockExpiresAt) > nowTime;
+      }
+      return false;
     });
 
     // Custom distance matrix if stored

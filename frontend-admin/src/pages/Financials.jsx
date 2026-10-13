@@ -52,11 +52,60 @@ const Financials = () => {
         </div>
       </div>
       
-      <div className="card">
-        <h3>Financial Breakdown</h3>
-        <p className="text-muted mb-6">A detailed view of revenue versus cost over time is in development.</p>
-        <div style={{height: '300px', background: '#F8FAFC', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '0.5rem', border: '1px dashed #CBD5E1'}}>
-           <p className="text-muted">Interactive Charts Coming Soon</p>
+      <div className="card" style={{ border: '1px solid #E2E8F0', padding: '1.5rem' }}>
+        <h3 style={{ margin: '0 0 0.5rem', color: 'var(--primary-navy)' }}>Financial & Cost Breakdown</h3>
+        <p className="text-muted" style={{ margin: '0 0 1.25rem', fontSize: '0.88rem' }}>
+          Breakdown of company expenditure across compensation models and consumables.
+        </p>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+          <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '1rem' }}>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>
+              Fixed Monthly Salaries
+            </span>
+            <h2 style={{ margin: '0.25rem 0', color: 'var(--primary-navy)', fontSize: '1.4rem' }}>
+              ₹{(stats?.fixedSalariesCost || 0).toLocaleString()}
+            </h2>
+            <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              Remuneration for fixed & hybrid base staff
+            </p>
+          </div>
+
+          <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '1rem' }}>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>
+              Wash Task Commissions
+            </span>
+            <h2 style={{ margin: '0.25rem 0', color: '#0284C7', fontSize: '1.4rem' }}>
+              ₹{(stats?.commissionsCost || 0).toLocaleString()}
+            </h2>
+            <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              Per-wash payout on completed bookings
+            </p>
+          </div>
+
+          <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '1rem' }}>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>
+              Consumables & Materials
+            </span>
+            <h2 style={{ margin: '0.25rem 0', color: '#D97706', fontSize: '1.4rem' }}>
+              ₹{(stats?.materialCost || 0).toLocaleString()}
+            </h2>
+            <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              Shampoo, microfiber, wax & equipment fees
+            </p>
+          </div>
+
+          <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '10px', padding: '1rem' }}>
+            <span style={{ fontSize: '0.78rem', color: '#166534', fontWeight: 600, textTransform: 'uppercase' }}>
+              Completed Washes
+            </span>
+            <h2 style={{ margin: '0.25rem 0', color: '#166534', fontSize: '1.4rem' }}>
+              {stats?.completedWashOrders || 0}
+            </h2>
+            <p style={{ margin: 0, fontSize: '0.75rem', color: '#15803D' }}>
+              Delivered across all service zones
+            </p>
+          </div>
         </div>
       </div>
     </div>

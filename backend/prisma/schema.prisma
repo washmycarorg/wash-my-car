@@ -141,6 +141,9 @@ model Booking {
   employee      Employee?    @relation(fields: [employeeId], references: [id])
   carId         Int?
   car           Car?         @relation(fields: [carId], references: [id])
+  carNumber     String?      // License plate registration number
+  carMake       String?      // e.g. Maruti, Tata, Hyundai
+  carModel      String?      // e.g. Swift, Nexon, Creta
   carTypeId     Int
   carType       CarType      @relation(fields: [carTypeId], references: [id])
   washTypeId    Int
@@ -178,6 +181,19 @@ model Booking {
   endLatitude    Float?
   endLongitude   Float?
   endAt          DateTime?
+
+  // Razorpay Payment & Slot Lock details
+  razorpayOrderId      String?
+  razorpayPaymentId    String?
+  razorpaySignature    String?
+  paymentLockExpiresAt DateTime?
+
+  // Cancellation & Refund details
+  cancelledAt          DateTime?
+  cancellationReason   String?
+  refundId             String?
+  refundAmount         Float?
+  refundStatus         String?   // PROCESSED, FAILED, NONE
 
   createdAt   DateTime  @default(now())
 }

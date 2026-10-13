@@ -48,11 +48,37 @@ export const getProfile = async (req, res) => {
       amount: b.employeePayout || 0
     }));
 
+    // Active & Next Job details for employee dashboard
+    const activeJobs = await prisma.booking.findMany({
+      where: {
+        employeeId: req.user.id,
+        status: { in: ['ASSIGNED', 'STARTED'] }
+      },
+      include: {
+        user: true,
+        car: true,
+        carType: true,
+        washType: true,
+        serviceArea: true,
+        addons: {
+          include: {
+            addon: true
+          }
+        }
+      },
+      orderBy: { date: 'asc' },
+      take: 5
+    });
+
+    const nextJob = activeJobs[0] || null;
+
     res.json({
       ...employee,
       earnings,
       commissionEarnings,
       recentPayouts,
+      nextJob,
+      activeJobs,
       stats: {
         completedJobs,
         pendingJobs

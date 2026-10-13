@@ -82,6 +82,19 @@ export const autoAssignSlot = async (id) => {
   return res.json();
 };
 
+export const cancelBookingByAdmin = async (id, reason) => {
+  const res = await fetch(`${API_URL}/admin/bookings/${id}/cancel`, {
+    method: 'PUT',
+    headers: getHeaders(),
+    body: JSON.stringify({ reason })
+  });
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.error || errorBody.message || 'Failed to cancel booking');
+  }
+  return res.json();
+};
+
 export const getLeaves = async () => {
   const res = await fetch(`${API_URL}/admin/leaves`, { headers: getHeaders() });
   if (!res.ok) throw new Error(await res.text());

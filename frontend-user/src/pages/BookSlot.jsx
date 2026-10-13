@@ -8,7 +8,9 @@ import {
   Clock, Users, Navigation
 } from 'lucide-react';
 import { 
-  createBooking, 
+  createBooking,
+  verifyBookingPayment,
+  cancelPendingPayment,
   getCarTypes, 
   getWashTypes, 
   getServiceAreas, 
@@ -158,6 +160,7 @@ const BookSlot = () => {
   const [eligibleCoupons, setEligibleCoupons] = useState([]);
   const [systemSettings, setSystemSettings] = useState(null);
   const [userPoints, setUserPoints] = useState(0);
+  const [userProfile, setUserProfile] = useState(null);
 
   // Plan Prices Map: { [washTypeId]: price }
   const [planPrices, setPlanPrices] = useState({});
@@ -239,6 +242,7 @@ const BookSlot = () => {
       setSystemSettings(settingsRes);
 
       if (profileRes) {
+        setUserProfile(profileRes);
         setUserPoints(profileRes.points || 0);
       }
 
@@ -272,10 +276,10 @@ const BookSlot = () => {
   }, []);
 
   // Fetch dynamically configured slots & distance validation
-  useEffect(() => {
-    if (!date) return;
+  const refreshSlots = (targetDate = date, targetAreaId = selectedServiceAreaId, targetAddress = address) => {
+    if (!targetDate) return Promise.resolve();
     setLoadingSlots(true);
-    getAvailableSlots(date, selectedServiceAreaId, address)
+    return getAvailableSlots(targetDate, targetAreaId, targetAddress)
       .then(res => {
         if (res && Array.isArray(res.slots)) {
           setAvailableSlotsList(res.slots);
@@ -285,7 +289,6 @@ const BookSlot = () => {
           if (res.targetZone) {
             setSlotNotice(`Assigned Service Hub: ${res.targetZone}`);
           }
-          // If selected slot is disabled or unavailable, default to first available
           const currentIsAvailable = res.slots.some(s => s.slot === timeSlot && s.available);
           if (!currentIsAvailable) {
             const firstAvail = res.slots.find(s => s.available);
@@ -308,6 +311,10 @@ const BookSlot = () => {
       .finally(() => {
         setLoadingSlots(false);
       });
+  };
+
+  useEffect(() => {
+    refreshSlots();
   }, [date, selectedServiceAreaId, address, currentStep]);
 
   // Sync saved car selection
@@ -1110,11 +1117,92 @@ const BookSlot = () => {
       };
 
       const res = await createBooking(payload);
-      setBookingSuccess(res);
-      setLoading(false);
+
+      // Check if online Razorpay payment is required
+      if (res.requiresPayment && res.rzpOrder) {
+        if (!window.Razorpay) {
+          alert('Razorpay payment gateway script not loaded. Please refresh the page and try again.');
+          try {
+            await cancelPendingPayment(res.booking.id, 'RAZORPAY_SCRIPT_UNAVAILABLE');
+          } catch (e) {}
+          refreshSlots();
+          setLoading(false);
+          return;
+        }
+
+        const rzpOptions = {
+          key: res.rzpOrder.key || import.meta.env.VITE_RAZORPAY_KEY_ID,
+          amount: res.rzpOrder.amount,
+          currency: res.rzpOrder.currency || 'INR',
+          name: 'Wash My Car',
+          description: `Doorstep Car Wash (${selectedWashTypeObj?.name || 'Package'})`,
+          order_id: res.rzpOrder.id,
+          prefill: {
+            name: userProfile?.name || '',
+            email: userProfile?.email || '',
+            contact: userProfile?.phone || ''
+          },
+          theme: {
+            color: '#0284C7'
+          },
+          modal: {
+            ondismiss: async function () {
+              // Customer dismissed / timed out on Razorpay checkout without completing payment
+              try {
+                await cancelPendingPayment(res.booking.id, 'PAYMENT_ABANDONED_OR_TIMEOUT');
+              } catch (e) {
+                console.warn('Slot unlock notice:', e);
+              }
+              refreshSlots();
+              setLoading(false);
+              alert('Payment was not completed. Your temporary slot reservation has been released for other customers.');
+            }
+          },
+          handler: async function (paymentResponse) {
+            try {
+              setLoading(true);
+              const verifyRes = await verifyBookingPayment({
+                bookingId: res.booking.id,
+                razorpayOrderId: paymentResponse.razorpay_order_id,
+                razorpayPaymentId: paymentResponse.razorpay_payment_id,
+                razorpaySignature: paymentResponse.razorpay_signature
+              });
+              setBookingSuccess(verifyRes.booking || res.booking);
+            } catch (verErr) {
+              console.error('Verification error:', verErr);
+              alert('Payment verification failed: ' + (verErr.message || 'Please contact support'));
+              refreshSlots();
+            } finally {
+              setLoading(false);
+            }
+          }
+        };
+
+        const rzpInstance = new window.Razorpay(rzpOptions);
+        rzpInstance.on('payment.failed', async function (failedResp) {
+          try {
+            await cancelPendingPayment(res.booking.id, failedResp.error?.description || 'PAYMENT_FAILED');
+          } catch (e) {}
+          refreshSlots();
+          setLoading(false);
+          alert('Payment Failed: ' + (failedResp.error?.description || 'Transaction unsuccessful') + '. Your temporary slot lock has been released.');
+        });
+
+        rzpInstance.open();
+      } else {
+        // Zero payable booking (100% coupon discount or points covered)
+        setBookingSuccess(res.booking || res);
+        setLoading(false);
+      }
     } catch (err) {
       console.error(err);
-      alert('Failed to place booking: ' + (err.message || 'Please check your inputs'));
+      const errMsg = err.message || 'Please check your inputs';
+      if (errMsg.toLowerCase().includes('reserved') || errMsg.toLowerCase().includes('locked') || errMsg.toLowerCase().includes('conflict')) {
+        alert('⚠️ Slot Concurrency Notice: ' + errMsg + '\nRefreshing available slots for you...');
+        refreshSlots();
+      } else {
+        alert('Failed to place booking: ' + errMsg);
+      }
       setLoading(false);
     }
   };

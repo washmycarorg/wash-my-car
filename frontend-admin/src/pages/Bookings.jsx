@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getBookings, assignSlot, autoAssignSlot, getEmployees, getEmployeesWorkload, getCarTypes, getWashTypes, getSettings, updateSettings } from '../api';
+import { getBookings, assignSlot, autoAssignSlot, cancelBookingByAdmin, getEmployees, getEmployeesWorkload, getCarTypes, getWashTypes, getSettings, updateSettings } from '../api';
 import { Calendar, User, Car, MapPin, Compass, Image, Eye, RefreshCw, CheckCircle, Navigation, AlertCircle, Search, X, Zap, Sparkles, ChevronDown } from 'lucide-react';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
@@ -280,6 +280,27 @@ const Bookings = () => {
   const [loading, setLoading] = useState(true);
   const [autoAssignMode, setAutoAssignMode] = useState(true);
   const [updatingMode, setUpdatingMode] = useState(false);
+
+  // Admin Cancellation Modal State
+  const [adminCancelModal, setAdminCancelModal] = useState(null);
+  const [adminCancelReason, setAdminCancelReason] = useState('');
+  const [adminCancelLoading, setAdminCancelLoading] = useState(false);
+
+  const handleAdminCancelSubmit = async () => {
+    if (!adminCancelModal) return;
+    setAdminCancelLoading(true);
+    try {
+      const res = await cancelBookingByAdmin(adminCancelModal.id, adminCancelReason || 'Cancelled by administration');
+      alert(res.message || 'Booking cancelled and refund processed.');
+      setAdminCancelModal(null);
+      setAdminCancelReason('');
+      fetchData();
+    } catch (err) {
+      alert('Failed to cancel booking: ' + (err.message || 'Unknown error'));
+    } finally {
+      setAdminCancelLoading(false);
+    }
+  };
 
   // Search & Filter States
   const [searchPhone, setSearchPhone] = useState('');
@@ -746,14 +767,32 @@ const Bookings = () => {
                 
                 {/* Status */}
                 <td style={{ padding: '1.25rem 1.5rem' }}>
-                  <span className={`badge ${b.status === 'COMPLETED' ? 'badge-success' : b.status === 'STARTED' ? 'badge-warning' : 'badge-primary'}`}>
+                  <span className={`badge ${b.status === 'COMPLETED' ? 'badge-success' : b.status === 'STARTED' ? 'badge-warning' : b.status === 'CANCELLED' ? 'badge-danger' : 'badge-primary'}`} style={{
+                    background: b.status === 'CANCELLED' ? '#FEE2E2' : undefined,
+                    color: b.status === 'CANCELLED' ? '#DC2626' : undefined,
+                    fontWeight: 700
+                  }}>
                     {b.status}
                   </span>
+                  {b.cancellationReason && (
+                    <div style={{ fontSize: '0.72rem', color: '#991B1B', marginTop: '0.25rem', maxWidth: '140px', lineHeight: 1.25 }}>
+                      {b.cancellationReason}
+                    </div>
+                  )}
+                  {b.refundStatus === 'PROCESSED' && (
+                    <div style={{ fontSize: '0.7rem', color: '#166534', background: '#DCFCE7', padding: '0.15rem 0.4rem', borderRadius: '4px', marginTop: '0.25rem', fontWeight: 600 }}>
+                      Refunded ₹{b.refundAmount || b.price}
+                    </div>
+                  )}
                 </td>
                 
                 {/* Assignment triggers */}
                 <td style={{ padding: '1.25rem 1.5rem' }}>
-                  {b.employeeId ? (
+                  {b.status === 'CANCELLED' ? (
+                    <div style={{ fontSize: '0.82rem', color: '#DC2626', fontWeight: 600 }}>
+                      Service Cancelled
+                    </div>
+                  ) : b.employeeId ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         {b.employee?.photo ? (
@@ -768,8 +807,8 @@ const Bookings = () => {
                           <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{b.employee?.phone}</span>
                         </div>
                       </div>
-                      {b.status !== 'COMPLETED' && b.status !== 'CANCELLED' && (
-                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.15rem' }}>
+                      {b.status !== 'COMPLETED' && (
+                        <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.15rem', flexWrap: 'wrap' }}>
                           <button 
                             className="btn btn-outline" 
                             style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', borderRadius: '4px' }}
@@ -777,17 +816,37 @@ const Bookings = () => {
                           >
                             Unassign
                           </button>
+                          <button 
+                            className="btn" 
+                            style={{ background: '#FEE2E2', color: '#DC2626', border: '1px solid #FCA5A5', padding: '0.2rem 0.5rem', fontSize: '0.75rem', borderRadius: '4px', fontWeight: 600 }}
+                            onClick={() => { setAdminCancelModal(b); setAdminCancelReason(''); }}
+                          >
+                            Cancel & Refund
+                          </button>
                         </div>
                       )}
                     </div>
                   ) : (
-                    <AssignEmployeeDropdown
-                      booking={b}
-                      employees={employees}
-                      workloads={workloads}
-                      onAssign={handleManualAssign}
-                      onFetchWorkload={fetchWorkload}
-                    />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                      <AssignEmployeeDropdown
+                        booking={b}
+                        employees={employees}
+                        workloads={workloads}
+                        onAssign={handleManualAssign}
+                        onFetchWorkload={fetchWorkload}
+                      />
+                      {b.status !== 'COMPLETED' && (
+                        <div>
+                          <button 
+                            className="btn" 
+                            style={{ background: '#FEE2E2', color: '#DC2626', border: '1px solid #FCA5A5', padding: '0.2rem 0.5rem', fontSize: '0.72rem', borderRadius: '4px', fontWeight: 600 }}
+                            onClick={() => { setAdminCancelModal(b); setAdminCancelReason(''); }}
+                          >
+                            Cancel & Refund
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </td>
 
@@ -999,6 +1058,98 @@ const Bookings = () => {
               </div>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Admin Cancel & Refund Modal */}
+      {adminCancelModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1100,
+          padding: '1rem'
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '480px',
+            padding: '1.75rem',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            boxSizing: 'border-box'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0, color: '#DC2626', fontSize: '1.2rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <AlertCircle size={20} color="#DC2626" /> Cancel & Refund Booking #{adminCancelModal.id}
+              </h3>
+              <button
+                onClick={() => setAdminCancelModal(null)}
+                style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <X size={18} color="#64748B" />
+              </button>
+            </div>
+
+            <p style={{ color: '#475569', fontSize: '0.9rem', lineHeight: 1.5, margin: '0 0 1rem' }}>
+              Are you sure you want to cancel this booking for <strong>{adminCancelModal.user?.name || adminCancelModal.user?.phone}</strong> on <strong>{new Date(adminCancelModal.date).toLocaleDateString()} ({adminCancelModal.timeSlot})</strong>?
+            </p>
+
+            {adminCancelModal.price > 0 && (
+              <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '10px', padding: '0.75rem 1rem', marginBottom: '1rem', color: '#065F46', fontSize: '0.85rem' }}>
+                <strong>💳 Automatic Razorpay Refund:</strong>
+                <div style={{ marginTop: '0.2rem' }}>
+                  If paid online via Razorpay, a refund of <strong>₹{adminCancelModal.price}</strong> will be processed immediately. If points were used, they will be credited back.
+                </div>
+              </div>
+            )}
+
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--primary-navy)', marginBottom: '0.4rem' }}>
+                Cancellation Reason (visible to customer & employee)
+              </label>
+              <textarea
+                rows={3}
+                className="form-input"
+                placeholder="e.g. Inclement weather, technician unavailable, administrative request..."
+                value={adminCancelReason}
+                onChange={e => setAdminCancelReason(e.target.value)}
+                style={{ width: '100%', borderRadius: '8px', border: '1px solid #CBD5E1', padding: '0.6rem 0.75rem', fontSize: '0.88rem', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button
+                type="button"
+                onClick={() => setAdminCancelModal(null)}
+                disabled={adminCancelLoading}
+                className="btn btn-outline"
+                style={{ borderRadius: '8px', padding: '0.6rem 1.25rem' }}
+              >
+                Keep Booking
+              </button>
+              <button
+                type="button"
+                onClick={handleAdminCancelSubmit}
+                disabled={adminCancelLoading}
+                style={{
+                  background: '#DC2626',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0.6rem 1.25rem',
+                  fontWeight: 700,
+                  cursor: adminCancelLoading ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {adminCancelLoading ? 'Processing Refund...' : 'Confirm Cancel & Refund'}
+              </button>
+            </div>
           </div>
         </div>
       )}

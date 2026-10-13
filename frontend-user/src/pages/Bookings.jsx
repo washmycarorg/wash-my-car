@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { getBookings, getCars, getProfile } from '../api';
+import { getBookings, getCars, getProfile, cancelBooking } from '../api';
 import { 
   Calendar, Car, Filter, ChevronDown, CheckCircle, Clock, 
   AlertCircle, XCircle, Star, Tag, Gift, Sparkles,
-  Shield, Bike, Droplets, Feather, Flame 
+  Shield, Bike, Droplets, Feather, Flame, X, RefreshCw
 } from 'lucide-react';
 
 const renderAddonIcon = (iconName, size = 14) => {
@@ -48,6 +48,31 @@ const Bookings = () => {
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [filterDate, setFilterDate] = useState('');
   const [filterCarId, setFilterCarId] = useState('ALL');
+
+  // Cancellation modal state
+  const [cancellingBooking, setCancellingBooking] = useState(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelLoading, setCancelLoading] = useState(false);
+
+  const fetchBookingsList = () => {
+    return getBookings().then(bks => setBookings(bks)).catch(err => console.error(err));
+  };
+
+  const handleCancelBooking = async () => {
+    if (!cancellingBooking) return;
+    setCancelLoading(true);
+    try {
+      const res = await cancelBooking(cancellingBooking.id, cancelReason || 'Cancelled by customer');
+      alert(res.message || 'Booking cancelled successfully.');
+      setCancellingBooking(null);
+      setCancelReason('');
+      await fetchBookingsList();
+    } catch (err) {
+      alert('Failed to cancel booking: ' + (err.message || 'Unknown error'));
+    } finally {
+      setCancelLoading(false);
+    }
+  };
 
   useEffect(() => {
     Promise.all([getBookings(), getCars().catch(() => []), getProfile().catch(() => null)])
@@ -267,6 +292,76 @@ const Bookings = () => {
                 </span>
               </div>
             )}
+
+            {/* Cancelled Details & Automatic Refund Status */}
+            {booking.status === 'CANCELLED' && (
+              <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '10px', padding: '0.85rem 1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#DC2626', fontWeight: 700, fontSize: '0.88rem', marginBottom: '0.25rem' }}>
+                  <XCircle size={16} /> Booking Cancelled
+                </div>
+                {booking.cancelledAt && (
+                  <div style={{ fontSize: '0.78rem', color: '#991B1B' }}>
+                    Cancelled on: {new Date(booking.cancelledAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                  </div>
+                )}
+                {booking.cancellationReason && (
+                  <div style={{ fontSize: '0.82rem', color: '#7F1D1D', marginTop: '0.2rem' }}>
+                    <strong>Reason:</strong> {booking.cancellationReason}
+                  </div>
+                )}
+                <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #FCA5A5' }}>
+                  {booking.refundStatus === 'PROCESSED' ? (
+                    <div style={{ background: '#DCFCE7', color: '#166534', padding: '0.45rem 0.65rem', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <CheckCircle size={15} color="#16A34A" />
+                      <span>Automatic Refund of <strong>₹{booking.refundAmount || booking.price}</strong> processed via Razorpay (Refund ID: {booking.refundId || 'N/A'}). Amount will credit back within 5-7 business days.</span>
+                    </div>
+                  ) : booking.refundStatus === 'FAILED' ? (
+                    <div style={{ background: '#FFFBEB', color: '#B45309', padding: '0.45rem 0.65rem', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <AlertCircle size={15} color="#D97706" />
+                      <span>Automatic gateway refund encountered an issue. Customer care will process manual refund.</span>
+                    </div>
+                  ) : booking.razorpayPaymentId ? (
+                    <div style={{ fontSize: '0.8rem', color: '#991B1B', fontWeight: 600 }}>
+                      Automatic Refund: Processing via Razorpay...
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '0.8rem', color: '#64748B' }}>
+                      No online transaction charges to refund for this booking.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Cancel Action Button for Active Bookings */}
+            {['PENDING', 'ASSIGNED'].includes(booking.status) && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '0.35rem' }}>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCancellingBooking(booking);
+                    setCancelReason('');
+                  }}
+                  className="btn"
+                  style={{
+                    background: '#FEE2E2',
+                    color: '#DC2626',
+                    border: '1.5px solid #FCA5A5',
+                    padding: '0.45rem 1rem',
+                    borderRadius: '8px',
+                    fontWeight: 700,
+                    fontSize: '0.82rem',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem'
+                  }}
+                >
+                  <XCircle size={15} /> Cancel Booking & Refund
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -377,6 +472,98 @@ const Bookings = () => {
           <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem' }}>
             {bookings.length === 0 ? "You haven't booked any services yet." : "No bookings match your current filters."}
           </p>
+        </div>
+      )}
+
+      {/* Cancellation Confirmation Modal */}
+      {cancellingBooking && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(4px)',
+          zIndex: 1100,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem'
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '20px',
+            width: '100%',
+            maxWidth: '480px',
+            padding: '1.75rem',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            boxSizing: 'border-box'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0, color: '#DC2626', fontSize: '1.15rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <AlertCircle size={20} color="#DC2626" /> Cancel Booking #{cancellingBooking.id}
+              </h3>
+              <button
+                onClick={() => setCancellingBooking(null)}
+                style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <X size={18} color="#64748B" />
+              </button>
+            </div>
+
+            <p style={{ color: '#475569', fontSize: '0.9rem', lineHeight: 1.5, margin: '0 0 1rem' }}>
+              Are you sure you want to cancel your scheduled wash on <strong>{new Date(cancellingBooking.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} ({cancellingBooking.timeSlot})</strong>?
+            </p>
+
+            {cancellingBooking.price > 0 && (
+              <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '10px', padding: '0.75rem 1rem', marginBottom: '1rem', color: '#065F46', fontSize: '0.85rem' }}>
+                <strong>💳 Automatic Razorpay Refund:</strong>
+                <div style={{ marginTop: '0.2rem' }}>
+                  A refund of <strong>₹{cancellingBooking.price}</strong> will be initiated automatically to your original payment account. Any redeemed loyalty points will also be restored.
+                </div>
+              </div>
+            )}
+
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--primary-navy)', marginBottom: '0.4rem' }}>
+                Reason for Cancellation (Optional)
+              </label>
+              <textarea
+                rows={3}
+                className="form-input"
+                placeholder="e.g. Schedule change, traveling, need different date/time..."
+                value={cancelReason}
+                onChange={e => setCancelReason(e.target.value)}
+                style={{ width: '100%', borderRadius: '8px', border: '1px solid #CBD5E1', padding: '0.6rem 0.75rem', fontSize: '0.88rem', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button
+                type="button"
+                onClick={() => setCancellingBooking(null)}
+                disabled={cancelLoading}
+                className="btn btn-outline"
+                style={{ borderRadius: '8px', padding: '0.6rem 1.25rem' }}
+              >
+                Keep Booking
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelBooking}
+                disabled={cancelLoading}
+                style={{
+                  background: '#DC2626',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0.6rem 1.25rem',
+                  fontWeight: 700,
+                  cursor: cancelLoading ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {cancelLoading ? 'Cancelling & Refunding...' : 'Confirm Cancellation'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

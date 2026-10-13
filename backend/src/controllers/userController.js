@@ -1,5 +1,7 @@
 import prisma from '../config/db.js';
-import { parseSlotTimeWindow } from './slotController.js';
+import { parseSlotTimeWindow, cleanupExpiredSlotLocks } from './slotController.js';
+import { getRazorpayInstance, verifyRazorpaySignature } from '../config/razorpay.js';
+import { computeEmployeePayout } from '../utils/payoutHelper.js';
 
 export const getProfile = async (req, res) => {
   try {
@@ -279,6 +281,37 @@ export const createBooking = async (req, res) => {
       });
     }
 
+    // Double-confirmation: Ensure the slot is currently available and not locked by another customer
+    await cleanupExpiredSlotLocks();
+    const startOfDay = new Date(`${bookingDateStr}T00:00:00.000Z`);
+    const endOfDay = new Date(`${bookingDateStr}T23:59:59.999Z`);
+    const nowTime = new Date();
+
+    const rawBookingsInSlot = await prisma.booking.findMany({
+      where: {
+        date: { gte: startOfDay, lte: endOfDay },
+        timeSlot: timeSlot,
+        status: { not: 'CANCELLED' }
+      }
+    });
+
+    const activeInSlot = rawBookingsInSlot.filter(b => {
+      if (b.status === 'CANCELLED') return false;
+      if (b.paymentStatus === 'PAID') return true;
+      if (b.paymentStatus === 'PENDING') {
+        if (!b.paymentLockExpiresAt) return true;
+        return new Date(b.paymentLockExpiresAt) > nowTime;
+      }
+      return false;
+    });
+
+    const maxCapacity = Math.max(1, sysSettings?.activeWorkers || 1);
+    if (activeInSlot.length >= maxCapacity) {
+      return res.status(409).json({
+        error: 'This arrival window has just been booked by another customer. Please select another time window to proceed.'
+      });
+    }
+
     // Fetch price setting for the combination
     const priceSetting = await prisma.washPrice.findUnique({
       where: {
@@ -371,9 +404,9 @@ export const createBooking = async (req, res) => {
         if (offer.rotation === 'OVERALL' && bookingsWithCoupon.length >= offer.usageLimit) {
           return res.status(400).json({ error: 'You have reached the overall usage limit for this coupon' });
         } else if (offer.rotation === 'MONTHLY') {
-          const now = new Date();
-          const currentMonth = now.getMonth();
-          const currentYear = now.getFullYear();
+          const nowMonth = new Date();
+          const currentMonth = nowMonth.getMonth();
+          const currentYear = nowMonth.getFullYear();
           const monthlyCount = bookingsWithCoupon.filter(b => {
             const bDate = new Date(b.date);
             return bDate.getMonth() === currentMonth && bDate.getFullYear() === currentYear;
@@ -382,8 +415,8 @@ export const createBooking = async (req, res) => {
             return res.status(400).json({ error: 'You have reached the monthly usage limit for this coupon' });
           }
         } else if (offer.rotation === 'YEARLY') {
-          const now = new Date();
-          const currentYear = now.getFullYear();
+          const nowYr = new Date();
+          const currentYear = nowYr.getFullYear();
           const yearlyCount = bookingsWithCoupon.filter(b => {
             const bDate = new Date(b.date);
             return bDate.getFullYear() === currentYear;
@@ -460,14 +493,6 @@ export const createBooking = async (req, res) => {
       ? Math.floor(finalPrice * settings.rewardPointsRatio)
       : 0;
 
-    // Deduct and add points to User
-    await prisma.user.update({
-      where: { id: req.user.id },
-      data: {
-        points: Math.max(0, user.points - redeemedPoints + pointsEarned)
-      }
-    });
-
     let employeePayout = 0;
     if (priceSetting.payoutType === 'PERCENTAGE') {
       employeePayout = (originalPrice * priceSetting.payoutValue) / 100;
@@ -475,16 +500,33 @@ export const createBooking = async (req, res) => {
       employeePayout = priceSetting.payoutValue;
     }
 
-    // Save Car if requested
+    // Normalize car registration number
+    let cleanCarNumber = carNumber ? String(carNumber).trim().toUpperCase() : null;
+
+    // Save/link Car so car details & license registration number are ALWAYS preserved
     let finalCarId = carId ? Number(carId) : null;
-    if (!finalCarId && saveCar && carMake && carModel) {
+    if (finalCarId) {
+      const existingCar = await prisma.car.findUnique({ where: { id: finalCarId } });
+      if (existingCar) {
+        if (!cleanCarNumber && existingCar.carNumber) {
+          cleanCarNumber = existingCar.carNumber;
+        } else if (cleanCarNumber && existingCar.carNumber !== cleanCarNumber) {
+          await prisma.car.update({
+            where: { id: finalCarId },
+            data: { carNumber: cleanCarNumber }
+          }).catch(() => {});
+        }
+        if (!carMake) carMake = existingCar.make;
+        if (!carModel) carModel = existingCar.model;
+      }
+    } else if (carMake || carModel || cleanCarNumber) {
       const newCar = await prisma.car.create({
         data: {
           userId: req.user.id,
-          make: carMake,
-          model: carModel,
+          make: carMake || 'Car',
+          model: carModel || 'Model',
           carTypeId: Number(carTypeId),
-          carNumber: carNumber ? String(carNumber).trim().toUpperCase() : null
+          carNumber: cleanCarNumber
         }
       });
       finalCarId = newCar.id;
@@ -504,7 +546,143 @@ export const createBooking = async (req, res) => {
       });
     }
 
-    // Create the booking
+    // If finalPrice is 0 (100% coupon or points): confirm booking immediately
+    if (finalPrice <= 0) {
+      if (redeemedPoints > 0 || pointsEarned > 0) {
+        await prisma.user.update({
+          where: { id: req.user.id },
+          data: {
+            points: Math.max(0, user.points - redeemedPoints + pointsEarned)
+          }
+        });
+      }
+
+      const booking = await prisma.booking.create({
+        data: {
+          userId: req.user.id,
+          carTypeId: Number(carTypeId),
+          washTypeId: Number(washTypeId),
+          serviceAreaId: Number(serviceAreaId),
+          carId: finalCarId,
+          carNumber: cleanCarNumber,
+          carMake: carMake || null,
+          carModel: carModel || null,
+          date: new Date(date),
+          timeSlot: timeSlot || '10:00 AM',
+          latitude: Number(latitude),
+          longitude: Number(longitude),
+          address,
+          price: 0,
+          addonsTotal,
+          employeePayout,
+          companyCost,
+          appliedOfferCode: appliedCode,
+          pointsRedeemed: redeemedPoints,
+          pointsEarned: pointsEarned,
+          paymentStatus: 'PAID',
+          status: 'PENDING',
+          ...(selectedAddons.length > 0 && {
+            addons: {
+              create: selectedAddons.map(addon => ({
+                addonId: addon.id,
+                price: addon.price,
+                quantity: 1
+              }))
+            }
+          })
+        },
+        include: {
+          addons: { include: { addon: true } },
+          carType: true,
+          washType: true
+        }
+      });
+
+      // Auto assignment if enabled
+      if (settings.autoAssignment) {
+        const regionCandidates = await prisma.employee.findMany({
+          where: {
+            status: 'ACTIVE',
+            serviceAreas: { some: { id: Number(serviceAreaId) } }
+          },
+          include: {
+            bookings: {
+              where: {
+                date: {
+                  gte: new Date(new Date(date).setHours(0, 0, 0, 0)),
+                  lte: new Date(new Date(date).setHours(23, 59, 59, 999))
+                },
+                status: { in: ['ASSIGNED', 'STARTED'] }
+              }
+            }
+          }
+        });
+
+        if (regionCandidates.length > 0) {
+          const onDutyInRegion = regionCandidates.filter(emp => emp.onDuty);
+          const candidatePool = onDutyInRegion.length > 0 ? onDutyInRegion : regionCandidates;
+          const eligible = candidatePool.filter(emp => {
+            const count = emp.bookings.filter(b => b.timeSlot === timeSlot).length;
+            return count < 2;
+          });
+          const targetList = eligible.length > 0 ? eligible : candidatePool;
+          targetList.sort((a, b) => a.bookings.length - b.bookings.length);
+          const chosenEmployee = targetList[0];
+
+          const calculatedPayout = await computeEmployeePayout(
+            chosenEmployee.id,
+            Number(washTypeId),
+            Number(carTypeId),
+            originalPrice,
+            priceSetting
+          );
+
+          const updatedBooking = await prisma.booking.update({
+            where: { id: booking.id },
+            data: {
+              employeeId: chosenEmployee.id,
+              status: 'ASSIGNED',
+              employeePayout: calculatedPayout
+            },
+            include: {
+              employee: true,
+              addons: { include: { addon: true } },
+              washType: true,
+              carType: true
+            }
+          });
+          return res.json({ requiresPayment: false, booking: updatedBooking });
+        }
+      }
+
+      return res.json({ requiresPayment: false, booking });
+    }
+
+    // Online Razorpay Payment required (> 0)
+    // 1. Create order on Razorpay
+    const razorpay = getRazorpayInstance();
+    let rzpOrder = null;
+    try {
+      rzpOrder = await razorpay.orders.create({
+        amount: Math.round(finalPrice * 100), // in paise
+        currency: 'INR',
+        receipt: `bkg_${Date.now()}_${req.user.id}`.slice(-40),
+        notes: {
+          userId: String(req.user.id),
+          date: String(date),
+          timeSlot: String(timeSlot),
+          carTypeId: String(carTypeId),
+          washTypeId: String(washTypeId)
+        }
+      });
+    } catch (rzpErr) {
+      console.error('Razorpay order creation error:', rzpErr);
+      return res.status(500).json({
+        error: `Could not initiate Razorpay order: ${rzpErr.message || 'Check Razorpay API keys in backend .env'}`
+      });
+    }
+
+    // 2. Create provisional booking holding a 10-minute slot lock
     const booking = await prisma.booking.create({
       data: {
         userId: req.user.id,
@@ -512,20 +690,25 @@ export const createBooking = async (req, res) => {
         washTypeId: Number(washTypeId),
         serviceAreaId: Number(serviceAreaId),
         carId: finalCarId,
+        carNumber: cleanCarNumber,
+        carMake: carMake || null,
+        carModel: carModel || null,
         date: new Date(date),
         timeSlot: timeSlot || '10:00 AM',
         latitude: Number(latitude),
         longitude: Number(longitude),
         address,
         price: finalPrice,
-        addonsTotal: addonsTotal,
+        addonsTotal,
         employeePayout,
         companyCost,
         appliedOfferCode: appliedCode,
         pointsRedeemed: redeemedPoints,
         pointsEarned: pointsEarned,
-        paymentStatus: 'PAID', // payment is mock and completed online
-        status: 'PENDING',
+        paymentStatus: 'PENDING',
+        status: 'PENDING_PAYMENT',
+        razorpayOrderId: rzpOrder.id,
+        paymentLockExpiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes lock
         ...(selectedAddons.length > 0 && {
           addons: {
             create: selectedAddons.map(addon => ({
@@ -537,30 +720,93 @@ export const createBooking = async (req, res) => {
         })
       },
       include: {
-        addons: {
-          include: {
-            addon: true
-          }
-        }
+        addons: { include: { addon: true } },
+        washType: true,
+        carType: true
       }
     });
 
-    // Auto assignment algorithm based on region / service area
+    return res.json({
+      requiresPayment: true,
+      bookingId: booking.id,
+      razorpayOrderId: rzpOrder.id,
+      amount: rzpOrder.amount, // in paise
+      currency: rzpOrder.currency,
+      keyId: process.env.RAZORPAY_KEY_ID || '',
+      finalPayable: finalPrice,
+      booking
+    });
+
+  } catch (error) { 
+    res.status(500).json({ error: error.message }); 
+  }
+};
+
+// Verify Razorpay Payment and Confirm Booking
+export const verifyBookingPayment = async (req, res) => {
+  try {
+    const { bookingId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
+
+    const booking = await prisma.booking.findUnique({
+      where: { id: Number(bookingId) },
+      include: { washType: true, carType: true }
+    });
+
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    if (booking.userId !== req.user.id) {
+      return res.status(403).json({ error: 'Unauthorized to verify this booking' });
+    }
+
+    if (booking.status === 'CANCELLED') {
+      return res.status(400).json({ error: 'This booking was cancelled or the payment session expired.' });
+    }
+
+    // Verify HMAC signature
+    if (process.env.RAZORPAY_KEY_SECRET) {
+      const isValid = verifyRazorpaySignature(razorpayOrderId, razorpayPaymentId, razorpaySignature);
+      if (!isValid) {
+        return res.status(400).json({ error: 'Invalid Razorpay payment signature' });
+      }
+    }
+
+    // Apply points redemption and rewards now that payment is confirmed
+    const settings = await prisma.systemSettings.findUnique({ where: { id: 1 } }) || {
+      autoAssignment: true,
+      pointsRedemption: true,
+      pointsReward: true,
+      pointsToCashRatio: 4.0,
+      rewardPointsRatio: 0.1
+    };
+
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+    if (booking.pointsRedeemed > 0 || booking.pointsEarned > 0) {
+      await prisma.user.update({
+        where: { id: req.user.id },
+        data: {
+          points: Math.max(0, user.points - booking.pointsRedeemed + booking.pointsEarned)
+        }
+      });
+    }
+
+    // Auto assignment logic and 3-tier employee payout calculation
+    let assignedEmployeeId = null;
+    let finalEmployeePayout = booking.employeePayout;
+
     if (settings.autoAssignment) {
-      // Find active employees mapped to this specific service region
       const regionCandidates = await prisma.employee.findMany({
         where: {
           status: 'ACTIVE',
-          serviceAreas: {
-            some: { id: Number(serviceAreaId) }
-          }
+          serviceAreas: { some: { id: booking.serviceAreaId } }
         },
         include: {
           bookings: {
             where: {
               date: {
-                gte: new Date(new Date(date).setHours(0, 0, 0, 0)),
-                lte: new Date(new Date(date).setHours(23, 59, 59, 999))
+                gte: new Date(new Date(booking.date).setHours(0, 0, 0, 0)),
+                lte: new Date(new Date(booking.date).setHours(23, 59, 59, 999))
               },
               status: { in: ['ASSIGNED', 'STARTED'] }
             }
@@ -569,43 +815,194 @@ export const createBooking = async (req, res) => {
       });
 
       if (regionCandidates.length > 0) {
-        // Prioritize on-duty employees in the region, otherwise consider all active region employees
         const onDutyInRegion = regionCandidates.filter(emp => emp.onDuty);
         const candidatePool = onDutyInRegion.length > 0 ? onDutyInRegion : regionCandidates;
-
         const eligible = candidatePool.filter(emp => {
-          const slotBookingsCount = emp.bookings.filter(b => b.timeSlot === timeSlot).length;
-          return slotBookingsCount < 2; // Cap: Max 2 bookings per slot per day
+          const count = emp.bookings.filter(b => b.timeSlot === booking.timeSlot).length;
+          return count < 2;
         });
-
         const targetList = eligible.length > 0 ? eligible : candidatePool;
-
-        // Sort by lowest daily workload
         targetList.sort((a, b) => a.bookings.length - b.bookings.length);
         const chosenEmployee = targetList[0];
-        
-        const updatedBooking = await prisma.booking.update({
-          where: { id: booking.id },
-          data: {
-            employeeId: chosenEmployee.id,
-            status: 'ASSIGNED'
-          },
-          include: { 
-            employee: true,
-            addons: {
-              include: {
-                addon: true
-              }
-            }
-          }
-        });
-        return res.json(updatedBooking);
+        assignedEmployeeId = chosenEmployee.id;
+
+        finalEmployeePayout = await computeEmployeePayout(
+          chosenEmployee.id,
+          booking.washTypeId,
+          booking.carTypeId,
+          booking.price
+        );
       }
     }
 
-    res.json(booking);
-  } catch (error) { 
-    res.status(500).json({ error: error.message }); 
+    const updatedBooking = await prisma.booking.update({
+      where: { id: booking.id },
+      data: {
+        paymentStatus: 'PAID',
+        razorpayPaymentId,
+        razorpaySignature,
+        status: assignedEmployeeId ? 'ASSIGNED' : 'PENDING',
+        employeeId: assignedEmployeeId,
+        employeePayout: finalEmployeePayout,
+        paymentLockExpiresAt: null
+      },
+      include: {
+        addons: { include: { addon: true } },
+        car: true,
+        carType: true,
+        washType: true,
+        employee: true
+      }
+    });
+
+    res.json({ message: 'Payment verified and booking confirmed successfully', booking: updatedBooking });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Release provisional slot lock if user dismisses modal or payment fails
+export const cancelPendingPayment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const booking = await prisma.booking.findUnique({
+      where: { id: Number(id) }
+    });
+
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    if (booking.userId !== req.user.id) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    if (booking.paymentStatus === 'PENDING' && (booking.status === 'PENDING_PAYMENT' || booking.status === 'PENDING')) {
+      await prisma.booking.update({
+        where: { id: booking.id },
+        data: {
+          status: 'CANCELLED',
+          cancellationReason: 'Payment cancelled / modal dismissed by user',
+          paymentLockExpiresAt: null
+        }
+      });
+    }
+
+    res.json({ message: 'Provisional lock released successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Customer Cancellation with Automatic Razorpay Refund
+export const cancelBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason = 'Cancelled by customer' } = req.body;
+
+    const booking = await prisma.booking.findUnique({
+      where: { id: Number(id) },
+      include: { employee: true, user: true }
+    });
+
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    if (booking.userId !== req.user.id) {
+      return res.status(403).json({ error: 'Unauthorized to cancel this booking' });
+    }
+
+    if (booking.status === 'CANCELLED') {
+      return res.status(400).json({ error: 'This booking is already cancelled.' });
+    }
+
+    if (booking.status === 'STARTED' || booking.status === 'COMPLETED') {
+      return res.status(400).json({
+        error: `Cannot cancel booking because technician has already ${booking.status.toLowerCase()} service.`
+      });
+    }
+
+    let refundDetails = {
+      refundId: null,
+      refundAmount: 0,
+      refundStatus: 'NONE'
+    };
+
+    // Automatic Razorpay refund if paid online with Razorpay
+    if (booking.paymentStatus === 'PAID' && booking.razorpayPaymentId && booking.price > 0) {
+      try {
+        const razorpay = getRazorpayInstance();
+        const refundResponse = await razorpay.payments.refund(booking.razorpayPaymentId, {
+          amount: Math.round(booking.price * 100),
+          notes: {
+            bookingId: booking.id,
+            reason: reason
+          }
+        });
+
+        refundDetails = {
+          refundId: refundResponse.id,
+          refundAmount: booking.price,
+          refundStatus: 'PROCESSED'
+        };
+      } catch (refundErr) {
+        console.error('Razorpay automatic refund error:', refundErr);
+        refundDetails = {
+          refundId: null,
+          refundAmount: booking.price,
+          refundStatus: 'FAILED'
+        };
+      }
+    }
+
+    // Refund redeemed loyalty points back to customer
+    if (booking.pointsRedeemed > 0) {
+      await prisma.user.update({
+        where: { id: booking.userId },
+        data: {
+          points: { increment: booking.pointsRedeemed }
+        }
+      });
+    }
+
+    // Revert earned points
+    if (booking.pointsEarned > 0) {
+      await prisma.user.update({
+        where: { id: booking.userId },
+        data: {
+          points: { decrement: Math.min(booking.user.points, booking.pointsEarned) }
+        }
+      });
+    }
+
+    const updatedBooking = await prisma.booking.update({
+      where: { id: booking.id },
+      data: {
+        status: 'CANCELLED',
+        cancelledAt: new Date(),
+        cancellationReason: reason,
+        paymentStatus: refundDetails.refundStatus === 'PROCESSED' ? 'REFUNDED' : (booking.paymentStatus === 'PAID' ? 'REFUND_PENDING' : 'CANCELLED'),
+        refundId: refundDetails.refundId,
+        refundAmount: refundDetails.refundAmount,
+        refundStatus: refundDetails.refundStatus
+      },
+      include: {
+        employee: true,
+        car: true,
+        washType: true,
+        carType: true
+      }
+    });
+
+    res.json({
+      message: refundDetails.refundStatus === 'PROCESSED'
+        ? `Booking cancelled successfully and automatic refund of ₹${booking.price} initiated.`
+        : 'Booking cancelled successfully.',
+      booking: updatedBooking
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 };
 

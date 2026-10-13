@@ -1,4 +1,6 @@
 import prisma from '../config/db.js';
+import { getRazorpayInstance } from '../config/razorpay.js';
+import { computeEmployeePayout } from '../utils/payoutHelper.js';
 
 export const getDashboardStats = async (req, res) => {
   try {
@@ -16,15 +18,26 @@ export const getDashboardStats = async (req, res) => {
     });
     const totalRevenue = completedBookings.reduce((sum, b) => sum + (b.price || 0), 0);
     
-    // Cost to Company (sum of employee payouts + additional company cost like chemicals/materials)
-    const totalCostToCompany = completedBookings.reduce(
-      (sum, b) => sum + (b.employeePayout || 0) + (b.companyCost || 0),
-      0
-    );
+    // Cost to Company (Commissions on completed jobs + Company chemicals/materials + Active fixed/hybrid payroll)
+    const totalCommissions = completedBookings.reduce((sum, b) => sum + (b.employeePayout || 0), 0);
+    const totalMaterialCost = completedBookings.reduce((sum, b) => sum + (b.companyCost || 0), 0);
+
+    const activeEmployees = await prisma.employee.findMany({ where: { status: 'ACTIVE' } });
+    const totalFixedSalaries = activeEmployees.reduce((sum, emp) => {
+      const type = emp.payType || 'COMMISSION_ONLY';
+      if (type === 'FIXED_SALARY') return sum + (emp.salary || emp.baseSalary || 0);
+      if (type === 'HYBRID') return sum + (emp.baseSalary || 0);
+      return sum;
+    }, 0);
+
+    const totalCostToCompany = totalCommissions + totalMaterialCost + totalFixedSalaries;
 
     res.json({
       totalRevenue,
       totalCostToCompany,
+      totalCommissions,
+      totalFixedSalaries,
+      totalMaterialCost,
       activeBookings,
       employeesOnline,
       totalBookings
@@ -609,14 +622,33 @@ export const assignSlot = async (req, res) => {
   try {
     const { id } = req.params;
     const { employeeId } = req.body;
+
+    const existingBooking = await prisma.booking.findUnique({
+      where: { id: Number(id) }
+    });
+
+    if (!existingBooking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    let employeePayout = existingBooking.employeePayout;
+    if (employeeId) {
+      employeePayout = await computeEmployeePayout(
+        Number(employeeId),
+        existingBooking.washTypeId,
+        existingBooking.carTypeId,
+        existingBooking.price
+      );
+    }
     
     const booking = await prisma.booking.update({
       where: { id: Number(id) },
       data: { 
         employeeId: employeeId ? Number(employeeId) : null,
-        status: employeeId ? 'ASSIGNED' : 'PENDING'
+        status: employeeId ? 'ASSIGNED' : 'PENDING',
+        employeePayout
       },
-      include: { employee: true }
+      include: { employee: true, washType: true, carType: true }
     });
     res.json(booking);
   } catch (error) { 
@@ -671,18 +703,110 @@ export const autoAssignSlot = async (req, res) => {
     eligible.sort((a, b) => a.bookings.length - b.bookings.length);
     const chosenEmployee = eligible[0];
 
+    const employeePayout = await computeEmployeePayout(
+      chosenEmployee.id,
+      booking.washTypeId,
+      booking.carTypeId,
+      booking.price
+    );
+
     const updatedBooking = await prisma.booking.update({
       where: { id: Number(id) },
       data: {
         employeeId: chosenEmployee.id,
-        status: 'ASSIGNED'
+        status: 'ASSIGNED',
+        employeePayout
       },
-      include: { employee: true }
+      include: { employee: true, washType: true, carType: true }
     });
 
     res.json({ message: 'Auto-assigned successfully', booking: updatedBooking });
   } catch (error) { 
     res.status(500).json({ error: error.message }); 
+  }
+};
+
+// Admin Cancel & Refund Booking
+export const cancelBookingByAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason = 'Cancelled by administrator' } = req.body;
+
+    const booking = await prisma.booking.findUnique({
+      where: { id: Number(id) },
+      include: { employee: true, user: true }
+    });
+
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    if (booking.status === 'CANCELLED') {
+      return res.status(400).json({ error: 'This booking is already cancelled.' });
+    }
+
+    let refundDetails = {
+      refundId: null,
+      refundAmount: 0,
+      refundStatus: 'NONE'
+    };
+
+    if (booking.paymentStatus === 'PAID' && booking.razorpayPaymentId && booking.price > 0) {
+      try {
+        const razorpay = getRazorpayInstance();
+        const refundResponse = await razorpay.payments.refund(booking.razorpayPaymentId, {
+          amount: Math.round(booking.price * 100),
+          notes: {
+            bookingId: booking.id,
+            reason: reason
+          }
+        });
+
+        refundDetails = {
+          refundId: refundResponse.id,
+          refundAmount: booking.price,
+          refundStatus: 'PROCESSED'
+        };
+      } catch (err) {
+        console.error('Razorpay refund error:', err);
+        refundDetails = {
+          refundId: null,
+          refundAmount: booking.price,
+          refundStatus: 'FAILED'
+        };
+      }
+    }
+
+    // Refund loyalty points if redeemed
+    if (booking.pointsRedeemed > 0) {
+      await prisma.user.update({
+        where: { id: booking.userId },
+        data: { points: { increment: booking.pointsRedeemed } }
+      });
+    }
+
+    const updatedBooking = await prisma.booking.update({
+      where: { id: booking.id },
+      data: {
+        status: 'CANCELLED',
+        cancelledAt: new Date(),
+        cancellationReason: reason,
+        paymentStatus: refundDetails.refundStatus === 'PROCESSED' ? 'REFUNDED' : (booking.paymentStatus === 'PAID' ? 'REFUND_PENDING' : 'CANCELLED'),
+        refundId: refundDetails.refundId,
+        refundAmount: refundDetails.refundAmount,
+        refundStatus: refundDetails.refundStatus
+      },
+      include: { employee: true, user: true, washType: true, carType: true }
+    });
+
+    res.json({
+      message: refundDetails.refundStatus === 'PROCESSED'
+        ? `Booking cancelled and automatic refund of ₹${booking.price} initiated.`
+        : 'Booking cancelled successfully.',
+      booking: updatedBooking
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 };
 
