@@ -1485,8 +1485,10 @@ const Home = () => {
                 fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)',
                 fontWeight: 900,
                 lineHeight: 1.2,
+                color: '#FFFFFF',
                 margin: '0 0 1rem 0',
-                letterSpacing: '-0.02em'
+                letterSpacing: '-0.02em',
+                textShadow: '0 2px 10px rgba(0,0,0,0.35)'
               }}>
                 {settings?.subscriptionBannerTitle || 'Unlimited Doorstep Shine with Wash My Car VIP Club'}
               </h2>

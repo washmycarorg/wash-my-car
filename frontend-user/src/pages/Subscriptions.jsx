@@ -367,6 +367,7 @@ const Subscriptions = () => {
             fontSize: 'clamp(1.6rem, 4vw, 2.2rem)',
             fontWeight: 900,
             lineHeight: 1.18,
+            color: '#FFFFFF',
             margin: '0 0 0.85rem 0',
             letterSpacing: '-0.02em',
             textShadow: '0 2px 10px rgba(0,0,0,0.3)'
