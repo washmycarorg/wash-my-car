@@ -1366,25 +1366,27 @@ const Subscriptions = () => {
         <div style={{
           position: 'fixed',
           inset: 0,
-          background: 'rgba(15, 23, 42, 0.75)',
-          backdropFilter: 'blur(5px)',
+          background: 'rgba(15, 23, 42, 0.8)',
+          backdropFilter: 'blur(6px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 1000,
-          padding: '1rem'
+          zIndex: 99999,
+          padding: '1rem',
+          paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))'
         }}>
           <div style={{
             background: '#FFFFFF',
             borderRadius: '24px',
             width: '100%',
             maxWidth: '640px',
-            maxHeight: '90vh',
+            maxHeight: 'min(86vh, 720px)',
             display: 'flex',
             flexDirection: 'column',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.3)',
+            boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.45)',
             position: 'relative',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            zIndex: 100000
           }}>
             {/* Header */}
             <div style={{
@@ -1393,7 +1395,8 @@ const Subscriptions = () => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              background: '#F8FAFC'
+              background: '#F8FAFC',
+              flexShrink: 0
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                 <div style={{ width: 36, height: 36, borderRadius: '10px', background: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1632,7 +1635,8 @@ const Subscriptions = () => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'flex-end',
-              gap: '0.75rem'
+              gap: '0.75rem',
+              flexShrink: 0
             }}>
               <button
                 type="button"
