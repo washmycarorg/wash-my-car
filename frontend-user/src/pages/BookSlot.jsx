@@ -1076,6 +1076,7 @@ const BookSlot = () => {
   const totalSubDiscount = subWashDiscount + totalVipAddonSavings;
   const totalAddonsEffective = selectedAddonsList.reduce((sum, a) => sum + getAddonPricing(a).effectivePrice, 0);
   const couponDiscount = washCouponDiscount + totalCouponAddonSavings;
+  const totalAddonSavings = totalCouponAddonSavings;
   const washPayableAfterSubAndCoupon = Math.max(0, baseWashPrice - subWashDiscount - washCouponDiscount);
   const subtotalAfterDiscounts = Math.max(0, washPayableAfterSubAndCoupon + totalAddonsEffective);
 
@@ -1450,10 +1451,10 @@ const BookSlot = () => {
                   <span>-₹{washCouponDiscount.toFixed(2)}</span>
                 </div>
               )}
-              {totalAddonSavings > 0 && (
+              {totalCouponAddonSavings > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#059669', fontWeight: 600 }}>
                   <span>• Free / Offer Add-on Savings</span>
-                  <span>-₹{totalAddonSavings.toFixed(2)}</span>
+                  <span>-₹{totalCouponAddonSavings.toFixed(2)}</span>
                 </div>
               )}
               {pointsDiscount > 0 && (
