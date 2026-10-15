@@ -150,6 +150,20 @@ export const getAvailableBookingSlots = async (req, res) => {
     }
 
     const settings = await prisma.systemSettings.findUnique({ where: { id: 1 } });
+    
+    if (settings && settings.bookingsEnabled === false) {
+      return res.json({
+        date,
+        zone: 'NAD',
+        activeWorkers: 0,
+        configuredSlots: [],
+        availableSlots: [],
+        distanceConstraintKm: 0,
+        bookingsEnabled: false,
+        message: 'Doorstep car wash bookings are currently paused by administration. Please check back later.'
+      });
+    }
+
     const allAreas = await prisma.serviceArea.findMany();
     
     // Configured slots (max 6)

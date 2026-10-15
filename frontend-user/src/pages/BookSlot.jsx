@@ -5,7 +5,7 @@ import {
   Search, Compass, AlertCircle, Tag, Sparkles, Plus, Check,
   Shield, Bike, Droplets, Feather, Flame, Info, ArrowRight,
   ArrowLeft, ArrowDown, X, Gift, CheckSquare, Square, ChevronRight, ChevronLeft, ChevronDown, HelpCircle,
-  Clock, Users, Navigation
+  Clock, Users, Navigation, CalendarX, Crown
 } from 'lucide-react';
 import { 
   createBooking,
@@ -1078,6 +1078,19 @@ const BookSlot = () => {
 
     setLoading(true);
 
+    // Verify live system booking status (guards against low network / cached screens)
+    try {
+      const liveSettings = await getSettings();
+      if (liveSettings && liveSettings.bookingsEnabled === false) {
+        setSystemSettings(liveSettings);
+        setLoading(false);
+        alert('Doorstep car wash bookings are currently paused by administration. You cannot proceed to book or pay at this moment. Please check back later.');
+        return;
+      }
+    } catch (checkErr) {
+      console.warn('Could not re-verify live booking status before checkout:', checkErr);
+    }
+
     try {
       let finalCarMake = '';
       let finalCarModel = '';
@@ -1305,6 +1318,93 @@ const BookSlot = () => {
               style={{ padding: '0.75rem 1.75rem', borderRadius: '12px' }}
             >
               Go to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Master switch check: if bookings are turned off by admin
+  if (systemSettings && systemSettings.bookingsEnabled === false) {
+    return (
+      <div style={{ maxWidth: '640px', margin: '2.5rem auto', padding: '0 1rem' }}>
+        <div className="card animate-fade-in" style={{
+          padding: '3rem 2rem',
+          textAlign: 'center',
+          borderRadius: '24px',
+          border: '1.5px solid #FECACA',
+          background: 'linear-gradient(180deg, #FFFDFD 0%, #FFFFFF 100%)',
+          boxShadow: '0 20px 40px -10px rgba(220, 38, 38, 0.1)'
+        }}>
+          <div style={{
+            width: '68px',
+            height: '68px',
+            borderRadius: '50%',
+            background: '#FEE2E2',
+            color: '#DC2626',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 1.5rem',
+            boxShadow: '0 6px 16px rgba(220, 38, 38, 0.2)'
+          }}>
+            <CalendarX size={34} strokeWidth={2.2} />
+          </div>
+
+          <span style={{
+            background: '#FEE2E2',
+            color: '#B91C1C',
+            fontSize: '0.75rem',
+            fontWeight: 800,
+            padding: '4px 14px',
+            borderRadius: '20px',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em'
+          }}>
+            SLOT RESERVATIONS PAUSED
+          </span>
+
+          <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0F172A', margin: '1rem 0 0.75rem' }}>
+            Doorstep Bookings Temporarily Closed
+          </h2>
+
+          <p style={{ color: '#64748B', lineHeight: 1.6, fontSize: '0.95rem', margin: '0 auto 2rem', maxWidth: '460px' }}>
+            Doorstep slot bookings are temporarily suspended by the administration for maintenance or heavy weather dispatch. Existing bookings remain unaffected. Please check back shortly!
+          </p>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.85rem', justifyContent: 'center' }}>
+            <button
+              onClick={() => navigate('/dashboard')}
+              style={{
+                background: 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)',
+                color: 'white',
+                border: 'none',
+                padding: '0.75rem 1.75rem',
+                borderRadius: '12px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)'
+              }}
+            >
+              Back to Dashboard
+            </button>
+            <button
+              onClick={() => navigate('/subscriptions')}
+              style={{
+                background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)',
+                color: '#92400E',
+                border: '1.5px solid #F59E0B',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '12px',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem'
+              }}
+            >
+              <Crown size={16} color="#D97706" /> Explore VIP Passes
             </button>
           </div>
         </div>

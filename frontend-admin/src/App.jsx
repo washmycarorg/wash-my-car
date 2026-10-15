@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Calendar, Settings, Bell, Search, DollarSign, Briefcase, FileText, Tag, Menu, X, MapPin, Package, Globe, MessageSquare, Compass } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Settings, Bell, Search, DollarSign, Briefcase, FileText, Tag, Menu, X, MapPin, Package, Globe, MessageSquare, Compass, Crown, UserCheck } from 'lucide-react';
 import { loginAdmin, getStats, getEmployees, toggleEmployeeStatus, updateEmployee, getServiceAreas } from './api';
 
 import Bookings from './pages/Bookings';
@@ -14,6 +14,8 @@ import SettingsPage from './pages/Settings';
 import CmsSettings from './pages/CmsSettings';
 import Inquiries from './pages/Inquiries';
 import SlotsManagement from './pages/SlotsManagement';
+import Subscriptions from './pages/Subscriptions';
+import UsersDirectory from './pages/UsersDirectory';
 import logo from './assets/wash my car.png';
 
 const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
@@ -51,7 +53,10 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
             <LayoutDashboard size={20} /> Dashboard
           </Link>
           <Link to="/employees" className={`sidebar-link ${isActive('/employees')}`}>
-            <Users size={20} /> Employees
+            <Briefcase size={20} /> Employees
+          </Link>
+          <Link to="/users" className={`sidebar-link ${isActive('/users')}`}>
+            <Users size={20} /> Users Directory
           </Link>
           <Link to="/bookings" className={`sidebar-link ${isActive('/bookings')}`}>
             <Calendar size={20} /> Bookings & Slots
@@ -70,6 +75,9 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
           </Link>
           <Link to="/services" className={`sidebar-link ${isActive('/services')}`}>
             <Briefcase size={20} /> Packages & Plans
+          </Link>
+          <Link to="/subscriptions" className={`sidebar-link ${isActive('/subscriptions')}`}>
+            <Crown size={20} /> VIP Subscriptions
           </Link>
           <Link to="/inventory" className={`sidebar-link ${isActive('/inventory')}`}>
             <Package size={20} /> Inventory Management
@@ -710,12 +718,14 @@ const App = () => {
         <Route path="/" element={auth ? <Navigate to="/dashboard"/> : <AdminLogin setAuth={setAuth} />} />
         <Route path="/dashboard" element={<ProtectedAdminRoute><Dashboard /></ProtectedAdminRoute>} />
         <Route path="/employees" element={<ProtectedAdminRoute><EmployeeManagement /></ProtectedAdminRoute>} />
+        <Route path="/users" element={<ProtectedAdminRoute><AdminLayout title="Users & Customer Directory"><UsersDirectory /></AdminLayout></ProtectedAdminRoute>} />
         <Route path="/bookings" element={<ProtectedAdminRoute><AdminLayout title="Slots Details & Assignment"><Bookings /></AdminLayout></ProtectedAdminRoute>} />
         <Route path="/slots-management" element={<ProtectedAdminRoute><AdminLayout title="Slot Scheduling & Distance Dispatch"><SlotsManagement /></AdminLayout></ProtectedAdminRoute>} />
         <Route path="/inquiries" element={<ProtectedAdminRoute><AdminLayout title="User Enquiries & Complaints"><Inquiries /></AdminLayout></ProtectedAdminRoute>} />
         <Route path="/earnings" element={<ProtectedAdminRoute><AdminLayout title="Earnings & Cost to Company"><Financials /></AdminLayout></ProtectedAdminRoute>} />
         <Route path="/leaves" element={<ProtectedAdminRoute><AdminLayout title="Leave Approval"><LeaveApprovals /></AdminLayout></ProtectedAdminRoute>} />
         <Route path="/services" element={<ProtectedAdminRoute><AdminLayout title="Packages & Plans"><Services /></AdminLayout></ProtectedAdminRoute>} />
+        <Route path="/subscriptions" element={<ProtectedAdminRoute><AdminLayout title="VIP Subscriptions & Membership Passes"><Subscriptions /></AdminLayout></ProtectedAdminRoute>} />
         <Route path="/inventory" element={<ProtectedAdminRoute><AdminLayout title="Inventory & Stock Tracking"><Inventory /></AdminLayout></ProtectedAdminRoute>} />
         <Route path="/offers" element={<ProtectedAdminRoute><AdminLayout title="Execute Offers"><Offers /></AdminLayout></ProtectedAdminRoute>} />
         <Route path="/areas" element={<ProtectedAdminRoute><AdminLayout title="Service Areas Management"><Areas /></AdminLayout></ProtectedAdminRoute>} />

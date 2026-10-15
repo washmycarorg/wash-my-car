@@ -29,27 +29,55 @@ const Header = ({ toggleSidebar, profile }) => {
           <Menu size={24} color="var(--primary-navy)" />
         </button>
 
-        <Link to="/dashboard" style={{textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-          <img src={logo} alt="Wash My Car Logo" style={{height: '32px', width: 'auto', objectFit: 'contain'}} />
-          <div style={{display: 'flex', alignItems: 'baseline', gap: '0.35rem', flexWrap: 'nowrap'}}>
-            <span style={{
-              fontSize: '1.15rem', 
-              fontWeight: 900, 
-              letterSpacing: '0.04em',
-              lineHeight: 1
-            }}>
-              <span style={{color: 'var(--primary-navy)'}}>WASH </span>
-              <span style={{color: 'var(--accent-teal)'}}>MY </span>
-              <span style={{color: 'var(--primary-navy)'}}>CAR</span>
-            </span>
-            <span style={{
-              color: 'var(--accent-teal)',
-              fontSize: '1.05rem',
-              fontWeight: 900,
-              letterSpacing: '0.06em',
-              lineHeight: 1
-            }}>
-              ORG
+        <Link to="/dashboard" style={{textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
+          <div style={{
+            background: 'white',
+            padding: '3px',
+            borderRadius: '12px',
+            border: '1.5px solid #E2E8F0',
+            boxShadow: '0 4px 14px rgba(2, 132, 199, 0.15)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '48px',
+            height: '48px',
+            flexShrink: 0
+          }}>
+            <img 
+              src={logo} 
+              alt="Wash My Car Logo" 
+              style={{
+                width: '100%', 
+                height: '100%', 
+                objectFit: 'contain',
+                transform: 'scale(1.15)'
+              }} 
+            />
+          </div>
+          <div style={{display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
+            <div style={{display: 'flex', alignItems: 'baseline', gap: '0.35rem', flexWrap: 'nowrap'}}>
+              <span style={{
+                fontSize: '1.25rem', 
+                fontWeight: 900, 
+                letterSpacing: '0.03em',
+                lineHeight: 1.1
+              }}>
+                <span style={{color: 'var(--primary-navy)'}}>WASH </span>
+                <span style={{color: 'var(--accent-teal)'}}>MY </span>
+                <span style={{color: 'var(--primary-navy)'}}>CAR</span>
+              </span>
+              <span style={{
+                color: 'var(--accent-teal)',
+                fontSize: '1.15rem',
+                fontWeight: 900,
+                letterSpacing: '0.05em',
+                lineHeight: 1.1
+              }}>
+                ORG
+              </span>
+            </div>
+            <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#64748B', letterSpacing: '0.06em', textTransform: 'uppercase', marginTop: '1px' }}>
+              Doorstep Car Wash
             </span>
           </div>
         </Link>

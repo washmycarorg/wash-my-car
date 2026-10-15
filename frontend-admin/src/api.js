@@ -475,3 +475,46 @@ export const updateSlotsConfig = async (data) => {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 };
+
+// Subscriptions Management
+export const getSubscriptionPlans = async () => {
+  const res = await fetch(`${API_URL}/admin/subscriptions/plans`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const createSubscriptionPlan = async (data) => {
+  const res = await fetch(`${API_URL}/admin/subscriptions/plans`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const updateSubscriptionPlan = async (id, data) => {
+  const res = await fetch(`${API_URL}/admin/subscriptions/plans/${id}`, {
+    method: 'PUT',
+    headers: getHeaders(),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const deleteSubscriptionPlan = async (id) => {
+  const res = await fetch(`${API_URL}/admin/subscriptions/plans/${id}`, {
+    method: 'DELETE',
+    headers: getHeaders()
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const getSubscribers = async () => {
+  const res = await fetch(`${API_URL}/admin/subscriptions/subscribers`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+

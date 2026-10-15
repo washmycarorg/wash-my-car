@@ -5,7 +5,7 @@ import {
   Mail, Award, Clock, Menu, X, Sparkles, Star, ChevronRight, Check, 
   Compass, Shield, Tag, ChevronDown, MessageCircle, ArrowRight,
   Flame, Bike, Feather, Smartphone, ExternalLink, HelpCircle,
-  ChevronLeft, Copy, Send, User, Gift, Zap, Image, Upload, Trash2
+  ChevronLeft, Copy, Send, User, Gift, Zap, Image, Upload, Trash2, Crown
 } from 'lucide-react';
 import { getHomeContent, getServiceAreas, getWashTypes, getAllWashPrices, getCarTypes, getAddons, getActiveCoupons, submitInquiry, getSettings } from '../api';
 
@@ -116,6 +116,22 @@ const Home = () => {
     outletPlanTitle: "Branded Outlet Partner",
     outletPlanPrice: "₹3.5 LAKH",
     outletPlanPerks: "Storefront branding,Interior setup,High-end pressure equipment,Technology & SOPs",
+    franchisePlans: [
+      {
+        id: "plan-1",
+        title: "Doorstep Franchise Partner",
+        price: "₹1.8 LAKH",
+        badge: "MOBILE DETAILING",
+        perks: "Low investment,No shop required,Proven high margin model,Machinery & launch support"
+      },
+      {
+        id: "plan-2",
+        title: "Branded Outlet Partner",
+        price: "₹3.5 LAKH",
+        badge: "PHYSICAL STUDIO",
+        perks: "Storefront branding,Interior setup,High-end pressure equipment,Technology & SOPs"
+      }
+    ],
 
     contactPhone: "+91 98765 43210",
     contactEmail: "washmycarorg@gmail.com",
@@ -147,7 +163,8 @@ const Home = () => {
     phone: '',
     email: '',
     service: 'Doorstep Car Wash',
-    message: ''
+    message: '',
+    otherReason: ''
   });
   const [selectedImages, setSelectedImages] = useState([]);
   const [contactSubmitted, setContactSubmitted] = useState(false);
@@ -187,6 +204,33 @@ const Home = () => {
             }
           }
 
+          let franchiseParsed = res.franchisePlans;
+          if (typeof franchiseParsed === 'string') {
+            try {
+              franchiseParsed = JSON.parse(franchiseParsed);
+            } catch (e) {
+              franchiseParsed = null;
+            }
+          }
+          if (!Array.isArray(franchiseParsed) || franchiseParsed.length === 0) {
+            franchiseParsed = [
+              {
+                id: 'plan-1',
+                title: res.doorstepPlanTitle || "Doorstep Franchise Partner",
+                price: res.doorstepPlanPrice || "₹1.8 LAKH",
+                badge: "MOBILE DETAILING",
+                perks: res.doorstepPlanPerks || "Low investment,No shop required,Proven high margin model,Machinery & launch support"
+              },
+              {
+                id: 'plan-2',
+                title: res.outletPlanTitle || "Branded Outlet Partner",
+                price: res.outletPlanPrice || "₹3.5 LAKH",
+                badge: "PHYSICAL STUDIO",
+                perks: res.outletPlanPerks || "Storefront branding,Interior setup,High-end pressure equipment,Technology & SOPs"
+              }
+            ];
+          }
+
           const resolvedSlides = Array.isArray(slidesParsed) && slidesParsed.length > 0
             ? slidesParsed
             : DEFAULT_HERO_SLIDES;
@@ -195,6 +239,7 @@ const Home = () => {
             ...prev,
             ...res,
             heroSlides: resolvedSlides,
+            franchisePlans: franchiseParsed,
             faqs: Array.isArray(faqsParsed) && faqsParsed.length > 0 ? faqsParsed : prev.faqs
           }));
         }
@@ -324,15 +369,27 @@ const Home = () => {
       setContactError('Please enter your Name and Phone Number so our team can reach you.');
       return;
     }
+    if (contactForm.service === 'Other' && !contactForm.otherReason?.trim()) {
+      setContactError('Please specify the reason or issue for your inquiry.');
+      return;
+    }
     setContactError('');
     setIsSubmittingContact(true);
     try {
+      const finalService = contactForm.service === 'Other' && contactForm.otherReason?.trim()
+        ? `Other: ${contactForm.otherReason.trim()}`
+        : (contactForm.service || 'Doorstep Car Wash');
+
+      const finalMessage = contactForm.message?.trim()
+        ? contactForm.message.trim()
+        : (contactForm.otherReason?.trim() ? `Reason: ${contactForm.otherReason.trim()}` : 'Inquiry submitted from home page');
+
       await submitInquiry({
         name: contactForm.name.trim(),
         phone: contactForm.phone.trim(),
         email: contactForm.email ? contactForm.email.trim() : null,
-        service: contactForm.service || 'Doorstep Car Wash',
-        message: contactForm.message ? contactForm.message.trim() : 'Inquiry submitted from home page',
+        service: finalService,
+        message: finalMessage,
         images: selectedImages,
         type: contactForm.service && contactForm.service.includes('Franchise') ? 'FRANCHISE' : 'INQUIRY'
       });
@@ -468,17 +525,18 @@ const Home = () => {
         boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
       }}>
         {/* Brand Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }} onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', cursor: 'pointer' }} onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
           <div style={{ 
             background: 'white', 
-            padding: '0.2rem', 
-            borderRadius: '10px', 
+            padding: '3px', 
+            borderRadius: '14px', 
             display: 'flex', 
             alignItems: 'center', 
             justifyContent: 'center', 
-            width: '42px', 
-            height: '42px', 
-            boxShadow: '0 4px 12px rgba(14, 165, 233, 0.3)' 
+            width: '52px', 
+            height: '52px', 
+            boxShadow: '0 6px 18px rgba(14, 165, 233, 0.35), 0 0 0 1.5px rgba(255, 255, 255, 0.25)',
+            flexShrink: 0
           }}>
             <img src={logo} alt="Wash My Car Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', transform: 'scale(1.2)' }} />
           </div>
@@ -1372,6 +1430,159 @@ const Home = () => {
       </section>
 
 
+      {/* VIP SUBSCRIPTION ADVERTISEMENT BANNER SECTION */}
+      {settings?.subscriptionsEnabled && (
+        <section style={{ padding: '0 6%', margin: '2rem auto 3.5rem auto', maxWidth: '1280px' }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #0F172A 0%, #1E1B4B 60%, #311042 100%)',
+            borderRadius: '28px',
+            overflow: 'hidden',
+            padding: 'clamp(2rem, 4vw, 3.5rem)',
+            color: 'white',
+            boxShadow: '0 25px 60px -15px rgba(245, 158, 11, 0.25), 0 10px 30px rgba(0, 0, 0, 0.4)',
+            border: '2px solid rgba(245, 158, 11, 0.35)',
+            position: 'relative'
+          }}>
+            {/* Background Image Overlay with Gradient */}
+            {settings?.subscriptionBannerImage && (
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                bottom: 0,
+                width: '55%',
+                backgroundImage: `url(${settings.subscriptionBannerImage})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                opacity: 0.18,
+                mixBlendMode: 'luminosity',
+                maskImage: 'linear-gradient(to left, rgba(0,0,0,1) 30%, transparent 100%)',
+                WebkitMaskImage: 'linear-gradient(to left, rgba(0,0,0,1) 30%, transparent 100%)',
+                pointerEvents: 'none'
+              }} />
+            )}
+
+            <div style={{ position: 'relative', zIndex: 2, maxWidth: '680px' }}>
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                background: 'linear-gradient(90deg, rgba(245, 158, 11, 0.25) 0%, rgba(217, 119, 6, 0.15) 100%)',
+                border: '1.5px solid #F59E0B',
+                color: '#FCD34D',
+                padding: '6px 16px',
+                borderRadius: '30px',
+                fontSize: '0.8rem',
+                fontWeight: 800,
+                letterSpacing: '0.05em',
+                marginBottom: '1.25rem',
+                boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)'
+              }}>
+                <Crown size={16} color="#FBBF24" /> VIP PASS & SUBSCRIPTIONS NOW LIVE
+              </div>
+
+              <h2 style={{
+                fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)',
+                fontWeight: 900,
+                lineHeight: 1.2,
+                margin: '0 0 1rem 0',
+                letterSpacing: '-0.02em'
+              }}>
+                {settings?.subscriptionBannerTitle || 'Unlimited Doorstep Shine with Wash My Car VIP Club'}
+              </h2>
+
+              <p style={{
+                fontSize: '1rem',
+                color: '#CBD5E1',
+                lineHeight: 1.6,
+                margin: '0 0 1.75rem 0'
+              }}>
+                {settings?.subscriptionBannerSubtitle || 'Save up to 40% every month with doorstep vehicle wash passes, zero booking fees, priority slots & complimentary add-on services!'}
+              </p>
+
+              {/* Perks Row */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                gap: '1rem',
+                marginBottom: '2rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <div style={{ width: 32, height: 32, borderRadius: '10px', background: 'rgba(245, 158, 11, 0.2)', border: '1px solid #F59E0B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Car size={18} color="#FCD34D" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#F8FAFC' }}>4 Monthly Washes</div>
+                    <div style={{ fontSize: '0.72rem', color: '#94A3B8' }}>Doorstep foam & vacuum</div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <div style={{ width: 32, height: 32, borderRadius: '10px', background: 'rgba(245, 158, 11, 0.2)', border: '1px solid #F59E0B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Gift size={18} color="#FCD34D" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#F8FAFC' }}>Free Add-ons</div>
+                    <div style={{ fontSize: '0.72rem', color: '#94A3B8' }}>Bike wash & sanitization</div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <div style={{ width: 32, height: 32, borderRadius: '10px', background: 'rgba(56, 189, 248, 0.2)', border: '1px solid #38BDF8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Zap size={18} color="#38BDF8" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#F8FAFC' }}>VIP Dispatch</div>
+                    <div style={{ fontSize: '0.72rem', color: '#94A3B8' }}>Priority morning slots</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* CTAs */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
+                <Link
+                  to="/subscriptions"
+                  style={{
+                    background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+                    color: 'white',
+                    padding: '0.9rem 2rem',
+                    borderRadius: '16px',
+                    fontWeight: 800,
+                    fontSize: '1rem',
+                    textDecoration: 'none',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    boxShadow: '0 8px 24px rgba(245, 158, 11, 0.45)',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <Crown size={20} /> Explore VIP Passes & Join <ArrowRight size={18} />
+                </Link>
+
+                <a
+                  href="#packages"
+                  style={{
+                    color: '#E2E8F0',
+                    padding: '0.9rem 1.5rem',
+                    borderRadius: '16px',
+                    fontWeight: 700,
+                    fontSize: '0.95rem',
+                    textDecoration: 'none',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    border: '1px solid rgba(255, 255, 255, 0.2)'
+                  }}
+                >
+                  Single Wash Packages
+                </a>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* 4. DOORSTEP WASH PACKAGES MATRIX (SERVICES) */}
       <section id="packages" style={{ padding: '5.5rem 6%', textAlign: 'center' }}>
         <div style={{ maxWidth: '800px', margin: '0 auto 2.5rem' }}>
@@ -1665,275 +1876,316 @@ const Home = () => {
       </section>
 
       {/* 5.5 REFER & EARN ADVERTISEMENT BANNER (ADMIN CONFIGURED - HIDDEN IF DISABLED) */}
-      {settings?.referralEnabled !== false && (
-        <section id="refer-earn" style={{ padding: '0 6% 4.5rem', maxWidth: '1240px', margin: '0 auto' }}>
-          <div style={{
-            background: 'linear-gradient(135deg, #070F26 0%, #111E3D 50%, #07152E 100%)',
-            borderRadius: '28px',
-            border: '1.5px solid rgba(56, 189, 248, 0.35)',
-            padding: '3rem 2.5rem',
-            boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.5), 0 0 35px rgba(14, 165, 233, 0.15)',
-            position: 'relative',
-            overflow: 'hidden'
-          }}>
-            {/* Ambient background glow */}
+      {settings?.referralEnabled !== false && (() => {
+        const isTieredStreak = settings?.referralStreakBonus === 'TIERED';
+        const basePoints = settings?.referralRewardPoints ?? 50;
+        const cashRatio = settings?.pointsToCashRatio || 4.0;
+        const cashValue = Math.round(basePoints / cashRatio);
+
+        return (
+          <section id="refer-earn" style={{ padding: '2rem 6% 4.5rem', maxWidth: '1240px', margin: '3rem auto 0' }}>
             <div style={{
-              position: 'absolute',
-              top: '-60px',
-              right: '-60px',
-              width: '280px',
-              height: '280px',
-              borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(14, 165, 233, 0.25) 0%, transparent 70%)',
-              pointerEvents: 'none'
-            }} />
-            <div style={{
-              position: 'absolute',
-              bottom: '-80px',
-              left: '10%',
-              width: '320px',
-              height: '320px',
-              borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(250, 204, 21, 0.15) 0%, transparent 70%)',
-              pointerEvents: 'none'
-            }} />
+              background: 'linear-gradient(135deg, #070F26 0%, #111E3D 50%, #07152E 100%)',
+              borderRadius: '28px',
+              border: '1.5px solid rgba(56, 189, 248, 0.35)',
+              padding: '3rem 2.5rem',
+              boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.5), 0 0 35px rgba(14, 165, 233, 0.15)',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              {/* Ambient background glow */}
+              <div style={{
+                position: 'absolute',
+                top: '-60px',
+                right: '-60px',
+                width: '280px',
+                height: '280px',
+                borderRadius: '50%',
+                background: 'radial-gradient(circle, rgba(14, 165, 233, 0.25) 0%, transparent 70%)',
+                pointerEvents: 'none'
+              }} />
+              <div style={{
+                position: 'absolute',
+                bottom: '-80px',
+                left: '10%',
+                width: '320px',
+                height: '320px',
+                borderRadius: '50%',
+                background: 'radial-gradient(circle, rgba(250, 204, 21, 0.15) 0%, transparent 70%)',
+                pointerEvents: 'none'
+              }} />
 
-            <div className="referral-container-grid" style={{ position: 'relative', zIndex: 1 }}>
-              {/* Left Content */}
-              <div>
-                <div style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  background: 'rgba(250, 204, 21, 0.12)',
-                  border: '1px solid rgba(250, 204, 21, 0.35)',
-                  padding: '0.4rem 1.1rem',
-                  borderRadius: '30px',
-                  color: '#FACC15',
-                  fontSize: '0.8rem',
-                  fontWeight: 900,
-                  letterSpacing: '0.6px',
-                  marginBottom: '1.25rem'
-                }}>
-                  <Sparkles size={15} />
-                  OFFICIAL REFERRAL PROGRAM
-                </div>
+              <div className="referral-container-grid" style={{ position: 'relative', zIndex: 1 }}>
+                {/* Left Content */}
+                <div>
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    background: 'rgba(250, 204, 21, 0.12)',
+                    border: '1px solid rgba(250, 204, 21, 0.35)',
+                    padding: '0.4rem 1.1rem',
+                    borderRadius: '30px',
+                    color: '#FACC15',
+                    fontSize: '0.8rem',
+                    fontWeight: 900,
+                    letterSpacing: '0.6px',
+                    marginBottom: '1.25rem'
+                  }}>
+                    <Sparkles size={15} />
+                    OFFICIAL REFERRAL PROGRAM
+                  </div>
 
-                <h2 style={{
-                  fontSize: 'clamp(2rem, 3.8vw, 2.9rem)',
-                  fontWeight: 900,
-                  color: '#FFFFFF',
-                  margin: '0 0 1rem',
-                  lineHeight: 1.18,
-                  letterSpacing: '-0.5px'
-                }}>
-                  Refer Friends & Get <span style={{ background: 'linear-gradient(135deg, #38BDF8, #FACC15)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Free Doorstep Washes</span>
-                </h2>
+                  <h2 style={{
+                    fontSize: 'clamp(2rem, 3.8vw, 2.9rem)',
+                    fontWeight: 900,
+                    color: '#FFFFFF',
+                    margin: '0 0 1rem',
+                    lineHeight: 1.18,
+                    letterSpacing: '-0.5px'
+                  }}>
+                    Refer Friends & Get <span style={{ background: 'linear-gradient(135deg, #38BDF8, #FACC15)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{isTieredStreak ? 'Free Doorstep Washes' : `+${basePoints} Reward Points`}</span>
+                  </h2>
 
-                <p style={{ color: '#94A3B8', fontSize: '1.02rem', lineHeight: 1.65, margin: '0 0 1.5rem', maxWidth: '520px' }}>
-                  Share your personal invite code with friends & neighbors. When they complete their first doorstep wash, you both unlock reward points redeemable for 100% free car & bike detailing!
-                </p>
+                  <p style={{ color: '#94A3B8', fontSize: '1.02rem', lineHeight: 1.65, margin: '0 0 1.5rem', maxWidth: '520px' }}>
+                    {isTieredStreak
+                      ? 'Share your personal invite code with friends & neighbors. When they complete their first doorstep wash, you both unlock reward points redeemable for 100% free car & bike detailing!'
+                      : `Share your invite code with friends & neighbors. For every friend who completes their first doorstep wash, you instantly earn +${basePoints} points (equal to ₹${cashValue} discount) with no tier restrictions!`}
+                  </p>
 
-                {/* Feature highlights checklist */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', marginBottom: '2rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#E2E8F0', fontSize: '0.88rem' }}>
-                    <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(56, 189, 248, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Check size={13} color="#38BDF8" />
+                  {/* Feature highlights checklist */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', marginBottom: '2rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#E2E8F0', fontSize: '0.88rem' }}>
+                      <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(56, 189, 248, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Check size={13} color="#38BDF8" />
+                      </div>
+                      <span>Zero cash needed — redeem points directly at checkout (4 pts = ₹1)</span>
                     </div>
-                    <span>Zero cash needed — redeem points directly at checkout</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#E2E8F0', fontSize: '0.88rem' }}>
-                    <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(56, 189, 248, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Check size={13} color="#38BDF8" />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#E2E8F0', fontSize: '0.88rem' }}>
+                      <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(56, 189, 248, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Check size={13} color="#38BDF8" />
+                      </div>
+                      <span>Instant automatic wallet credit upon friend's first completed wash</span>
                     </div>
-                    <span>Instant automatic credit upon friend's first completed wash</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#E2E8F0', fontSize: '0.88rem' }}>
-                    <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(56, 189, 248, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Check size={13} color="#38BDF8" />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#E2E8F0', fontSize: '0.88rem' }}>
+                      <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(56, 189, 248, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Check size={13} color="#38BDF8" />
+                      </div>
+                      <span>
+                        {isTieredStreak
+                          ? 'Bonus streak multipliers unlocked with each active consecutive referral'
+                          : `Same flat reward points: exactly +${basePoints} pts for every successful referral`}
+                      </span>
                     </div>
-                    <span>Bonus streak multipliers unlocked with each active referral</span>
                   </div>
-                </div>
 
-                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <button
-                    onClick={() => navigate('/login')}
-                    style={{
-                      background: 'linear-gradient(135deg, #0EA5E9, #0284C7)',
-                      color: 'white',
-                      border: 'none',
-                      padding: '0.85rem 1.8rem',
-                      borderRadius: '16px',
-                      fontWeight: 800,
-                      fontSize: '0.95rem',
-                      cursor: 'pointer',
-                      boxShadow: '0 10px 25px rgba(14, 165, 233, 0.4)',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      transition: 'transform 0.2s, box-shadow 0.2s'
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 14px 28px rgba(14, 165, 233, 0.5)';
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 10px 25px rgba(14, 165, 233, 0.4)';
-                    }}
-                  >
-                    <span>Start Earning Rewards</span>
-                    <ArrowRight size={17} />
-                  </button>
-                  <Link
-                    to="/rewards"
-                    style={{
-                      color: '#38BDF8',
-                      textDecoration: 'none',
-                      fontWeight: 700,
-                      fontSize: '0.92rem',
-                      padding: '0.8rem 1.25rem',
-                      borderRadius: '14px',
-                      background: 'rgba(56, 189, 248, 0.08)',
-                      border: '1px solid rgba(56, 189, 248, 0.25)',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.4rem',
-                      transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.background = 'rgba(56, 189, 248, 0.15)';
-                      e.currentTarget.style.borderColor = '#38BDF8';
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.background = 'rgba(56, 189, 248, 0.08)';
-                      e.currentTarget.style.borderColor = 'rgba(56, 189, 248, 0.25)';
-                    }}
-                  >
-                    <span>View Rewards & Tiers</span>
-                    <ArrowRight size={15} />
-                  </Link>
-                </div>
-              </div>
-
-              {/* Right: Modern Aesthetic Metrics Grid */}
-              <div className="referral-stats-grid">
-                {/* Stat 1: Referral Base Points */}
-                <div className="referral-stat-card">
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                    <div style={{
-                      width: '38px',
-                      height: '38px',
-                      borderRadius: '12px',
-                      background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(14, 165, 233, 0.1))',
-                      border: '1px solid rgba(56, 189, 248, 0.3)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#38BDF8'
-                    }}>
-                      <Gift size={20} />
-                    </div>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#38BDF8', background: 'rgba(56, 189, 248, 0.12)', padding: '0.2rem 0.55rem', borderRadius: '20px' }}>
-                      BASE PERK
-                    </span>
-                  </div>
-                  <div style={{ fontSize: '2.4rem', fontWeight: 900, color: '#38BDF8', lineHeight: 1, letterSpacing: '-0.5px' }}>
-                    +{settings?.referralRewardPoints ?? 50}
-                  </div>
-                  <div style={{ color: '#F8FAFC', fontWeight: 800, fontSize: '0.95rem', marginTop: '0.5rem' }}>
-                    Points Per Referral
-                  </div>
-                  <div style={{ color: '#94A3B8', fontSize: '0.78rem', marginTop: '0.25rem', lineHeight: 1.4 }}>
-                    Credited on friend's 1st completed doorstep wash
+                  <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <button
+                      onClick={() => navigate('/login')}
+                      style={{
+                        background: 'linear-gradient(135deg, #0EA5E9, #0284C7)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '0.85rem 1.8rem',
+                        borderRadius: '16px',
+                        fontWeight: 800,
+                        fontSize: '0.95rem',
+                        cursor: 'pointer',
+                        boxShadow: '0 10px 25px rgba(14, 165, 233, 0.4)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        transition: 'transform 0.2s, box-shadow 0.2s'
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 14px 28px rgba(14, 165, 233, 0.5)';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 10px 25px rgba(14, 165, 233, 0.4)';
+                      }}
+                    >
+                      <span>Start Earning Rewards</span>
+                      <ArrowRight size={17} />
+                    </button>
+                    <Link
+                      to="/rewards"
+                      style={{
+                        color: '#38BDF8',
+                        textDecoration: 'none',
+                        fontWeight: 700,
+                        fontSize: '0.92rem',
+                        padding: '0.8rem 1.25rem',
+                        borderRadius: '14px',
+                        background: 'rgba(56, 189, 248, 0.08)',
+                        border: '1px solid rgba(56, 189, 248, 0.25)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.background = 'rgba(56, 189, 248, 0.15)';
+                        e.currentTarget.style.borderColor = '#38BDF8';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.background = 'rgba(56, 189, 248, 0.08)';
+                        e.currentTarget.style.borderColor = 'rgba(56, 189, 248, 0.25)';
+                      }}
+                    >
+                      <span>{isTieredStreak ? 'View Rewards & Tiers' : 'View Rewards & Wallet'}</span>
+                      <ArrowRight size={15} />
+                    </Link>
                   </div>
                 </div>
 
-                {/* Stat 2: Streak Bonus Multiplier */}
-                <div className="referral-stat-card">
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                    <div style={{
-                      width: '38px',
-                      height: '38px',
-                      borderRadius: '12px',
-                      background: 'linear-gradient(135deg, rgba(250, 204, 21, 0.2), rgba(234, 179, 8, 0.1))',
-                      border: '1px solid rgba(250, 204, 21, 0.3)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#FACC15'
-                    }}>
-                      <Zap size={20} />
-                    </div>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#FACC15', background: 'rgba(250, 204, 21, 0.12)', padding: '0.2rem 0.55rem', borderRadius: '20px' }}>
-                      MULTIPLIER
-                    </span>
-                  </div>
-                  <div style={{ fontSize: '2.4rem', fontWeight: 900, color: '#FACC15', lineHeight: 1, letterSpacing: '-0.5px' }}>
-                    +{Number(settings?.referralStreakBonus) > 0 ? Number(settings.referralStreakBonus) : 25}
-                  </div>
-                  <div style={{ color: '#F8FAFC', fontWeight: 800, fontSize: '0.95rem', marginTop: '0.5rem' }}>
-                    Streak Bonus Points
-                  </div>
-                  <div style={{ color: '#94A3B8', fontSize: '0.78rem', marginTop: '0.25rem', lineHeight: 1.4 }}>
-                    Bonus multiplier for active consecutive invites
-                  </div>
-                </div>
-
-                {/* Stat 3: Full Width Milestone Card */}
-                <div className="referral-stat-card referral-full-card">
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                {/* Right: Modern Aesthetic Metrics Grid */}
+                <div className="referral-stats-grid">
+                  {/* Stat 1: Referral Base Points */}
+                  <div className="referral-stat-card">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
                       <div style={{
-                        width: '42px',
-                        height: '42px',
+                        width: '38px',
+                        height: '38px',
                         borderRadius: '12px',
-                        background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(5, 150, 105, 0.15))',
-                        border: '1px solid rgba(52, 211, 153, 0.35)',
+                        background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(14, 165, 233, 0.1))',
+                        border: '1px solid rgba(56, 189, 248, 0.3)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: '#34D399',
-                        flexShrink: 0
+                        color: '#38BDF8'
                       }}>
-                        <Award size={22} />
+                        <Gift size={20} />
                       </div>
-                      <div>
-                        <div style={{ fontSize: '0.96rem', fontWeight: 800, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                          <span>100% Cashless Doorstep Detailing</span>
-                          <span style={{ fontSize: '0.75rem', color: '#38BDF8', fontWeight: 700 }}>
-                            • {settings?.referralMaxLimit ? `Max ${settings.referralMaxLimit} Referrals/Month` : 'Unlimited Referrals'}
-                          </span>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#38BDF8', background: 'rgba(56, 189, 248, 0.12)', padding: '0.2rem 0.55rem', borderRadius: '20px' }}>
+                        {isTieredStreak ? 'BASE PERK' : 'PER REFERRAL'}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '2.4rem', fontWeight: 900, color: '#38BDF8', lineHeight: 1, letterSpacing: '-0.5px' }}>
+                      +{basePoints}
+                    </div>
+                    <div style={{ color: '#F8FAFC', fontWeight: 800, fontSize: '0.95rem', marginTop: '0.5rem' }}>
+                      Points Per Referral
+                    </div>
+                    <div style={{ color: '#94A3B8', fontSize: '0.78rem', marginTop: '0.25rem', lineHeight: 1.4 }}>
+                      Credited on friend's 1st completed doorstep wash
+                    </div>
+                  </div>
+
+                  {/* Stat 2: Streak Bonus Multiplier OR Flat Value */}
+                  {isTieredStreak ? (
+                    <div className="referral-stat-card">
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                        <div style={{
+                          width: '38px',
+                          height: '38px',
+                          borderRadius: '12px',
+                          background: 'linear-gradient(135deg, rgba(250, 204, 21, 0.2), rgba(234, 179, 8, 0.1))',
+                          border: '1px solid rgba(250, 204, 21, 0.3)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#FACC15'
+                        }}>
+                          <Zap size={20} />
                         </div>
-                        <p style={{ color: '#94A3B8', fontSize: '0.8rem', margin: '0.2rem 0 0', lineHeight: 1.4 }}>
-                          Redeem earned wallet points at checkout for free exterior foam wash, deep steam & bike care.
-                        </p>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#FACC15', background: 'rgba(250, 204, 21, 0.12)', padding: '0.2rem 0.55rem', borderRadius: '20px' }}>
+                          MULTIPLIER
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '2.4rem', fontWeight: 900, color: '#FACC15', lineHeight: 1, letterSpacing: '-0.5px' }}>
+                        +{Number(settings?.referralStreakBonus) > 0 ? Number(settings.referralStreakBonus) : 25}
+                      </div>
+                      <div style={{ color: '#F8FAFC', fontWeight: 800, fontSize: '0.95rem', marginTop: '0.5rem' }}>
+                        Streak Bonus Points
+                      </div>
+                      <div style={{ color: '#94A3B8', fontSize: '0.78rem', marginTop: '0.25rem', lineHeight: 1.4 }}>
+                        Bonus multiplier for active consecutive invites
                       </div>
                     </div>
-                    <span style={{
-                      background: 'linear-gradient(135deg, #059669, #10B981)',
-                      color: 'white',
-                      padding: '0.35rem 0.85rem',
-                      borderRadius: '20px',
-                      fontSize: '0.74rem',
-                      fontWeight: 800,
-                      letterSpacing: '0.5px',
-                      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.35rem'
-                    }}>
-                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#FFFFFF', animation: 'spin 2s linear infinite' }} />
-                      ACTIVE PROGRAM
-                    </span>
+                  ) : (
+                    <div className="referral-stat-card">
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                        <div style={{
+                          width: '38px',
+                          height: '38px',
+                          borderRadius: '12px',
+                          background: 'linear-gradient(135deg, rgba(250, 204, 21, 0.2), rgba(234, 179, 8, 0.1))',
+                          border: '1px solid rgba(250, 204, 21, 0.3)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#FACC15'
+                        }}>
+                          <Check size={20} />
+                        </div>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#FACC15', background: 'rgba(250, 204, 21, 0.12)', padding: '0.2rem 0.55rem', borderRadius: '20px' }}>
+                          FLAT REWARD
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '2.4rem', fontWeight: 900, color: '#FACC15', lineHeight: 1, letterSpacing: '-0.5px' }}>
+                        ₹{cashValue}
+                      </div>
+                      <div style={{ color: '#F8FAFC', fontWeight: 800, fontSize: '0.95rem', marginTop: '0.5rem' }}>
+                        Cash Value Per Invite
+                      </div>
+                      <div style={{ color: '#94A3B8', fontSize: '0.78rem', marginTop: '0.25rem', lineHeight: 1.4 }}>
+                        Flat points for every single referral with zero tiers
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Stat 3: Full Width Milestone Card */}
+                  <div className="referral-stat-card referral-full-card">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                        <div style={{
+                          width: '42px',
+                          height: '42px',
+                          borderRadius: '12px',
+                          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(5, 150, 105, 0.15))',
+                          border: '1px solid rgba(52, 211, 153, 0.35)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#34D399',
+                          flexShrink: 0
+                        }}>
+                          <Award size={22} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.96rem', fontWeight: 800, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                            <span>100% Cashless Doorstep Detailing</span>
+                            <span style={{ fontSize: '0.75rem', color: '#38BDF8', fontWeight: 700 }}>
+                              • {settings?.referralMaxLimit ? `Max ${settings.referralMaxLimit} Referrals/Month` : 'Unlimited Referrals'}
+                            </span>
+                          </div>
+                          <p style={{ color: '#94A3B8', fontSize: '0.8rem', margin: '0.2rem 0 0', lineHeight: 1.4 }}>
+                            Redeem earned wallet points at checkout for free exterior foam wash, deep steam & bike care.
+                          </p>
+                        </div>
+                      </div>
+                      <span style={{
+                        background: 'linear-gradient(135deg, #059669, #10B981)',
+                        color: 'white',
+                        fontWeight: 800,
+                        fontSize: '0.76rem',
+                        padding: '0.35rem 0.85rem',
+                        borderRadius: '20px',
+                        letterSpacing: '0.5px'
+                      }}>
+                        4 POINTS = ₹1 CASH
+                      </span>
+                    </div>
                   </div>
                 </div>
+
               </div>
             </div>
-          </div>
-        </section>
-      )}
+          </section>
+        );
+      })()}
 
       {/* 6. THE WASH MY CAR ORG DIFFERENCE (WHY CHOOSE US) */}
       <section id="why-us" style={{ padding: '6rem 6%', background: '#F8FAFC' }}>
@@ -2208,117 +2460,93 @@ const Home = () => {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2rem' }}>
-            
-            {/* Doorstep Partner Card */}
-            <div style={{
-              borderRadius: '24px',
-              padding: '2.5rem',
-              background: '#0F172A',
-              color: 'white',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
-              border: '1px solid rgba(255,255,255,0.1)'
-            }}>
-              <div>
-                <span style={{ background: 'rgba(56, 189, 248, 0.2)', color: '#38BDF8', padding: '0.35rem 0.85rem', borderRadius: '15px', fontSize: '0.75rem', fontWeight: 800 }}>
-                  MOBILE FRANCHISE
-                </span>
-                <h3 style={{ fontSize: '1.8rem', fontWeight: 900, margin: '1rem 0 0.5rem', color: '#FFFFFF' }}>
-                  {cms.doorstepPlanTitle}
-                </h3>
-                <div style={{ fontSize: '2.4rem', fontWeight: 900, color: '#FACC15', margin: '0.5rem 0 1.5rem' }}>
-                  {cms.doorstepPlanPrice}
-                </div>
+            {(cms.franchisePlans && cms.franchisePlans.length > 0 ? cms.franchisePlans : [
+              {
+                id: 'plan-1',
+                title: cms.doorstepPlanTitle || 'Doorstep Franchise Partner',
+                price: cms.doorstepPlanPrice || '₹1.8 LAKH',
+                badge: 'MOBILE DETAILING',
+                perks: cms.doorstepPlanPerks || 'Low investment,No shop required,Proven high margin model,Machinery & launch support'
+              },
+              {
+                id: 'plan-2',
+                title: cms.outletPlanTitle || 'Branded Outlet Partner',
+                price: cms.outletPlanPrice || '₹3.5 LAKH',
+                badge: 'PHYSICAL STUDIO',
+                perks: cms.outletPlanPerks || 'Storefront branding,Interior setup,High-end pressure equipment,Technology & SOPs'
+              }
+            ]).map((plan, pIdx) => {
+              const isEven = pIdx % 2 === 1;
+              const cardBg = isEven
+                ? 'linear-gradient(135deg, #0369A1, #0284C7)'
+                : '#0F172A';
+              const badgeBg = isEven
+                ? 'rgba(255, 255, 255, 0.2)'
+                : 'rgba(56, 189, 248, 0.2)';
+              const badgeColor = isEven ? 'white' : '#38BDF8';
+              const btnBg = isEven ? '#0F172A' : 'white';
+              const btnColor = isEven ? 'white' : '#0F172A';
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '2rem' }}>
-                  {(cms.doorstepPlanPerks || '').split(',').map((perk, pi) => (
-                    <div key={pi} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: '#CBD5E1' }}>
-                      <Check size={15} color="#38BDF8" style={{ flexShrink: 0 }} /> {perk.trim()}
+              return (
+                <div
+                  key={plan.id || pIdx}
+                  style={{
+                    borderRadius: '24px',
+                    padding: '2.5rem',
+                    background: cardBg,
+                    color: 'white',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    boxShadow: isEven ? '0 20px 40px rgba(14,165,233,0.25)' : '0 20px 40px rgba(0,0,0,0.15)',
+                    border: isEven ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(255,255,255,0.1)'
+                  }}
+                >
+                  <div>
+                    <span style={{ background: badgeBg, color: badgeColor, padding: '0.35rem 0.85rem', borderRadius: '15px', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      {plan.badge || `MODEL OPTION ${pIdx + 1}`}
+                    </span>
+                    <h3 style={{ fontSize: '1.8rem', fontWeight: 900, margin: '1rem 0 0.5rem', color: '#FFFFFF' }}>
+                      {plan.title}
+                    </h3>
+                    <div style={{ fontSize: '2.4rem', fontWeight: 900, color: '#FACC15', margin: '0.5rem 0 1.5rem' }}>
+                      {plan.price}
                     </div>
-                  ))}
-                </div>
-              </div>
 
-              <a 
-                href={`https://wa.me/${cleanWhatsappNumber}?text=Hi%20Wash%20My%20Car%20Org%2C%20I%20am%20interested%20in%20the%20Doorstep%20Franchise%20Partner%20model.`}
-                target="_blank" 
-                rel="noopener noreferrer"
-                style={{ 
-                  background: 'white', 
-                  color: '#0F172A', 
-                  padding: '0.9rem', 
-                  borderRadius: '16px', 
-                  fontWeight: 800, 
-                  fontSize: '0.95rem', 
-                  textAlign: 'center',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.4rem',
-                  textDecoration: 'none'
-                }}
-              >
-                Inquire Franchise →
-              </a>
-            </div>
-
-            {/* Outlet Partner Card */}
-            <div style={{
-              borderRadius: '24px',
-              padding: '2.5rem',
-              background: 'linear-gradient(135deg, #0369A1, #0284C7)',
-              color: 'white',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              boxShadow: '0 20px 40px rgba(14,165,233,0.25)',
-              border: '1px solid rgba(255,255,255,0.2)'
-            }}>
-              <div>
-                <span style={{ background: 'rgba(255, 255, 255, 0.2)', color: 'white', padding: '0.35rem 0.85rem', borderRadius: '15px', fontSize: '0.75rem', fontWeight: 800 }}>
-                  FIXED DETAILING STUDIO
-                </span>
-                <h3 style={{ fontSize: '1.8rem', fontWeight: 900, margin: '1rem 0 0.5rem', color: '#FFFFFF' }}>
-                  {cms.outletPlanTitle}
-                </h3>
-                <div style={{ fontSize: '2.4rem', fontWeight: 900, color: '#FACC15', margin: '0.5rem 0 1.5rem' }}>
-                  {cms.outletPlanPrice}
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '2rem' }}>
-                  {(cms.outletPlanPerks || '').split(',').map((perk, pi) => (
-                    <div key={pi} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: '#EFF6FF' }}>
-                      <Check size={15} color="#FFFFFF" style={{ flexShrink: 0 }} /> {perk.trim()}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.75rem', marginBottom: '2rem' }}>
+                      {(plan.perks || '').split(',').map((perk, pi) => (
+                        <div key={pi} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.88rem', color: isEven ? '#EFF6FF' : '#CBD5E1' }}>
+                          <Check size={16} color={isEven ? '#FFFFFF' : '#38BDF8'} style={{ flexShrink: 0 }} />
+                          <span>{perk.trim()}</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
+
+                  <a 
+                    href={`https://wa.me/${cleanWhatsappNumber}?text=Hi%20Wash%20My%20Car%20Org%2C%20I%20am%20interested%20in%20the%20${encodeURIComponent(plan.title)}%20model.`}
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    style={{ 
+                      background: btnBg, 
+                      color: btnColor, 
+                      padding: '0.95rem', 
+                      borderRadius: '16px', 
+                      fontWeight: 800, 
+                      fontSize: '0.95rem', 
+                      textAlign: 'center',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.4rem',
+                      textDecoration: 'none'
+                    }}
+                  >
+                    Inquire {plan.title} →
+                  </a>
                 </div>
-              </div>
-
-              <a 
-                href={`https://wa.me/${cleanWhatsappNumber}?text=Hi%20Wash%20My%20Car%20Org%2C%20I%20am%20interested%20in%20the%20Fixed%20Outlet%20Partner%20model.`}
-                target="_blank" 
-                rel="noopener noreferrer"
-                style={{ 
-                  background: '#0F172A', 
-                  color: 'white', 
-                  padding: '0.9rem', 
-                  borderRadius: '16px', 
-                  fontWeight: 800, 
-                  fontSize: '0.95rem', 
-                  textAlign: 'center',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.4rem',
-                  textDecoration: 'none'
-                }}
-              >
-                Inquire Studio Model →
-              </a>
-            </div>
-
+              );
+            })}
           </div>
         </div>
       </section>
@@ -2700,13 +2928,42 @@ const Home = () => {
                         onBlur={e => e.target.style.borderColor = '#CBD5E1'}
                       >
                         <option value="Doorstep Car Wash">Doorstep Car Wash</option>
+                        <option value="Booking related issue">Booking related issue</option>
+                        <option value="Refund issue">Refund issue</option>
                         <option value="Deep Interior & Steam Spa">Deep Interior & Steam Spa</option>
                         <option value="Full Vehicle Detailing Spa">Full Vehicle Detailing Spa</option>
                         <option value="9H Ceramic & Paint Protection">9H Ceramic & Paint Protection</option>
                         <option value="Bike & Helmet Wash Add-on">Bike & Helmet Wash Add-on</option>
                         <option value="Franchise Partnership">Franchise Partnership</option>
+                        <option value="Other">Other</option>
                       </select>
                     </div>
+
+                    {/* Conditional Input Column for "Other" Reason */}
+                    {contactForm.service === 'Other' && (
+                      <div style={{ gridColumn: '1 / -1', marginTop: '0.25rem' }}>
+                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'var(--primary-navy)', marginBottom: '0.35rem' }}>
+                          Specify Your Reason / Topic <span style={{ color: '#DC2626' }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Rescheduling query, payment status, commercial corporate booking..."
+                          value={contactForm.otherReason || ''}
+                          onChange={e => setContactForm({ ...contactForm, otherReason: e.target.value })}
+                          style={{
+                            width: '100%',
+                            padding: '0.85rem 1rem',
+                            borderRadius: '14px',
+                            border: '1.5px solid #0EA5E9',
+                            fontSize: '0.92rem',
+                            outline: 'none',
+                            boxSizing: 'border-box',
+                            background: '#F0F9FF'
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
 
                   {/* Message / Vehicle Details */}

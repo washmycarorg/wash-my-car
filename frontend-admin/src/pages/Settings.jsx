@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getSettings, updateSettings } from '../api';
 import { 
   Upload, Image as ImageIcon, Link as LinkIcon, Trash2, Plus, 
-  Minus, Sparkles, Flame, Check, X, Award
+  Minus, Sparkles, Flame, Check, X, Award, Crown, Power, Calendar, CalendarX, AlertTriangle
 } from 'lucide-react';
 
 const SettingsPage = () => {
@@ -16,6 +16,8 @@ const SettingsPage = () => {
   ]);
   const [adImageTab, setAdImageTab] = useState('upload'); // 'upload' | 'url'
   const [settings, setSettings] = useState({
+    bookingsEnabled: true,
+    subscriptionsEnabled: true,
     autoAssignment: true,
     pointsRedemption: true,
     pointsReward: true,
@@ -35,7 +37,10 @@ const SettingsPage = () => {
     dashboardAdImage: "https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=1600&q=85",
     dashboardAdTitle: "Special Weekend Doorstep Detail & Snow Foam Spa",
     dashboardAdSubtitle: "Get sparkling exterior foam wash & deep interior cabin sanitize with spot-free purified water at your doorstep.",
-    dashboardAdBadge: "PROMOTIONAL OFFER • LIMITED SLOTS"
+    dashboardAdBadge: "PROMOTIONAL OFFER • LIMITED SLOTS",
+    subscriptionBannerTitle: "Exclusive VIP Car Care Membership",
+    subscriptionBannerSubtitle: "Save up to 40% with monthly doorstep passes, complimentary add-ons & priority scheduling.",
+    subscriptionBannerImage: "https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=1600&q=85"
   });
 
   useEffect(() => {
@@ -64,6 +69,8 @@ const SettingsPage = () => {
         setStreakTiers(loadedTiers);
 
         setSettings({
+          bookingsEnabled: res.bookingsEnabled !== undefined ? !!res.bookingsEnabled : true,
+          subscriptionsEnabled: res.subscriptionsEnabled !== undefined ? !!res.subscriptionsEnabled : true,
           autoAssignment: !!res.autoAssignment,
           pointsRedemption: !!res.pointsRedemption,
           pointsReward: !!res.pointsReward,
@@ -78,7 +85,10 @@ const SettingsPage = () => {
           dashboardAdImage: res.dashboardAdImage || "https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=1600&q=85",
           dashboardAdTitle: res.dashboardAdTitle || "Special Weekend Doorstep Detail & Snow Foam Spa",
           dashboardAdSubtitle: res.dashboardAdSubtitle || "Get sparkling exterior foam wash & deep interior cabin sanitize with spot-free purified water at your doorstep.",
-          dashboardAdBadge: res.dashboardAdBadge || "PROMOTIONAL OFFER • LIMITED SLOTS"
+          dashboardAdBadge: res.dashboardAdBadge || "PROMOTIONAL OFFER • LIMITED SLOTS",
+          subscriptionBannerTitle: res.subscriptionBannerTitle || "Exclusive VIP Car Care Membership",
+          subscriptionBannerSubtitle: res.subscriptionBannerSubtitle || "Save up to 40% with monthly doorstep passes, complimentary add-ons & priority scheduling.",
+          subscriptionBannerImage: res.subscriptionBannerImage || "https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=1600&q=85"
         });
         setLoading(false);
       })
@@ -185,6 +195,8 @@ const SettingsPage = () => {
     try {
       const tiersJson = JSON.stringify(streakTiers);
       const res = await updateSettings({
+        bookingsEnabled: settings.bookingsEnabled,
+        subscriptionsEnabled: settings.subscriptionsEnabled,
         autoAssignment: settings.autoAssignment,
         pointsRedemption: settings.pointsRedemption,
         pointsReward: settings.pointsReward,
@@ -199,10 +211,15 @@ const SettingsPage = () => {
         dashboardAdImage: settings.dashboardAdImage,
         dashboardAdTitle: settings.dashboardAdTitle,
         dashboardAdSubtitle: settings.dashboardAdSubtitle,
-        dashboardAdBadge: settings.dashboardAdBadge
+        dashboardAdBadge: settings.dashboardAdBadge,
+        subscriptionBannerTitle: settings.subscriptionBannerTitle,
+        subscriptionBannerSubtitle: settings.subscriptionBannerSubtitle,
+        subscriptionBannerImage: settings.subscriptionBannerImage
       });
       setSettings(prev => ({
         ...prev,
+        bookingsEnabled: res.bookingsEnabled !== undefined ? !!res.bookingsEnabled : prev.bookingsEnabled,
+        subscriptionsEnabled: res.subscriptionsEnabled !== undefined ? !!res.subscriptionsEnabled : prev.subscriptionsEnabled,
         autoAssignment: !!res.autoAssignment,
         pointsRedemption: !!res.pointsRedemption,
         pointsReward: !!res.pointsReward,
@@ -217,7 +234,10 @@ const SettingsPage = () => {
         dashboardAdImage: res.dashboardAdImage ?? prev.dashboardAdImage,
         dashboardAdTitle: res.dashboardAdTitle ?? prev.dashboardAdTitle,
         dashboardAdSubtitle: res.dashboardAdSubtitle ?? prev.dashboardAdSubtitle,
-        dashboardAdBadge: res.dashboardAdBadge ?? prev.dashboardAdBadge
+        dashboardAdBadge: res.dashboardAdBadge ?? prev.dashboardAdBadge,
+        subscriptionBannerTitle: res.subscriptionBannerTitle ?? prev.subscriptionBannerTitle,
+        subscriptionBannerSubtitle: res.subscriptionBannerSubtitle ?? prev.subscriptionBannerSubtitle,
+        subscriptionBannerImage: res.subscriptionBannerImage ?? prev.subscriptionBannerImage
       }));
       alert('System settings updated successfully!');
     } catch (err) {
@@ -240,6 +260,205 @@ const SettingsPage = () => {
 
         <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           
+          {/* ======================================================== */}
+          {/* 1. MASTER FEATURE TOGGLES: BOOKINGS & VIP SUBSCRIPTIONS */}
+          {/* ======================================================== */}
+          <div style={{
+            background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
+            borderRadius: '16px',
+            padding: '1.5rem',
+            color: 'white',
+            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.2)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1.25rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.75rem' }}>
+              <div>
+                <span style={{ fontSize: '1.05rem', fontWeight: 800, color: 'white', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Power size={20} color="#38BDF8" /> Master System Controls
+                </span>
+                <span style={{ fontSize: '0.78rem', color: '#94A3B8' }}>
+                  Global availability switches directly affecting customer booking and VIP access.
+                </span>
+              </div>
+            </div>
+
+            {/* SWITCH 1: Doorstep Bookings Switch */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '1rem',
+              background: settings.bookingsEnabled ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.15)',
+              border: settings.bookingsEnabled ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(239, 68, 68, 0.4)',
+              borderRadius: '12px',
+              padding: '1rem 1.25rem'
+            }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '4px' }}>
+                  <span style={{ fontWeight: 800, fontSize: '0.95rem', color: settings.bookingsEnabled ? '#34D399' : '#F87171' }}>
+                    Customer Doorstep Slot Bookings
+                  </span>
+                  <span style={{
+                    fontSize: '0.68rem',
+                    fontWeight: 800,
+                    padding: '2px 8px',
+                    borderRadius: '10px',
+                    background: settings.bookingsEnabled ? '#059669' : '#DC2626',
+                    color: 'white'
+                  }}>
+                    {settings.bookingsEnabled ? 'ACCEPTING BOOKINGS' : 'PAUSED (BLOCKED)'}
+                  </span>
+                </div>
+                <span style={{ fontSize: '0.78rem', color: '#CBD5E1', lineHeight: 1.4, display: 'block' }}>
+                  When OFF: Customers cannot book slots on any date, cannot navigate to booking pages, and checkout is strictly halted on "Proceed to Pay" with a maintenance notice.
+                </span>
+              </div>
+
+              <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '56px', height: '30px', flexShrink: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={settings.bookingsEnabled}
+                  onChange={e => setSettings({ ...settings, bookingsEnabled: e.target.checked })}
+                  style={{ opacity: 0, width: 0, height: 0 }}
+                />
+                <span className="slider" style={{
+                  position: 'absolute',
+                  cursor: 'pointer',
+                  inset: 0,
+                  backgroundColor: settings.bookingsEnabled ? '#10B981' : '#64748B',
+                  transition: '0.3s',
+                  borderRadius: '34px'
+                }}>
+                  <span style={{
+                    position: 'absolute',
+                    content: '""',
+                    height: '22px',
+                    width: '22px',
+                    left: '4px',
+                    bottom: '4px',
+                    backgroundColor: 'white',
+                    transition: '0.3s',
+                    borderRadius: '50%',
+                    transform: settings.bookingsEnabled ? 'translateX(26px)' : 'none'
+                  }} />
+                </span>
+              </label>
+            </div>
+
+            {/* SWITCH 2: VIP Subscriptions Switch */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '1rem',
+              background: settings.subscriptionsEnabled ? 'rgba(245, 158, 11, 0.15)' : 'rgba(100, 116, 139, 0.15)',
+              border: settings.subscriptionsEnabled ? '1px solid rgba(245, 158, 11, 0.45)' : '1px solid rgba(100, 116, 139, 0.3)',
+              borderRadius: '12px',
+              padding: '1rem 1.25rem'
+            }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '4px' }}>
+                  <Crown size={18} color="#FBBF24" />
+                  <span style={{ fontWeight: 800, fontSize: '0.95rem', color: settings.subscriptionsEnabled ? '#FCD34D' : '#94A3B8' }}>
+                    VIP Subscriptions Feature
+                  </span>
+                  <span style={{
+                    fontSize: '0.68rem',
+                    fontWeight: 800,
+                    padding: '2px 8px',
+                    borderRadius: '10px',
+                    background: settings.subscriptionsEnabled ? '#D97706' : '#475569',
+                    color: 'white'
+                  }}>
+                    {settings.subscriptionsEnabled ? 'GOLD DOCK & BANNER ON' : 'DISABLED'}
+                  </span>
+                </div>
+                <span style={{ fontSize: '0.78rem', color: '#CBD5E1', lineHeight: 1.4, display: 'block' }}>
+                  When ON: Subscription page is visible to users, appears in the user floating dock highlighted in Gold (replaces rewards), and the VIP advertisement banner appears on the homepage.
+                </span>
+              </div>
+
+              <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '56px', height: '30px', flexShrink: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={settings.subscriptionsEnabled}
+                  onChange={e => setSettings({ ...settings, subscriptionsEnabled: e.target.checked })}
+                  style={{ opacity: 0, width: 0, height: 0 }}
+                />
+                <span className="slider" style={{
+                  position: 'absolute',
+                  cursor: 'pointer',
+                  inset: 0,
+                  backgroundColor: settings.subscriptionsEnabled ? '#F59E0B' : '#64748B',
+                  transition: '0.3s',
+                  borderRadius: '34px'
+                }}>
+                  <span style={{
+                    position: 'absolute',
+                    content: '""',
+                    height: '22px',
+                    width: '22px',
+                    left: '4px',
+                    bottom: '4px',
+                    backgroundColor: 'white',
+                    transition: '0.3s',
+                    borderRadius: '50%',
+                    transform: settings.subscriptionsEnabled ? 'translateX(26px)' : 'none'
+                  }} />
+                </span>
+              </label>
+            </div>
+
+            {/* VIP Subscription Ad Banner Configuration */}
+            {settings.subscriptionsEnabled && (
+              <div style={{
+                background: 'rgba(0,0,0,0.25)',
+                borderRadius: '10px',
+                padding: '1rem',
+                border: '1px solid rgba(245, 158, 11, 0.25)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.75rem'
+              }}>
+                <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#FCD34D', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Homepage VIP Subscription Advertisement Banner:
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', color: '#94A3B8', marginBottom: '3px' }}>Banner Title</label>
+                  <input
+                    type="text"
+                    value={settings.subscriptionBannerTitle}
+                    onChange={e => setSettings({ ...settings, subscriptionBannerTitle: e.target.value })}
+                    style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.15)', background: '#1E293B', color: 'white', fontSize: '0.85rem' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', color: '#94A3B8', marginBottom: '3px' }}>Banner Subtitle / Value Proposition</label>
+                  <input
+                    type="text"
+                    value={settings.subscriptionBannerSubtitle}
+                    onChange={e => setSettings({ ...settings, subscriptionBannerSubtitle: e.target.value })}
+                    style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.15)', background: '#1E293B', color: 'white', fontSize: '0.85rem' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', color: '#94A3B8', marginBottom: '3px' }}>Banner Image URL</label>
+                  <input
+                    type="text"
+                    value={settings.subscriptionBannerImage}
+                    onChange={e => setSettings({ ...settings, subscriptionBannerImage: e.target.value })}
+                    style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.15)', background: '#1E293B', color: 'white', fontSize: '0.85rem' }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Auto Assignment Toggle */}
           <div style={{
             display: 'flex',

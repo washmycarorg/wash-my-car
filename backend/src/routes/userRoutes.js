@@ -24,7 +24,11 @@ import {
   getPublicActiveCoupons,
   verifyBookingPayment,
   cancelPendingPayment,
-  cancelBooking
+  cancelBooking,
+  getUserSubscriptionPlans,
+  getMySubscriptions,
+  subscribeToPlan,
+  verifySubscriptionPayment
 } from '../controllers/userController.js';
 
 import { submitInquiry } from '../controllers/inquiryController.js';
@@ -43,8 +47,14 @@ router.get('/active-coupons', getPublicActiveCoupons);
 router.get('/settings', getPublicSettings);
 router.post('/inquiries', submitInquiry);
 router.get('/available-slots', getAvailableBookingSlots);
+router.get('/subscriptions/plans', getUserSubscriptionPlans);
 
 router.use(verifyToken);
+
+// User subscriptions
+router.get('/subscriptions/my', getMySubscriptions);
+router.post('/subscriptions/subscribe', subscribeToPlan);
+router.post('/subscriptions/verify-payment', verifySubscriptionPayment);
 
 router.get('/profile', getProfile);
 router.put('/profile', updateProfile);

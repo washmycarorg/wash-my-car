@@ -84,6 +84,13 @@ router.get('/inquiries', getAdminInquiries);
 router.put('/inquiries/:id', updateInquiryStatus);
 router.delete('/inquiries/:id', deleteInquiry);
 
+// Subscriptions
+router.get('/subscriptions/plans', adminController.getAdminSubscriptionPlans);
+router.post('/subscriptions/plans', adminController.createSubscriptionPlan);
+router.put('/subscriptions/plans/:id', adminController.updateSubscriptionPlan);
+router.delete('/subscriptions/plans/:id', adminController.deleteSubscriptionPlan);
+router.get('/subscriptions/subscribers', adminController.getAdminSubscribers);
+
 // Slot Configuration & Zone Dispatch
 router.get('/slots-config', getAdminSlotsConfig);
 router.put('/slots-config', updateAdminSlotsConfig);

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, CalendarCheck, CalendarDays, Droplets, Car, Gift, User, LogOut, X } from 'lucide-react';
+import { LayoutDashboard, CalendarCheck, CalendarDays, Droplets, Car, Gift, User, LogOut, X, Crown } from 'lucide-react';
 
 import logo from '../assets/wash my car.png';
 
@@ -10,6 +10,7 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
 
   const links = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+    { name: 'VIP Pass & Club', path: '/subscriptions', icon: Crown },
     { name: 'Book Slot', path: '/book', icon: CalendarCheck },
     { name: 'My Bookings', path: '/bookings', icon: CalendarDays },
     { name: 'Services', path: '/services', icon: Droplets },
@@ -46,8 +47,8 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
       }}>
         <div style={{padding: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.1)'}}>
            <div className="flex items-center gap-3">
-             <div style={{background: 'white', padding: '0.2rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '45px', height: '45px'}}>
-               <img src={logo} alt="Wash My Car Logo" style={{width: '100%', height: '100%', objectFit: 'contain', transform: 'scale(1.2)'}} />
+             <div style={{background: 'white', padding: '3px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '52px', height: '52px', flexShrink: 0, boxShadow: '0 4px 12px rgba(0,0,0,0.15)'}}>
+               <img src={logo} alt="Wash My Car Logo" style={{width: '100%', height: '100%', objectFit: 'contain', transform: 'scale(1.15)'}} />
              </div>
              <div>
                <h2 style={{color: 'white', fontSize: '1.1rem', margin: 0, fontWeight: 700, letterSpacing: '1px'}}>WASH <span style={{color: 'var(--accent-teal)'}}>MY</span> CAR <span style={{color: 'var(--accent-teal)'}}>ORG</span></h2>

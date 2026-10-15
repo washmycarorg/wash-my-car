@@ -113,6 +113,22 @@ const CmsSettings = () => {
     outletPlanTitle: 'Branded Outlet Partner',
     outletPlanPrice: '₹3.5 LAKH',
     outletPlanPerks: 'Storefront branding,Interior setup,High-end pressure equipment,Technology & SOPs',
+    franchisePlans: [
+      {
+        id: 'plan-1',
+        title: 'Doorstep Franchise Partner',
+        price: '₹1.8 LAKH',
+        badge: 'MOBILE DETAILING',
+        perks: 'Low investment,No shop required,Proven high margin model,Machinery & launch support'
+      },
+      {
+        id: 'plan-2',
+        title: 'Branded Outlet Partner',
+        price: '₹3.5 LAKH',
+        badge: 'PHYSICAL STUDIO',
+        perks: 'Storefront branding,Interior setup,High-end pressure equipment,Technology & SOPs'
+      }
+    ],
 
     contactPhone: '+91 98765 43210',
     contactEmail: 'washmycarorg@gmail.com',
@@ -158,6 +174,33 @@ const CmsSettings = () => {
             }
           }
 
+          let franchiseParsed = [];
+          if (res.franchisePlans) {
+            try {
+              franchiseParsed = typeof res.franchisePlans === 'string' ? JSON.parse(res.franchisePlans) : res.franchisePlans;
+            } catch (e) {
+              franchiseParsed = [];
+            }
+          }
+          if (!Array.isArray(franchiseParsed) || franchiseParsed.length === 0) {
+            franchiseParsed = [
+              {
+                id: 'plan-1',
+                title: res.doorstepPlanTitle || 'Doorstep Franchise Partner',
+                price: res.doorstepPlanPrice || '₹1.8 LAKH',
+                badge: 'MOBILE DETAILING',
+                perks: res.doorstepPlanPerks || 'Low investment,No shop required,Proven high margin model,Machinery & launch support'
+              },
+              {
+                id: 'plan-2',
+                title: res.outletPlanTitle || 'Branded Outlet Partner',
+                price: res.outletPlanPrice || '₹3.5 LAKH',
+                badge: 'PHYSICAL STUDIO',
+                perks: res.outletPlanPerks || 'Storefront branding,Interior setup,High-end pressure equipment,Technology & SOPs'
+              }
+            ];
+          }
+
           const resolvedSlides = Array.isArray(slidesParsed) && slidesParsed.length > 0
             ? slidesParsed
             : DEFAULT_HERO_SLIDES;
@@ -166,6 +209,7 @@ const CmsSettings = () => {
             ...prev,
             ...res,
             heroSlides: resolvedSlides,
+            franchisePlans: franchiseParsed,
             faqs: Array.isArray(faqsParsed) && faqsParsed.length > 0 ? faqsParsed : prev.faqs
           }));
         }
@@ -275,12 +319,56 @@ const CmsSettings = () => {
     }));
   };
 
+  // --- FRANCHISE PLANS HANDLERS ---
+  const handleAddFranchisePlan = () => {
+    const newPlan = {
+      id: `plan-${Date.now()}`,
+      title: 'New Franchise Model',
+      price: '₹2.0 LAKH',
+      badge: 'FRANCHISE OPTION',
+      perks: 'Complete machinery & van kit,Staff training,Dedicated territory,Live digital dispatch'
+    };
+    setFormData(prev => ({
+      ...prev,
+      franchisePlans: [...(prev.franchisePlans || []), newPlan]
+    }));
+  };
+
+  const handleFranchisePlanChange = (index, field, value) => {
+    setFormData(prev => {
+      const updated = [...(prev.franchisePlans || [])];
+      updated[index] = { ...updated[index], [field]: value };
+      return { ...prev, franchisePlans: updated };
+    });
+  };
+
+  const handleRemoveFranchisePlan = (index) => {
+    if ((formData.franchisePlans || []).length <= 1) {
+      alert('You must configure at least one franchise plan card.');
+      return;
+    }
+    setFormData(prev => ({
+      ...prev,
+      franchisePlans: (prev.franchisePlans || []).filter((_, i) => i !== index)
+    }));
+  };
+
   // --- SAVE & PUBLISH ---
   const handleSave = async (e) => {
     if (e) e.preventDefault();
     setSaving(true);
     try {
-      await updateCmsSettings(formData);
+      const payload = {
+        ...formData,
+        franchisePlans: JSON.stringify(formData.franchisePlans || []),
+        doorstepPlanTitle: formData.franchisePlans?.[0]?.title || formData.doorstepPlanTitle,
+        doorstepPlanPrice: formData.franchisePlans?.[0]?.price || formData.doorstepPlanPrice,
+        doorstepPlanPerks: formData.franchisePlans?.[0]?.perks || formData.doorstepPlanPerks,
+        outletPlanTitle: formData.franchisePlans?.[1]?.title || formData.outletPlanTitle,
+        outletPlanPrice: formData.franchisePlans?.[1]?.price || formData.outletPlanPrice,
+        outletPlanPerks: formData.franchisePlans?.[1]?.perks || formData.outletPlanPerks,
+      };
+      await updateCmsSettings(payload);
       alert('Homepage CMS & Slides updated successfully! Changes are live on the user website.');
     } catch (err) {
       console.error(err);
@@ -904,59 +992,132 @@ const CmsSettings = () => {
                   />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', borderTop: '1px dashed #CBD5E1', paddingTop: '1rem' }}>
-                  <div>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--primary-navy)' }}>Doorstep Franchise Format</span>
-                    <input
-                      type="text"
-                      className="form-input"
-                      style={{ marginTop: '0.25rem' }}
-                      value={formData.doorstepPlanTitle}
-                      onChange={e => setFormData({ ...formData, doorstepPlanTitle: e.target.value })}
-                    />
-                    <input
-                      type="text"
-                      className="form-input"
-                      style={{ marginTop: '0.35rem' }}
-                      placeholder="e.g. ₹1.8 LAKH"
-                      value={formData.doorstepPlanPrice}
-                      onChange={e => setFormData({ ...formData, doorstepPlanPrice: e.target.value })}
-                    />
-                    <textarea
-                      rows={2}
-                      className="form-input"
-                      style={{ marginTop: '0.35rem' }}
-                      placeholder="Comma separated perks"
-                      value={formData.doorstepPlanPerks}
-                      onChange={e => setFormData({ ...formData, doorstepPlanPerks: e.target.value })}
-                    />
+                <div style={{ borderTop: '1px dashed #CBD5E1', paddingTop: '1rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <div>
+                      <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--primary-navy)' }}>
+                        Franchise Model Cards ({(formData.franchisePlans || []).length})
+                      </span>
+                      <p style={{ margin: '0.2rem 0 0', fontSize: '0.78rem', color: '#64748B' }}>
+                        Configure 1, 2, 3 or more franchise partnership tiers. These cards will dynamically display on the homepage.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddFranchisePlan}
+                      className="btn btn-outline"
+                      style={{
+                        fontSize: '0.8rem',
+                        padding: '0.4rem 0.85rem',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        color: 'var(--primary-blue)',
+                        borderColor: 'var(--primary-blue)'
+                      }}
+                    >
+                      <Plus size={15} /> Add Franchise Card
+                    </button>
                   </div>
 
-                  <div>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--primary-navy)' }}>Fixed Outlet Format</span>
-                    <input
-                      type="text"
-                      className="form-input"
-                      style={{ marginTop: '0.25rem' }}
-                      value={formData.outletPlanTitle}
-                      onChange={e => setFormData({ ...formData, outletPlanTitle: e.target.value })}
-                    />
-                    <input
-                      type="text"
-                      className="form-input"
-                      style={{ marginTop: '0.35rem' }}
-                      placeholder="e.g. ₹3.5 LAKH"
-                      value={formData.outletPlanPrice}
-                      onChange={e => setFormData({ ...formData, outletPlanPrice: e.target.value })}
-                    />
-                    <textarea
-                      rows={2}
-                      className="form-input"
-                      style={{ marginTop: '0.35rem' }}
-                      placeholder="Comma separated perks"
-                      value={formData.outletPlanPerks}
-                      onChange={e => setFormData({ ...formData, outletPlanPerks: e.target.value })}
-                    />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {(formData.franchisePlans || []).map((plan, pIdx) => (
+                      <div
+                        key={plan.id || pIdx}
+                        style={{
+                          background: 'white',
+                          border: '1.5px solid #E2E8F0',
+                          borderRadius: '12px',
+                          padding: '1.1rem',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                          position: 'relative'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', paddingBottom: '0.5rem', borderBottom: '1px solid #F1F5F9' }}>
+                          <span style={{ fontWeight: 800, color: 'var(--primary-navy)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <span style={{ background: '#E0F2FE', color: '#0369A1', width: '22px', height: '22px', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem' }}>
+                              {pIdx + 1}
+                            </span>
+                            {plan.title || `Franchise Plan #${pIdx + 1}`}
+                          </span>
+                          {(formData.franchisePlans || []).length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveFranchisePlan(pIdx)}
+                              style={{
+                                background: '#FEE2E2',
+                                color: '#DC2626',
+                                border: 'none',
+                                borderRadius: '6px',
+                                padding: '0.3rem 0.6rem',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.3rem',
+                                fontSize: '0.75rem',
+                                fontWeight: 700
+                              }}
+                              title="Delete this franchise card"
+                            >
+                              <Trash2 size={13} /> Remove
+                            </button>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                          <div>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>
+                              Plan Title
+                            </label>
+                            <input
+                              type="text"
+                              className="form-input"
+                              placeholder="e.g. Doorstep Franchise Partner"
+                              value={plan.title || ''}
+                              onChange={e => handleFranchisePlanChange(pIdx, 'title', e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>
+                              Investment / Price
+                            </label>
+                            <input
+                              type="text"
+                              className="form-input"
+                              placeholder="e.g. ₹1.8 LAKH"
+                              value={plan.price || ''}
+                              onChange={e => handleFranchisePlanChange(pIdx, 'price', e.target.value)}
+                            />
+                          </div>
+                        </div>
+
+                        <div style={{ marginTop: '0.65rem' }}>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>
+                            Badge / Tagline (e.g. MOBILE DETAILING, PHYSICAL STUDIO, EXPRESS KIOSK)
+                          </label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            placeholder="e.g. MOBILE DETAILING"
+                            value={plan.badge || ''}
+                            onChange={e => handleFranchisePlanChange(pIdx, 'badge', e.target.value)}
+                          />
+                        </div>
+
+                        <div style={{ marginTop: '0.65rem' }}>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>
+                            Perks & Inclusions (Comma separated)
+                          </label>
+                          <textarea
+                            rows={2}
+                            className="form-input"
+                            placeholder="e.g. Low investment, No shop required, High profit margins, Full machinery & launch support"
+                            value={plan.perks || ''}
+                            onChange={e => handleFranchisePlanChange(pIdx, 'perks', e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -1287,15 +1448,14 @@ const CmsSettings = () => {
             {/* Franchise / Partner Mock */}
             <div style={{ background: '#0F172A', color: 'white', padding: '0.75rem', borderRadius: '8px', marginBottom: '0.5rem' }}>
               <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#38BDF8' }}>{formData.partnerTitle}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', marginTop: '0.4rem' }}>
-                <div style={{ background: 'rgba(255,255,255,0.06)', padding: '0.4rem', borderRadius: '6px' }}>
-                  <div style={{ fontSize: '0.65rem', fontWeight: 700 }}>{formData.doorstepPlanTitle}</div>
-                  <div style={{ color: '#FACC15', fontWeight: 800, fontSize: '0.8rem' }}>{formData.doorstepPlanPrice}</div>
-                </div>
-                <div style={{ background: 'rgba(255,255,255,0.06)', padding: '0.4rem', borderRadius: '6px' }}>
-                  <div style={{ fontSize: '0.65rem', fontWeight: 700 }}>{formData.outletPlanTitle}</div>
-                  <div style={{ color: '#FACC15', fontWeight: 800, fontSize: '0.8rem' }}>{formData.outletPlanPrice}</div>
-                </div>
+              <div style={{ display: 'grid', gridTemplateColumns: (formData.franchisePlans || []).length > 2 ? 'repeat(auto-fit, minmax(90px, 1fr))' : '1fr 1fr', gap: '0.4rem', marginTop: '0.4rem' }}>
+                {(formData.franchisePlans || []).map((p, pI) => (
+                  <div key={p.id || pI} style={{ background: 'rgba(255,255,255,0.06)', padding: '0.4rem', borderRadius: '6px' }}>
+                    <div style={{ fontSize: '0.62rem', color: '#38BDF8', fontWeight: 800 }}>{p.badge || 'FRANCHISE'}</div>
+                    <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title}</div>
+                    <div style={{ color: '#FACC15', fontWeight: 800, fontSize: '0.78rem' }}>{p.price}</div>
+                  </div>
+                ))}
               </div>
             </div>
 

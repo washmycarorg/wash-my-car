@@ -313,3 +313,56 @@ export const getAvailableSlots = async (date, serviceAreaId, address = '', zone 
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 };
+
+// Subscriptions
+export const getSubscriptionPlans = async (carTypeId = '') => {
+  const url = carTypeId 
+    ? `${API_URL}/users/subscriptions/plans?carTypeId=${carTypeId}` 
+    : `${API_URL}/users/subscriptions/plans`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const getMySubscriptions = async () => {
+  const res = await fetch(`${API_URL}/users/subscriptions/my`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const subscribeToPlan = async (planId) => {
+  const res = await fetch(`${API_URL}/users/subscriptions/subscribe`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ planId })
+  });
+  if (!res.ok) {
+    const errorText = await res.text();
+    try {
+      const parsed = JSON.parse(errorText);
+      throw new Error(parsed.error || parsed.message || errorText);
+    } catch (e) {
+      throw new Error(errorText || 'Subscription failed');
+    }
+  }
+  return res.json();
+};
+
+export const verifySubscriptionPayment = async (data) => {
+  const res = await fetch(`${API_URL}/users/subscriptions/verify-payment`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const errorText = await res.text();
+    try {
+      const parsed = JSON.parse(errorText);
+      throw new Error(parsed.error || parsed.message || errorText);
+    } catch (e) {
+      throw new Error(errorText || 'Payment verification failed');
+    }
+  }
+  return res.json();
+};
+

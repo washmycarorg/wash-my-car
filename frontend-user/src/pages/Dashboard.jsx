@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, Car, Sparkles, Gift, MapPin, Share2, Copy, Check } from 'lucide-react';
+import { Calendar, Car, Sparkles, Gift, MapPin, Share2, Copy, Check, Crown } from 'lucide-react';
 import { getProfile, getServiceAreas, getSettings } from '../api';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
@@ -227,28 +227,67 @@ const Dashboard = () => {
             {systemSettings?.dashboardAdSubtitle || 'Book a sparkling exterior foam wash and deep interior cabin sanitize with spot-free purified water at your doorstep.'}
           </p>
 
-          <div>
-            <Link
-              to="/book"
-              className="btn"
-              style={{
-                background: 'linear-gradient(135deg, #0284C7, #06B6D4)',
-                color: 'white',
-                fontWeight: 700,
-                padding: '0.65rem 1.4rem',
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            {systemSettings?.bookingsEnabled === false ? (
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.25)',
+                border: '1px solid #EF4444',
+                color: '#FCA5A5',
+                padding: '0.65rem 1.25rem',
                 borderRadius: '12px',
+                fontSize: '0.88rem',
+                fontWeight: 700,
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '0.45rem',
-                boxShadow: '0 6px 18px rgba(2, 132, 199, 0.45)',
-                border: 'none',
-                textDecoration: 'none',
-                fontSize: '0.92rem',
-                transition: 'all 0.2s'
-              }}
-            >
-              <Sparkles size={16} /> Book a Wash
-            </Link>
+                gap: '0.45rem'
+              }}>
+                ● Slot Bookings Paused by Admin
+              </div>
+            ) : (
+              <Link
+                to="/book"
+                className="btn"
+                style={{
+                  background: 'linear-gradient(135deg, #0284C7, #06B6D4)',
+                  color: 'white',
+                  fontWeight: 700,
+                  padding: '0.65rem 1.4rem',
+                  borderRadius: '12px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  boxShadow: '0 6px 18px rgba(2, 132, 199, 0.45)',
+                  border: 'none',
+                  textDecoration: 'none',
+                  fontSize: '0.92rem',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <Sparkles size={16} /> Book a Wash
+              </Link>
+            )}
+
+            {systemSettings?.subscriptionsEnabled !== false && (
+              <Link
+                to="/subscriptions"
+                style={{
+                  background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)',
+                  color: '#92400E',
+                  fontWeight: 800,
+                  padding: '0.65rem 1.25rem',
+                  borderRadius: '12px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  boxShadow: '0 4px 12px rgba(245, 158, 11, 0.35)',
+                  border: '1.5px solid #F59E0B',
+                  textDecoration: 'none',
+                  fontSize: '0.88rem'
+                }}
+              >
+                <Crown size={16} color="#D97706" /> VIP Pass
+              </Link>
+            )}
           </div>
         </div>
       </div>

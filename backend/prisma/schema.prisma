@@ -19,6 +19,7 @@ model User {
   bookings       Booking[]
   savedAddresses SavedAddress[]
   offers         Offer[]         @relation("UserEligibleOffers")
+  subscriptions  UserSubscription[]
   createdAt      DateTime        @default(now())
 }
 
@@ -52,12 +53,14 @@ model Admin {
 }
 
 model CarType {
-  id        Int         @id @default(autoincrement())
-  name      String      @unique // e.g. Sedan, SUV, Hatchback, etc.
-  cars      Car[]
-  bookings  Booking[]
-  prices    WashPrice[]
-  createdAt DateTime    @default(now())
+  id            Int                @id @default(autoincrement())
+  name          String             @unique // e.g. Sedan, SUV, Hatchback, etc.
+  cars          Car[]
+  bookings      Booking[]
+  prices        WashPrice[]
+  plans         SubscriptionPlan[]
+  subscriptions UserSubscription[]
+  createdAt     DateTime           @default(now())
 }
 
 model WashType {
@@ -285,6 +288,8 @@ model InventoryAllocation {
 
 model SystemSettings {
   id                  Int     @id @default(1)
+  bookingsEnabled     Boolean @default(true)   // Master Booking switch ON/OFF
+  subscriptionsEnabled Boolean @default(true)  // Subscription feature switch ON/OFF
   autoAssignment      Boolean @default(true)   // Auto assignment mode ON/OFF
   pointsRedemption    Boolean @default(true)   // Royalty redemption mode ON/OFF
   pointsReward        Boolean @default(true)   // Earning points reward mode ON/OFF
@@ -306,6 +311,11 @@ model SystemSettings {
   dashboardAdTitle    String? @default("Special Weekend Doorstep Detail & Snow Foam Spa")
   dashboardAdSubtitle String? @default("Get sparkling exterior foam wash & deep interior cabin sanitize with pure RO water at your doorstep.")
   dashboardAdBadge    String? @default("PROMOTIONAL OFFER • LIMITED SLOTS")
+
+  // Subscription Banner Settings
+  subscriptionBannerTitle    String? @default("Exclusive VIP Car Care Membership")
+  subscriptionBannerSubtitle String? @default("Save up to 40% with monthly doorstep passes, complimentary add-ons & priority scheduling.")
+  subscriptionBannerImage    String? @default("https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=1600&q=85")
 
   // Dispatch & Smart Route Slot Settings
   activeWorkers        Int     @default(1)     // Current field workers count (default 1)
@@ -383,6 +393,7 @@ model CmsContent {
   outletPlanTitle         String   @default("Branded Outlet Partner")
   outletPlanPrice         String   @default("₹3.5 LAKH")
   outletPlanPerks         String   @default("Storefront branding,Interior setup,High-end pressure equipment,Technology & SOPs")
+  franchisePlans          String?  @default("[{\"id\":\"plan-1\",\"title\":\"Doorstep Franchise Partner\",\"price\":\"₹1.8 LAKH\",\"badge\":\"MOBILE DETAILING\",\"perks\":\"Low investment,No shop required,High profit margins,Full machinery & launch support\"},{\"id\":\"plan-2\",\"title\":\"Branded Outlet Partner\",\"price\":\"₹3.5 LAKH\",\"badge\":\"PHYSICAL STUDIO\",\"perks\":\"Storefront branding,Interior setup,High-end pressure equipment,Complete SOPs & App technology\"}]")
 
   // Contact details
   contactPhone            String   @default("+91 98765 43210")
@@ -407,5 +418,48 @@ model OtpVerification {
   createdAt DateTime @default(now())
 
   @@index([phone, purpose])
+}
+
+model SubscriptionPlan {
+  id                  Int                @id @default(autoincrement())
+  name                String             // e.g. "Monthly Gold VIP", "Quarterly Diamond"
+  description         String?
+  carTypeId           Int
+  carType             CarType            @relation(fields: [carTypeId], references: [id], onDelete: Cascade)
+  durationDays        Int                @default(30) // 30, 90, 180, 365
+  durationLabel       String             @default("1 Month") // "1 Month", "3 Months", "6 Months", "1 Year"
+  price               Float
+  originalPrice       Float?
+  washesCount         Int                @default(4)
+  freeAddonsCount     Int                @default(2)
+  freeAddonIds        String?            @default("") // Comma-separated addon IDs or empty for all
+  features            String?            @default("[\"4 Doorstep Foam Washes\",\"2 Free Premium Add-ons\",\"Priority Slot Dispatch\",\"Zero Cancellation Fees\"]")
+  badge               String?            @default("MOST POPULAR")
+  active              Boolean            @default(true)
+  userSubscriptions   UserSubscription[]
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt @default(now())
+}
+
+model UserSubscription {
+  id                  Int               @id @default(autoincrement())
+  userId              Int
+  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId              Int
+  plan                SubscriptionPlan  @relation(fields: [planId], references: [id], onDelete: Cascade)
+  carTypeId           Int
+  carType             CarType           @relation(fields: [carTypeId], references: [id], onDelete: Cascade)
+  startDate           DateTime          @default(now())
+  endDate             DateTime
+  price               Float
+  washesTotal         Int               @default(4)
+  washesRemaining     Int               @default(4)
+  freeAddonsTotal     Int               @default(2)
+  freeAddonsRemaining Int               @default(2)
+  status              String            @default("ACTIVE") // ACTIVE, EXPIRED, CANCELLED
+  paymentStatus       String            @default("PAID")   // PAID, PENDING
+  razorpayOrderId     String?
+  razorpayPaymentId   String?
+  createdAt           DateTime          @default(now())
 }
 

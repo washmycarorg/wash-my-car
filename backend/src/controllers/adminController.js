@@ -89,7 +89,41 @@ export const getEmployees = async (req, res) => {
 
 export const getUsers = async (req, res) => {
   try {
+    const now = new Date();
+
+    // Auto-expire any user subscriptions that ended or have 0 washes remaining
+    await prisma.userSubscription.updateMany({
+      where: {
+        status: 'ACTIVE',
+        OR: [
+          { washesRemaining: { lte: 0 } },
+          { endDate: { lt: now } }
+        ]
+      },
+      data: { status: 'EXPIRED' }
+    });
+
     const users = await prisma.user.findMany({
+      include: {
+        subscriptions: {
+          include: {
+            plan: true,
+            carType: true
+          },
+          orderBy: { createdAt: 'desc' }
+        },
+        bookings: {
+          include: {
+            carType: true,
+            washType: true,
+            employee: true
+          },
+          orderBy: { date: 'desc' }
+        },
+        cars: {
+          include: { carType: true }
+        }
+      },
       orderBy: { createdAt: 'desc' }
     });
     res.json(users);
@@ -1008,6 +1042,8 @@ export const getSystemSettings = async (req, res) => {
       settings = await prisma.systemSettings.create({
         data: {
           id: 1,
+          bookingsEnabled: true,
+          subscriptionsEnabled: true,
           autoAssignment: true,
           pointsRedemption: true,
           pointsReward: true,
@@ -1022,7 +1058,10 @@ export const getSystemSettings = async (req, res) => {
             { count: 3, points: 100 },
             { count: 5, points: 150 }
           ]),
-          bookingTermsText: "1. Access Requirements: Customer agrees to provide adequate water tap access and a standard electric plug point for the technician to perform the doorstep car wash service safely.\n2. Vehicle Parking: The vehicle must be parked in a well-lit area with sufficient clearance around all sides.\n3. Valuable Items: Please remove all personal belongings and valuables from inside the car prior to service commencement.\n4. Timings: Service slots are subject to local traffic and weather conditions."
+          bookingTermsText: "1. Access Requirements: Customer agrees to provide adequate water tap access and a standard electric plug point for the technician to perform the doorstep car wash service safely.\n2. Vehicle Parking: The vehicle must be parked in a well-lit area with sufficient clearance around all sides.\n3. Valuable Items: Please remove all personal belongings and valuables from inside the car prior to service commencement.\n4. Timings: Service slots are subject to local traffic and weather conditions.",
+          subscriptionBannerTitle: "Exclusive VIP Car Care Membership",
+          subscriptionBannerSubtitle: "Save up to 40% with monthly doorstep passes, complimentary add-ons & priority scheduling.",
+          subscriptionBannerImage: "https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=1600&q=85"
         }
       });
     }
@@ -1035,6 +1074,8 @@ export const getSystemSettings = async (req, res) => {
 export const updateSystemSettings = async (req, res) => {
   try {
     const { 
+      bookingsEnabled,
+      subscriptionsEnabled,
       autoAssignment, 
       pointsRedemption, 
       pointsReward, 
@@ -1049,12 +1090,17 @@ export const updateSystemSettings = async (req, res) => {
       dashboardAdImage,
       dashboardAdTitle,
       dashboardAdSubtitle,
-      dashboardAdBadge
+      dashboardAdBadge,
+      subscriptionBannerTitle,
+      subscriptionBannerSubtitle,
+      subscriptionBannerImage
     } = req.body;
     
     const settings = await prisma.systemSettings.upsert({
       where: { id: 1 },
       update: {
+        ...(bookingsEnabled !== undefined && { bookingsEnabled: Boolean(bookingsEnabled) }),
+        ...(subscriptionsEnabled !== undefined && { subscriptionsEnabled: Boolean(subscriptionsEnabled) }),
         ...(autoAssignment !== undefined && { autoAssignment: Boolean(autoAssignment) }),
         ...(pointsRedemption !== undefined && { pointsRedemption: Boolean(pointsRedemption) }),
         ...(pointsReward !== undefined && { pointsReward: Boolean(pointsReward) }),
@@ -1069,10 +1115,15 @@ export const updateSystemSettings = async (req, res) => {
         ...(dashboardAdImage !== undefined && { dashboardAdImage: String(dashboardAdImage) }),
         ...(dashboardAdTitle !== undefined && { dashboardAdTitle: String(dashboardAdTitle) }),
         ...(dashboardAdSubtitle !== undefined && { dashboardAdSubtitle: String(dashboardAdSubtitle) }),
-        ...(dashboardAdBadge !== undefined && { dashboardAdBadge: String(dashboardAdBadge) })
+        ...(dashboardAdBadge !== undefined && { dashboardAdBadge: String(dashboardAdBadge) }),
+        ...(subscriptionBannerTitle !== undefined && { subscriptionBannerTitle: String(subscriptionBannerTitle) }),
+        ...(subscriptionBannerSubtitle !== undefined && { subscriptionBannerSubtitle: String(subscriptionBannerSubtitle) }),
+        ...(subscriptionBannerImage !== undefined && { subscriptionBannerImage: String(subscriptionBannerImage) })
       },
       create: {
         id: 1,
+        bookingsEnabled: bookingsEnabled !== undefined ? Boolean(bookingsEnabled) : true,
+        subscriptionsEnabled: subscriptionsEnabled !== undefined ? Boolean(subscriptionsEnabled) : true,
         autoAssignment: autoAssignment !== undefined ? Boolean(autoAssignment) : true,
         pointsRedemption: pointsRedemption !== undefined ? Boolean(pointsRedemption) : true,
         pointsReward: pointsReward !== undefined ? Boolean(pointsReward) : true,
@@ -1091,10 +1142,176 @@ export const updateSystemSettings = async (req, res) => {
         dashboardAdImage: dashboardAdImage || "https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=1600&q=85",
         dashboardAdTitle: dashboardAdTitle || "Special Weekend Doorstep Detail & Snow Foam Spa",
         dashboardAdSubtitle: dashboardAdSubtitle || "Get sparkling exterior foam wash & deep interior cabin sanitize with spot-free purified water at your doorstep.",
-        dashboardAdBadge: dashboardAdBadge || "PROMOTIONAL OFFER • LIMITED SLOTS"
+        dashboardAdBadge: dashboardAdBadge || "PROMOTIONAL OFFER • LIMITED SLOTS",
+        subscriptionBannerTitle: subscriptionBannerTitle || "Exclusive VIP Car Care Membership",
+        subscriptionBannerSubtitle: subscriptionBannerSubtitle || "Save up to 40% with monthly doorstep passes, complimentary add-ons & priority scheduling.",
+        subscriptionBannerImage: subscriptionBannerImage || "https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=1600&q=85"
       }
     });
     res.json(settings);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// ========================
+// SUBSCRIPTION PLANS ADMIN
+// ========================
+export const getAdminSubscriptionPlans = async (req, res) => {
+  try {
+    const plans = await prisma.subscriptionPlan.findMany({
+      include: {
+        carType: true,
+        _count: {
+          select: { userSubscriptions: true }
+        }
+      },
+      orderBy: [
+        { carTypeId: 'asc' },
+        { price: 'asc' }
+      ]
+    });
+    res.json(plans);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const createSubscriptionPlan = async (req, res) => {
+  try {
+    const { 
+      name, 
+      description, 
+      carTypeId, 
+      durationDays = 30, 
+      durationLabel = '1 Month', 
+      price, 
+      originalPrice, 
+      washesCount = 4, 
+      freeAddonsCount = 2, 
+      freeAddonIds = '', 
+      features, 
+      badge = 'MOST POPULAR',
+      active = true 
+    } = req.body;
+
+    if (!name || !carTypeId || price === undefined || price === null) {
+      return res.status(400).json({ error: 'Plan name, car type, and price are required.' });
+    }
+
+    const plan = await prisma.subscriptionPlan.create({
+      data: {
+        name: String(name).trim(),
+        description: description ? String(description).trim() : null,
+        carTypeId: Number(carTypeId),
+        durationDays: Number(durationDays) || 30,
+        durationLabel: String(durationLabel || '1 Month'),
+        price: Number(price),
+        originalPrice: originalPrice ? Number(originalPrice) : null,
+        washesCount: Number(washesCount) || 4,
+        freeAddonsCount: Number(freeAddonsCount) || 0,
+        freeAddonIds: Array.isArray(freeAddonIds) ? freeAddonIds.join(',') : String(freeAddonIds || ''),
+        features: Array.isArray(features) ? JSON.stringify(features) : (typeof features === 'string' ? features : '[]'),
+        badge: badge ? String(badge).trim() : null,
+        active: Boolean(active)
+      },
+      include: {
+        carType: true
+      }
+    });
+
+    res.status(201).json(plan);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const updateSubscriptionPlan = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { 
+      name, 
+      description, 
+      carTypeId, 
+      durationDays, 
+      durationLabel, 
+      price, 
+      originalPrice, 
+      washesCount, 
+      freeAddonsCount, 
+      freeAddonIds, 
+      features, 
+      badge, 
+      active 
+    } = req.body;
+
+    const updated = await prisma.subscriptionPlan.update({
+      where: { id: Number(id) },
+      data: {
+        ...(name !== undefined && { name: String(name).trim() }),
+        ...(description !== undefined && { description: description ? String(description).trim() : null }),
+        ...(carTypeId !== undefined && { carTypeId: Number(carTypeId) }),
+        ...(durationDays !== undefined && { durationDays: Number(durationDays) }),
+        ...(durationLabel !== undefined && { durationLabel: String(durationLabel) }),
+        ...(price !== undefined && { price: Number(price) }),
+        ...(originalPrice !== undefined && { originalPrice: originalPrice ? Number(originalPrice) : null }),
+        ...(washesCount !== undefined && { washesCount: Number(washesCount) }),
+        ...(freeAddonsCount !== undefined && { freeAddonsCount: Number(freeAddonsCount) }),
+        ...(freeAddonIds !== undefined && { freeAddonIds: Array.isArray(freeAddonIds) ? freeAddonIds.join(',') : String(freeAddonIds || '') }),
+        ...(features !== undefined && { features: Array.isArray(features) ? JSON.stringify(features) : String(features) }),
+        ...(badge !== undefined && { badge: badge ? String(badge).trim() : null }),
+        ...(active !== undefined && { active: Boolean(active) })
+      },
+      include: {
+        carType: true
+      }
+    });
+
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const deleteSubscriptionPlan = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await prisma.subscriptionPlan.delete({
+      where: { id: Number(id) }
+    });
+    res.json({ success: true, message: 'Subscription plan deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const getAdminSubscribers = async (req, res) => {
+  try {
+    const now = new Date();
+
+    // Auto-expire any active subscriptions whose validity ended or remaining washes completed
+    await prisma.userSubscription.updateMany({
+      where: {
+        status: 'ACTIVE',
+        OR: [
+          { washesRemaining: { lte: 0 } },
+          { endDate: { lt: now } }
+        ]
+      },
+      data: { status: 'EXPIRED' }
+    });
+
+    const subscriptions = await prisma.userSubscription.findMany({
+      include: {
+        user: {
+          select: { id: true, name: true, phone: true, email: true }
+        },
+        plan: true,
+        carType: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(subscriptions);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -1300,6 +1517,9 @@ export const updateCmsContent = async (req, res) => {
     }
     if (data.heroSlides && typeof data.heroSlides !== 'string') {
       data.heroSlides = JSON.stringify(data.heroSlides);
+    }
+    if (data.franchisePlans && typeof data.franchisePlans !== 'string') {
+      data.franchisePlans = JSON.stringify(data.franchisePlans);
     }
 
     const cms = await prisma.cmsContent.upsert({

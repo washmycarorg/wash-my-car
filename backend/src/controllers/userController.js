@@ -206,6 +206,14 @@ export const createBooking = async (req, res) => {
       });
     }
 
+    // Check if bookings are paused by admin
+    const sysSettings = await prisma.systemSettings.findUnique({ where: { id: 1 } });
+    if (sysSettings && sysSettings.bookingsEnabled === false) {
+      return res.status(400).json({ 
+        error: 'Doorstep car wash bookings are currently paused by administration. New slot reservations are temporarily disabled. Please check back later.' 
+      });
+    }
+
     // Validate booking date and time slot relative to current IST time
     const now = new Date();
     const istDateFormatter = new Intl.DateTimeFormat('en-CA', {
@@ -248,7 +256,6 @@ export const createBooking = async (req, res) => {
     }
 
     // Validate that the slot is an approved admin-configured slot for this date
-    const sysSettings = await prisma.systemSettings.findUnique({ where: { id: 1 } });
     let configuredSlots = [
       '08:30 AM - 10:30 AM',
       '10:30 AM - 12:30 PM',
@@ -931,6 +938,39 @@ export const cancelBooking = async (req, res) => {
       });
     }
 
+    // Cancellation policy: Permitted ONLY up to 7 hours before scheduled slot arrival
+    if (booking.date && booking.timeSlot) {
+      const slotWindow = parseSlotTimeWindow(booking.timeSlot);
+      if (slotWindow) {
+        const istDateParts = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Asia/Kolkata',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        }).formatToParts(new Date(booking.date));
+        let bYear, bMonth, bDay;
+        for (const p of istDateParts) {
+          if (p.type === 'year') bYear = p.value;
+          if (p.type === 'month') bMonth = p.value;
+          if (p.type === 'day') bDay = p.value;
+        }
+
+        const slotHour = Math.floor(slotWindow.startMinutes / 60);
+        const slotMinute = slotWindow.startMinutes % 60;
+        const slotIso = `${bYear}-${bMonth}-${bDay}T${String(slotHour).padStart(2, '0')}:${String(slotMinute).padStart(2, '0')}:00+05:30`;
+        const slotStartTime = new Date(slotIso).getTime();
+
+        const cutoffTime = slotStartTime - (7 * 60 * 60 * 1000);
+        const nowTime = Date.now();
+
+        if (nowTime > cutoffTime) {
+          return res.status(400).json({
+            error: 'Cancellations are only permitted up to 7 hours before your scheduled slot arrival time.'
+          });
+        }
+      }
+    }
+
     let refundDetails = {
       refundId: null,
       refundAmount: 0,
@@ -1404,4 +1444,228 @@ export const getPublicActiveCoupons = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// ==========================================
+// SUBSCRIPTIONS (USER)
+// ==========================================
+export const getUserSubscriptionPlans = async (req, res) => {
+  try {
+    const { carTypeId } = req.query;
+    const settings = await prisma.systemSettings.findUnique({ where: { id: 1 } });
+    if (settings && settings.subscriptionsEnabled === false) {
+      return res.json({ subscriptionsEnabled: false, plans: [] });
+    }
+
+    const where = { active: true };
+    if (carTypeId) {
+      where.carTypeId = Number(carTypeId);
+    }
+
+    const plans = await prisma.subscriptionPlan.findMany({
+      where,
+      include: {
+        carType: true
+      },
+      orderBy: [
+        { carTypeId: 'asc' },
+        { price: 'asc' }
+      ]
+    });
+
+    res.json({ subscriptionsEnabled: true, plans });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const getMySubscriptions = async (req, res) => {
+  try {
+    const now = new Date();
+
+    // Auto-expire any active subscriptions whose validity ended or remaining washes completed
+    await prisma.userSubscription.updateMany({
+      where: {
+        userId: req.user.id,
+        status: 'ACTIVE',
+        OR: [
+          { washesRemaining: { lte: 0 } },
+          { endDate: { lt: now } }
+        ]
+      },
+      data: { status: 'EXPIRED' }
+    });
+
+    const subscriptions = await prisma.userSubscription.findMany({
+      where: { userId: req.user.id },
+      include: {
+        plan: true,
+        carType: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const activeSubscription = subscriptions.find(s => 
+      s.status === 'ACTIVE' && 
+      s.paymentStatus === 'PAID' && 
+      s.washesRemaining > 0 &&
+      new Date(s.endDate) > now
+    );
+
+    res.json({
+      activeSubscription: activeSubscription || null,
+      history: subscriptions
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const subscribeToPlan = async (req, res) => {
+  try {
+    const { planId } = req.body;
+    if (!planId) {
+      return res.status(400).json({ error: 'Subscription plan ID is required.' });
+    }
+
+    const settings = await prisma.systemSettings.findUnique({ where: { id: 1 } });
+    if (settings && settings.subscriptionsEnabled === false) {
+      return res.status(400).json({ error: 'Subscriptions are currently not active. Please check back later.' });
+    }
+
+    const plan = await prisma.subscriptionPlan.findUnique({
+      where: { id: Number(planId) },
+      include: { carType: true }
+    });
+
+    if (!plan || !plan.active) {
+      return res.status(404).json({ error: 'Subscription plan not found or is currently inactive.' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    const startDate = new Date();
+    const endDate = new Date(startDate.getTime() + (plan.durationDays || 30) * 24 * 60 * 60 * 1000);
+
+    if (plan.price > 0) {
+      const razorpay = getRazorpayInstance();
+      let rzpOrder = null;
+      try {
+        rzpOrder = await razorpay.orders.create({
+          amount: Math.round(plan.price * 100),
+          currency: 'INR',
+          receipt: `sub_${Date.now()}_${user.id}`.slice(-40),
+          notes: {
+            userId: String(user.id),
+            planId: String(plan.id),
+            planName: plan.name,
+            carTypeId: String(plan.carTypeId)
+          }
+        });
+      } catch (rzpErr) {
+        console.warn('Razorpay order creation fallback for subscription:', rzpErr.message);
+      }
+
+      const subscription = await prisma.userSubscription.create({
+        data: {
+          userId: user.id,
+          planId: plan.id,
+          carTypeId: plan.carTypeId,
+          startDate,
+          endDate,
+          price: plan.price,
+          washesTotal: plan.washesCount,
+          washesRemaining: plan.washesCount,
+          freeAddonsTotal: plan.freeAddonsCount,
+          freeAddonsRemaining: plan.freeAddonsCount,
+          status: rzpOrder ? 'PENDING' : 'ACTIVE',
+          paymentStatus: rzpOrder ? 'PENDING' : 'PAID',
+          razorpayOrderId: rzpOrder ? rzpOrder.id : null
+        },
+        include: {
+          plan: true,
+          carType: true
+        }
+      });
+
+      return res.json({
+        requiresPayment: !!rzpOrder,
+        rzpOrder,
+        subscription,
+        keyId: process.env.RAZORPAY_KEY_ID || ''
+      });
+    }
+
+    const subscription = await prisma.userSubscription.create({
+      data: {
+        userId: user.id,
+        planId: plan.id,
+        carTypeId: plan.carTypeId,
+        startDate,
+        endDate,
+        price: 0,
+        washesTotal: plan.washesCount,
+        washesRemaining: plan.washesCount,
+        freeAddonsTotal: plan.freeAddonsCount,
+        freeAddonsRemaining: plan.freeAddonsCount,
+        status: 'ACTIVE',
+        paymentStatus: 'PAID'
+      },
+      include: {
+        plan: true,
+        carType: true
+      }
+    });
+
+    res.json({ requiresPayment: false, subscription });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const verifySubscriptionPayment = async (req, res) => {
+  try {
+    const { subscriptionId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
+    if (!subscriptionId) {
+      return res.status(400).json({ error: 'Subscription ID is required.' });
+    }
+
+    const subscription = await prisma.userSubscription.findUnique({
+      where: { id: Number(subscriptionId) },
+      include: { plan: true, carType: true }
+    });
+
+    if (!subscription) {
+      return res.status(404).json({ error: 'Subscription record not found.' });
+    }
+
+    if (razorpayOrderId && razorpayPaymentId && razorpaySignature) {
+      const isValid = verifyRazorpaySignature(razorpayOrderId, razorpayPaymentId, razorpaySignature);
+      if (!isValid) {
+        return res.status(400).json({ error: 'Payment signature verification failed.' });
+      }
+    }
+
+    const updatedSubscription = await prisma.userSubscription.update({
+      where: { id: Number(subscriptionId) },
+      data: {
+        status: 'ACTIVE',
+        paymentStatus: 'PAID',
+        razorpayPaymentId: razorpayPaymentId || subscription.razorpayPaymentId,
+        razorpayOrderId: razorpayOrderId || subscription.razorpayOrderId
+      },
+      include: {
+        plan: true,
+        carType: true
+      }
+    });
+
+    res.json({ success: true, subscription: updatedSubscription });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 

@@ -1,10 +1,25 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Calendar, Car, Sparkles, Gift, Menu } from 'lucide-react';
+import { Calendar, Car, Sparkles, Gift, Menu, Crown } from 'lucide-react';
+import { getSettings } from '../api';
 
 const FloatingDock = ({ onOpenMenu }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [subscriptionsEnabled, setSubscriptionsEnabled] = useState(true);
+
+  useEffect(() => {
+    getSettings()
+      .then(res => {
+        if (res && res.subscriptionsEnabled !== undefined) {
+          setSubscriptionsEnabled(!!res.subscriptionsEnabled);
+        }
+      })
+      .catch(() => {
+        // Fallback to true if offline
+        setSubscriptionsEnabled(true);
+      });
+  }, []);
 
   const isCurrent = (path) => location.pathname === path;
 
@@ -133,32 +148,80 @@ const FloatingDock = ({ onOpenMenu }) => {
         </span>
       </div>
 
-      {/* 4. Rewards */}
-      <button
-        type="button"
-        onClick={() => navigate('/rewards')}
-        style={{
-          background: isCurrent('/rewards') ? '#F0F9FF' : 'transparent',
-          border: 'none',
-          borderRadius: '18px',
-          color: isCurrent('/rewards') ? '#0284C7' : '#64748B',
-          padding: '8px 4px',
-          cursor: 'pointer',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '3px',
-          fontSize: '0.7rem',
-          fontWeight: isCurrent('/rewards') ? 700 : 600,
-          transition: 'all 0.2s ease',
-          flex: 1,
-          minWidth: 0
-        }}
-      >
-        <Gift size={20} strokeWidth={isCurrent('/rewards') ? 2.4 : 1.9} color={isCurrent('/rewards') ? '#0284C7' : '#64748B'} />
-        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>Rewards</span>
-      </button>
+      {/* 4. Subscriptions (Highlighted in Gold!) instead of Rewards */}
+      {subscriptionsEnabled ? (
+        <button
+          type="button"
+          onClick={() => navigate('/subscriptions')}
+          style={{
+            background: isCurrent('/subscriptions') 
+              ? 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)' 
+              : 'linear-gradient(135deg, #FFFDF5 0%, #FFFBEB 100%)',
+            border: isCurrent('/subscriptions') ? '1.5px solid #F59E0B' : '1px solid rgba(245, 158, 11, 0.4)',
+            borderRadius: '18px',
+            color: '#B45309',
+            padding: '7px 4px 6px 4px',
+            cursor: 'pointer',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '2px',
+            fontSize: '0.7rem',
+            fontWeight: 800,
+            transition: 'all 0.25s ease',
+            flex: 1,
+            minWidth: 0,
+            boxShadow: isCurrent('/subscriptions') 
+              ? '0 4px 14px rgba(245, 158, 11, 0.45)' 
+              : '0 2px 6px rgba(245, 158, 11, 0.18)'
+          }}
+        >
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Crown size={20} strokeWidth={2.5} color="#D97706" />
+            <span style={{
+              position: 'absolute',
+              top: '-3px',
+              right: '-8px',
+              fontSize: '0.55rem',
+              fontWeight: 900,
+              color: '#B45309',
+              lineHeight: 1
+            }}>
+              ★
+            </span>
+          </div>
+          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', color: '#B45309', letterSpacing: '0.01em' }}>
+            VIP Pass
+          </span>
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => navigate('/rewards')}
+          style={{
+            background: isCurrent('/rewards') ? '#F0F9FF' : 'transparent',
+            border: 'none',
+            borderRadius: '18px',
+            color: isCurrent('/rewards') ? '#0284C7' : '#64748B',
+            padding: '8px 4px',
+            cursor: 'pointer',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '3px',
+            fontSize: '0.7rem',
+            fontWeight: isCurrent('/rewards') ? 700 : 600,
+            transition: 'all 0.2s ease',
+            flex: 1,
+            minWidth: 0
+          }}
+        >
+          <Gift size={20} strokeWidth={isCurrent('/rewards') ? 2.4 : 1.9} color={isCurrent('/rewards') ? '#0284C7' : '#64748B'} />
+          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>Rewards</span>
+        </button>
+      )}
 
       {/* 5. Menu */}
       <button

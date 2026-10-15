@@ -37,6 +37,40 @@ const StatusBadge = ({ status }) => {
   );
 };
 
+const canCancelBooking = (bookingDate, timeSlot) => {
+  if (!bookingDate || !timeSlot) return true;
+  try {
+    const d = new Date(bookingDate);
+    const year = d.getFullYear();
+    const month = d.getMonth();
+    const day = d.getDate();
+
+    // Parse start time from slot window e.g. "06:00 PM" or "08:30 AM - 10:30 AM"
+    const timeRegex = /(\d{1,2}):(\d{2})\s*(AM|PM)/i;
+    const match = String(timeSlot).match(timeRegex);
+    if (!match) return true;
+
+    let hour = parseInt(match[1], 10);
+    const minute = parseInt(match[2], 10);
+    const meridiem = match[3].toUpperCase();
+
+    if (meridiem === 'PM' && hour !== 12) hour += 12;
+    if (meridiem === 'AM' && hour === 12) hour = 0;
+
+    // Slot start timestamp on booking day
+    const slotStart = new Date(year, month, day, hour, minute, 0, 0);
+    const now = new Date();
+
+    const diffMs = slotStart.getTime() - now.getTime();
+    const diffHours = diffMs / (1000 * 60 * 60);
+
+    // Permitted strictly at least 7 hours before slot start time
+    return diffHours >= 7;
+  } catch (err) {
+    return true;
+  }
+};
+
 const Bookings = () => {
   const [bookings, setBookings] = useState([]);
   const [savedCars, setSavedCars] = useState([]);
@@ -353,31 +387,49 @@ const Bookings = () => {
 
             {/* Cancel Action Button for Active Bookings */}
             {['PENDING', 'ASSIGNED'].includes(booking.status) && (
-              <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '0.35rem' }}>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setCancellingBooking(booking);
-                    setCancelReason('');
-                  }}
-                  className="btn"
-                  style={{
-                    background: '#FEE2E2',
-                    color: '#DC2626',
-                    border: '1.5px solid #FCA5A5',
-                    padding: '0.45rem 1rem',
+              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.75rem', paddingTop: '0.35rem', flexWrap: 'wrap' }}>
+                {canCancelBooking(booking.date, booking.timeSlot) ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCancellingBooking(booking);
+                      setCancelReason('');
+                    }}
+                    className="btn"
+                    style={{
+                      background: '#FEE2E2',
+                      color: '#DC2626',
+                      border: '1.5px solid #FCA5A5',
+                      padding: '0.45rem 1rem',
+                      borderRadius: '8px',
+                      fontWeight: 700,
+                      fontSize: '0.82rem',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem'
+                    }}
+                  >
+                    <XCircle size={15} /> Cancel Booking & Refund
+                  </button>
+                ) : (
+                  <div style={{
+                    fontSize: '0.78rem',
+                    color: '#64748B',
+                    background: '#F1F5F9',
+                    border: '1px solid #E2E8F0',
+                    padding: '0.4rem 0.75rem',
                     borderRadius: '8px',
-                    fontWeight: 700,
-                    fontSize: '0.82rem',
-                    cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '0.4rem'
-                  }}
-                >
-                  <XCircle size={15} /> Cancel Booking & Refund
-                </button>
+                    gap: '0.35rem',
+                    fontWeight: 600
+                  }}>
+                    <Clock size={13} color="#94A3B8" />
+                    Cancellation closed (Allowed up to 7 hrs before slot arrival)
+                  </div>
+                )}
               </div>
             )}
           </div>
