@@ -1,0 +1,21 @@
+# robots.txt for Wash My Car Org (https://washmycar.org.in)
+User-agent: *
+Allow: /
+Allow: /services
+Allow: /subscriptions
+Allow: /book
+Allow: /login
+Allow: /register
+Allow: /favicon.png
+Allow: /logo.png
+
+# Disallow private user and admin routes from crawling
+Disallow: /dashboard
+Disallow: /profile
+Disallow: /bookings
+Disallow: /cars
+Disallow: /rewards
+Disallow: /api/
+
+# Sitemap location for Googlebot & search crawlers
+Sitemap: https://washmycar.org.in/sitemap.xml
