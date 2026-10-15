@@ -320,6 +320,72 @@ export const createBooking = async (req, res) => {
       });
     }
 
+    // Resolve / Link Car early so vehicle binding for VIP subscriptions is verified
+    let cleanCarNumber = carNumber ? String(carNumber).trim().toUpperCase() : null;
+    let finalCarId = carId ? Number(carId) : null;
+    if (finalCarId) {
+      const existingCar = await prisma.car.findUnique({ where: { id: finalCarId } });
+      if (existingCar) {
+        if (!cleanCarNumber && existingCar.carNumber) {
+          cleanCarNumber = existingCar.carNumber.trim().toUpperCase();
+        } else if (cleanCarNumber && existingCar.carNumber !== cleanCarNumber) {
+          await prisma.car.update({
+            where: { id: finalCarId },
+            data: { carNumber: cleanCarNumber }
+          }).catch(() => {});
+        }
+        if (!carMake) carMake = existingCar.make;
+        if (!carModel) carModel = existingCar.model;
+      }
+    } else if (carMake || carModel || cleanCarNumber) {
+      const newCar = await prisma.car.create({
+        data: {
+          userId: req.user.id,
+          make: carMake || 'Car',
+          model: carModel || 'Model',
+          carTypeId: Number(carTypeId),
+          carNumber: cleanCarNumber
+        }
+      });
+      finalCarId = newCar.id;
+    }
+
+    // 0. Active Subscription VIP Benefits Check (Strictly bound to chosen registered car)
+    await prisma.userSubscription.updateMany({
+      where: {
+        userId: req.user.id,
+        status: 'ACTIVE',
+        OR: [
+          { washesRemaining: { lte: 0 } },
+          { endDate: { lt: now } }
+        ]
+      },
+      data: { status: 'EXPIRED' }
+    });
+
+    const activeSubs = await prisma.userSubscription.findMany({
+      where: {
+        userId: req.user.id,
+        carTypeId: Number(carTypeId),
+        status: 'ACTIVE',
+        paymentStatus: 'PAID',
+        washesRemaining: { gt: 0 },
+        endDate: { gt: now }
+      },
+      include: { plan: true, car: true }
+    });
+
+    const normCarNum = (n) => (n || '').replace(/[^A-Z0-9]/gi, '').toUpperCase();
+    const bookingCarNumNorm = normCarNum(cleanCarNumber);
+
+    // Only the specific car bound to the subscription is eligible for VIP benefits
+    const activeSub = activeSubs.find(sub => {
+      if (finalCarId && sub.carId && Number(sub.carId) === Number(finalCarId)) return true;
+      if (sub.carNumber && bookingCarNumNorm && normCarNum(sub.carNumber) === bookingCarNumNorm) return true;
+      if (sub.car?.carNumber && bookingCarNumNorm && normCarNum(sub.car.carNumber) === bookingCarNumNorm) return true;
+      return false;
+    });
+
     // Fetch price setting for the combination
     const priceSetting = await prisma.washPrice.findUnique({
       where: {
@@ -334,9 +400,40 @@ export const createBooking = async (req, res) => {
       return res.status(400).json({ error: 'Selected service combination is not priced yet' });
     }
 
+    // Check if subscription covers the selected wash package
+    let isSubscriptionCovered = false;
+    let subscriptionWashDiscount = 0;
+    let subscriptionAddonDiscount = 0;
+    let subWashesList = [];
+    let subAddonsList = [];
+    let matchedWashItem = null;
+    let coveredAddonIds = [];
+
+    if (activeSub) {
+      try {
+        subWashesList = JSON.parse(activeSub.washesBreakdown || '[]');
+      } catch (e) {
+        subWashesList = [];
+      }
+
+      // Check if selected washTypeId has remaining quota in subscription
+      if (subWashesList.length > 0) {
+        matchedWashItem = subWashesList.find(w => (Number(w.washTypeId) === Number(washTypeId) || w.washTypeId === null) && Number(w.remaining) > 0);
+      } else if (activeSub.washesRemaining > 0) {
+        matchedWashItem = { washTypeId: Number(washTypeId), washTypeName: 'Wash', remaining: activeSub.washesRemaining };
+        subWashesList = [matchedWashItem];
+      }
+
+      if (matchedWashItem) {
+        isSubscriptionCovered = true;
+      }
+    }
+
     // Fetch and calculate selected addons
     let finalAddonIds = Array.isArray(addonIds) ? addonIds.map(Number) : [];
-    if (couponCode) {
+    
+    // In subscription car bookings, no promotional coupons or promo free add-ons are applied
+    if (couponCode && !isSubscriptionCovered) {
       const offerCheck = await prisma.offer.findUnique({ where: { code: couponCode, active: true } });
       if (offerCheck) {
         if (offerCheck.freeAddonId && !finalAddonIds.includes(Number(offerCheck.freeAddonId))) {
@@ -361,13 +458,53 @@ export const createBooking = async (req, res) => {
     }
 
     const baseWashPrice = priceSetting.price;
+    const actualWashPrice = (priceSetting.actualPrice && priceSetting.actualPrice > baseWashPrice)
+      ? priceSetting.actualPrice
+      : baseWashPrice;
+    const planDiscount = Math.max(0, actualWashPrice - baseWashPrice);
+
     const originalPrice = baseWashPrice + addonsTotal;
     let finalPrice = originalPrice;
     const companyCost = (priceSetting.companyCost || 0.0);
+
+    // Apply subscription coverage if applicable
+    if (isSubscriptionCovered && matchedWashItem) {
+      subscriptionWashDiscount = baseWashPrice;
+
+      try {
+        subAddonsList = JSON.parse(activeSub.addonsBreakdown || '[]');
+      } catch (e) {
+        subAddonsList = [];
+      }
+
+      if (subAddonsList.length > 0) {
+        selectedAddons.forEach(addon => {
+          const aMatch = subAddonsList.find(a => (Number(a.addonId) === Number(addon.id) || a.addonId === null) && Number(a.remaining) > 0);
+          if (aMatch && !coveredAddonIds.includes(addon.id)) {
+            subscriptionAddonDiscount += addon.price;
+            coveredAddonIds.push(addon.id);
+          }
+        });
+      } else if (activeSub.freeAddonsRemaining > 0) {
+        let remCount = activeSub.freeAddonsRemaining;
+        selectedAddons.forEach(addon => {
+          if (remCount > 0 && !coveredAddonIds.includes(addon.id)) {
+            subscriptionAddonDiscount += addon.price;
+            coveredAddonIds.push(addon.id);
+            remCount--;
+          }
+        });
+      }
+    }
+
+    const totalSubDiscount = subscriptionWashDiscount + subscriptionAddonDiscount;
+    finalPrice = Math.max(0, originalPrice - totalSubDiscount);
     
-    // 1. Coupon Discount Calculation
+    // 1. Coupon Discount Calculation (Not allowed on subscription-covered bookings)
     let appliedCode = null;
-    if (couponCode) {
+    let couponDiscount = 0;
+    let addonDiscount = 0;
+    if (couponCode && !isSubscriptionCovered && finalPrice > 0) {
       const offer = await prisma.offer.findUnique({
         where: { code: couponCode, active: true },
         include: { eligibleUsers: true }
@@ -435,28 +572,27 @@ export const createBooking = async (req, res) => {
         }
       }
 
-      let discount = 0;
       if (offer.discountType === 'FLAT') {
-        discount = offer.discountAmount;
+        couponDiscount = Math.min(finalPrice, offer.discountAmount);
       } else if (offer.discountType === 'PERCENTAGE') {
-        discount = (baseWashPrice * offer.discountPct) / 100;
+        couponDiscount = (baseWashPrice * offer.discountPct) / 100;
         if (offer.limitOption === 'UP_TO' && offer.maxDiscountAmount) {
-          discount = Math.min(discount, offer.maxDiscountAmount);
+          couponDiscount = Math.min(couponDiscount, offer.maxDiscountAmount);
         }
+        couponDiscount = Math.min(finalPrice, couponDiscount);
       } else {
-        discount = 0;
+        couponDiscount = 0;
       }
 
       // Addon-specific coupon discount
-      let addonDiscount = 0;
       if (offer.freeAddonId) {
-        const freeAddonMatch = selectedAddons.find(a => a.id === offer.freeAddonId);
+        const freeAddonMatch = selectedAddons.find(a => a.id === offer.freeAddonId && !coveredAddonIds.includes(a.id));
         if (freeAddonMatch) {
           addonDiscount += freeAddonMatch.price;
         }
       }
       if (offer.discountAddonId) {
-        const discAddonMatch = selectedAddons.find(a => a.id === offer.discountAddonId);
+        const discAddonMatch = selectedAddons.find(a => a.id === offer.discountAddonId && !coveredAddonIds.includes(a.id));
         if (discAddonMatch) {
           if (offer.addonDiscountType === 'FREE') {
             addonDiscount += discAddonMatch.price;
@@ -468,13 +604,14 @@ export const createBooking = async (req, res) => {
         }
       }
 
-      discount += addonDiscount;
-      finalPrice = Math.max(0, originalPrice - discount);
+      const totalOfferDiscount = couponDiscount + addonDiscount;
+      finalPrice = Math.max(0, finalPrice - totalOfferDiscount);
       appliedCode = offer.code;
     }
 
     // 2. Royalty Points Redemption
     let redeemedPoints = 0;
+    let pointsDiscount = 0;
     const settings = await prisma.systemSettings.findUnique({ where: { id: 1 } }) || {
       autoAssignment: true,
       pointsRedemption: true,
@@ -489,12 +626,17 @@ export const createBooking = async (req, res) => {
       const userPointsCashValue = user.points / settings.pointsToCashRatio;
       if (userPointsCashValue >= finalPrice) {
         redeemedPoints = Math.ceil(finalPrice * settings.pointsToCashRatio);
+        pointsDiscount = finalPrice;
         finalPrice = 0;
       } else {
         redeemedPoints = user.points;
+        pointsDiscount = userPointsCashValue;
         finalPrice = finalPrice - userPointsCashValue;
       }
     }
+
+    // Total Savings calculation across all benefits
+    const totalSavings = Math.round((planDiscount + totalSubDiscount + couponDiscount + addonDiscount + pointsDiscount) * 100) / 100;
 
     // Earn points based on cash paid
     const pointsEarned = settings.pointsReward
@@ -506,38 +648,6 @@ export const createBooking = async (req, res) => {
       employeePayout = (originalPrice * priceSetting.payoutValue) / 100;
     } else {
       employeePayout = priceSetting.payoutValue;
-    }
-
-    // Normalize car registration number
-    let cleanCarNumber = carNumber ? String(carNumber).trim().toUpperCase() : null;
-
-    // Save/link Car so car details & license registration number are ALWAYS preserved
-    let finalCarId = carId ? Number(carId) : null;
-    if (finalCarId) {
-      const existingCar = await prisma.car.findUnique({ where: { id: finalCarId } });
-      if (existingCar) {
-        if (!cleanCarNumber && existingCar.carNumber) {
-          cleanCarNumber = existingCar.carNumber;
-        } else if (cleanCarNumber && existingCar.carNumber !== cleanCarNumber) {
-          await prisma.car.update({
-            where: { id: finalCarId },
-            data: { carNumber: cleanCarNumber }
-          }).catch(() => {});
-        }
-        if (!carMake) carMake = existingCar.make;
-        if (!carModel) carModel = existingCar.model;
-      }
-    } else if (carMake || carModel || cleanCarNumber) {
-      const newCar = await prisma.car.create({
-        data: {
-          userId: req.user.id,
-          make: carMake || 'Car',
-          model: carModel || 'Model',
-          carTypeId: Number(carTypeId),
-          carNumber: cleanCarNumber
-        }
-      });
-      finalCarId = newCar.id;
     }
 
     // Save Address if requested
@@ -554,13 +664,38 @@ export const createBooking = async (req, res) => {
       });
     }
 
-    // If finalPrice is 0 (100% coupon or points): confirm booking immediately
+    // If finalPrice is 0 (VIP subscription covered, 100% coupon or points): confirm booking immediately
     if (finalPrice <= 0) {
       if (redeemedPoints > 0 || pointsEarned > 0) {
         await prisma.user.update({
           where: { id: req.user.id },
           data: {
             points: Math.max(0, user.points - redeemedPoints + pointsEarned)
+          }
+        });
+      }
+
+      // Deduct subscription quota if covered by VIP pass
+      if (isSubscriptionCovered && activeSub && matchedWashItem) {
+        matchedWashItem.remaining = Math.max(0, Number(matchedWashItem.remaining) - 1);
+        coveredAddonIds.forEach(addonId => {
+          const aMatch = subAddonsList.find(a => (Number(a.addonId) === Number(addonId) || a.addonId === null) && Number(a.remaining) > 0);
+          if (aMatch) {
+            aMatch.remaining = Math.max(0, Number(aMatch.remaining) - 1);
+          }
+        });
+        const newWashesRemaining = Math.max(0, activeSub.washesRemaining - 1);
+        const newFreeAddonsRemaining = Math.max(0, activeSub.freeAddonsRemaining - coveredAddonIds.length);
+        const shouldExpire = newWashesRemaining <= 0 || (subWashesList.length > 0 && subWashesList.every(w => Number(w.remaining) <= 0));
+
+        await prisma.userSubscription.update({
+          where: { id: activeSub.id },
+          data: {
+            washesRemaining: newWashesRemaining,
+            freeAddonsRemaining: newFreeAddonsRemaining,
+            washesBreakdown: JSON.stringify(subWashesList),
+            addonsBreakdown: JSON.stringify(subAddonsList),
+            status: shouldExpire ? 'EXPIRED' : 'ACTIVE'
           }
         });
       }
@@ -580,6 +715,12 @@ export const createBooking = async (req, res) => {
           latitude: Number(latitude),
           longitude: Number(longitude),
           address,
+          actualPrice: actualWashPrice,
+          planDiscount,
+          couponDiscount,
+          addonDiscount,
+          pointsDiscount,
+          totalSavings,
           price: 0,
           addonsTotal,
           employeePayout,
@@ -588,6 +729,9 @@ export const createBooking = async (req, res) => {
           pointsRedeemed: redeemedPoints,
           pointsEarned: pointsEarned,
           paymentStatus: 'PAID',
+          paymentMethod: isSubscriptionCovered ? 'SUBSCRIPTION' : (redeemedPoints > 0 ? 'POINTS' : 'FREE'),
+          userSubscriptionId: isSubscriptionCovered ? activeSub.id : null,
+          subscriptionCovered: isSubscriptionCovered,
           status: 'PENDING',
           ...(selectedAddons.length > 0 && {
             addons: {
@@ -703,6 +847,12 @@ export const createBooking = async (req, res) => {
         latitude: Number(latitude),
         longitude: Number(longitude),
         address,
+        actualPrice: actualWashPrice,
+        planDiscount,
+        couponDiscount,
+        addonDiscount,
+        pointsDiscount,
+        totalSavings,
         price: finalPrice,
         addonsTotal,
         employeePayout,
@@ -710,6 +860,8 @@ export const createBooking = async (req, res) => {
         appliedOfferCode: appliedCode,
         pointsRedeemed: redeemedPoints,
         pointsEarned: pointsEarned,
+        userSubscriptionId: isSubscriptionCovered ? activeSub.id : null,
+        subscriptionCovered: isSubscriptionCovered,
         paymentStatus: 'PENDING',
         status: 'PENDING_PAYMENT',
         razorpayOrderId: rzpOrder.id,
@@ -844,6 +996,51 @@ export const verifyBookingPayment = async (req, res) => {
           booking.carTypeId,
           booking.price
         );
+      }
+    }
+
+    // If this booking was partially or fully covered by a VIP subscription, decrement remaining quota now
+    if (booking.subscriptionCovered && booking.userSubscriptionId) {
+      try {
+        const sub = await prisma.userSubscription.findUnique({
+          where: { id: booking.userSubscriptionId }
+        });
+        if (sub && sub.status === 'ACTIVE') {
+          let washesList = JSON.parse(sub.washesBreakdown || '[]');
+          let washMatch = washesList.find(w => (Number(w.washTypeId) === Number(booking.washTypeId) || w.washTypeId === null) && Number(w.remaining) > 0);
+          if (washMatch) {
+            washMatch.remaining = Math.max(0, Number(washMatch.remaining) - 1);
+          }
+          const newWashesRemaining = Math.max(0, sub.washesRemaining - 1);
+
+          let addonsList = JSON.parse(sub.addonsBreakdown || '[]');
+          // Deduct any covered addons
+          let usedAddonsCount = 0;
+          if (booking.addons && booking.addons.length > 0) {
+            booking.addons.forEach(ba => {
+              const aMatch = addonsList.find(a => (Number(a.addonId) === Number(ba.addonId) || a.addonId === null) && Number(a.remaining) > 0);
+              if (aMatch) {
+                aMatch.remaining = Math.max(0, Number(aMatch.remaining) - 1);
+                usedAddonsCount++;
+              }
+            });
+          }
+          const newFreeAddonsRemaining = Math.max(0, sub.freeAddonsRemaining - usedAddonsCount);
+          const shouldExpire = newWashesRemaining <= 0 || (washesList.length > 0 && washesList.every(w => Number(w.remaining) <= 0));
+
+          await prisma.userSubscription.update({
+            where: { id: sub.id },
+            data: {
+              washesRemaining: newWashesRemaining,
+              freeAddonsRemaining: newFreeAddonsRemaining,
+              washesBreakdown: JSON.stringify(washesList),
+              addonsBreakdown: JSON.stringify(addonsList),
+              status: shouldExpire ? 'EXPIRED' : 'ACTIVE'
+            }
+          });
+        }
+      } catch (subErr) {
+        console.warn('Subscription quota deduction notice:', subErr);
       }
     }
 
@@ -1150,7 +1347,7 @@ export const getWashPrice = async (req, res) => {
         }
       }
     });
-    res.json(priceSetting || { price: 0, payoutType: 'PERCENTAGE', payoutValue: 0 });
+    res.json(priceSetting || { price: 0, actualPrice: 0, payoutType: 'PERCENTAGE', payoutValue: 0 });
   } catch (error) { 
     res.status(500).json({ error: error.message }); 
   }
@@ -1499,12 +1696,13 @@ export const getMySubscriptions = async (req, res) => {
       where: { userId: req.user.id },
       include: {
         plan: true,
-        carType: true
+        carType: true,
+        car: true
       },
       orderBy: { createdAt: 'desc' }
     });
 
-    const activeSubscription = subscriptions.find(s => 
+    const activeSubscriptions = subscriptions.filter(s => 
       s.status === 'ACTIVE' && 
       s.paymentStatus === 'PAID' && 
       s.washesRemaining > 0 &&
@@ -1512,7 +1710,8 @@ export const getMySubscriptions = async (req, res) => {
     );
 
     res.json({
-      activeSubscription: activeSubscription || null,
+      activeSubscription: activeSubscriptions[0] || null,
+      activeSubscriptions,
       history: subscriptions
     });
   } catch (error) {
@@ -1522,7 +1721,7 @@ export const getMySubscriptions = async (req, res) => {
 
 export const subscribeToPlan = async (req, res) => {
   try {
-    const { planId } = req.body;
+    const { planId, carId, carMake, carModel, carNumber, saveCar } = req.body;
     if (!planId) {
       return res.status(400).json({ error: 'Subscription plan ID is required.' });
     }
@@ -1546,8 +1745,91 @@ export const subscribeToPlan = async (req, res) => {
       return res.status(404).json({ error: 'User not found.' });
     }
 
+    // Resolve and bind vehicle
+    let boundCarId = carId ? Number(carId) : null;
+    let boundCarNumber = carNumber ? String(carNumber).trim().toUpperCase() : null;
+    let boundCarMake = carMake ? String(carMake).trim() : null;
+    let boundCarModel = carModel ? String(carModel).trim() : null;
+
+    if (boundCarId) {
+      const existingCar = await prisma.car.findFirst({
+        where: { id: boundCarId, userId: req.user.id }
+      });
+      if (existingCar) {
+        if (!boundCarNumber && existingCar.carNumber) boundCarNumber = existingCar.carNumber.trim().toUpperCase();
+        if (boundCarNumber && existingCar.carNumber !== boundCarNumber) {
+          await prisma.car.update({
+            where: { id: boundCarId },
+            data: { carNumber: boundCarNumber }
+          }).catch(() => {});
+        }
+        if (!boundCarMake) boundCarMake = existingCar.make;
+        if (!boundCarModel) boundCarModel = existingCar.model;
+      }
+    } else if (boundCarNumber || boundCarMake || boundCarModel) {
+      // Create car entry for user
+      const createdCar = await prisma.car.create({
+        data: {
+          userId: req.user.id,
+          make: boundCarMake || 'Car',
+          model: boundCarModel || 'Model',
+          carTypeId: plan.carTypeId,
+          carNumber: boundCarNumber
+        }
+      });
+      boundCarId = createdCar.id;
+    }
+
     const startDate = new Date();
     const endDate = new Date(startDate.getTime() + (plan.durationDays || 30) * 24 * 60 * 60 * 1000);
+
+    // Parse plan's included washes
+    let initialWashesBreakdown = [];
+    if (plan.includedWashes) {
+      try {
+        const arr = JSON.parse(plan.includedWashes);
+        if (Array.isArray(arr) && arr.length > 0) {
+          initialWashesBreakdown = arr.map(w => ({
+            washTypeId: Number(w.washTypeId),
+            washTypeName: w.washTypeName || 'Wash',
+            total: Number(w.count) || 0,
+            remaining: Number(w.count) || 0
+          }));
+        }
+      } catch (e) {}
+    }
+    if (initialWashesBreakdown.length === 0) {
+      initialWashesBreakdown = [{
+        washTypeId: null,
+        washTypeName: 'Any Wash',
+        total: plan.washesCount || 4,
+        remaining: plan.washesCount || 4
+      }];
+    }
+
+    // Parse plan's included addons
+    let initialAddonsBreakdown = [];
+    if (plan.includedAddons) {
+      try {
+        const arr = JSON.parse(plan.includedAddons);
+        if (Array.isArray(arr) && arr.length > 0) {
+          initialAddonsBreakdown = arr.map(a => ({
+            addonId: Number(a.addonId),
+            addonName: a.addonName || 'Add-on',
+            total: Number(a.count) || 0,
+            remaining: Number(a.count) || 0
+          }));
+        }
+      } catch (e) {}
+    }
+    if (initialAddonsBreakdown.length === 0 && plan.freeAddonsCount > 0) {
+      initialAddonsBreakdown = [{
+        addonId: null,
+        addonName: 'Any Addon',
+        total: plan.freeAddonsCount,
+        remaining: plan.freeAddonsCount
+      }];
+    }
 
     if (plan.price > 0) {
       const razorpay = getRazorpayInstance();
@@ -1561,7 +1843,8 @@ export const subscribeToPlan = async (req, res) => {
             userId: String(user.id),
             planId: String(plan.id),
             planName: plan.name,
-            carTypeId: String(plan.carTypeId)
+            carTypeId: String(plan.carTypeId),
+            carNumber: boundCarNumber || ''
           }
         });
       } catch (rzpErr) {
@@ -1573,20 +1856,27 @@ export const subscribeToPlan = async (req, res) => {
           userId: user.id,
           planId: plan.id,
           carTypeId: plan.carTypeId,
+          carId: boundCarId,
+          carNumber: boundCarNumber,
+          carMake: boundCarMake,
+          carModel: boundCarModel,
           startDate,
           endDate,
           price: plan.price,
           washesTotal: plan.washesCount,
           washesRemaining: plan.washesCount,
+          washesBreakdown: JSON.stringify(initialWashesBreakdown),
           freeAddonsTotal: plan.freeAddonsCount,
           freeAddonsRemaining: plan.freeAddonsCount,
+          addonsBreakdown: JSON.stringify(initialAddonsBreakdown),
           status: rzpOrder ? 'PENDING' : 'ACTIVE',
           paymentStatus: rzpOrder ? 'PENDING' : 'PAID',
           razorpayOrderId: rzpOrder ? rzpOrder.id : null
         },
         include: {
           plan: true,
-          carType: true
+          carType: true,
+          car: true
         }
       });
 
@@ -1603,19 +1893,26 @@ export const subscribeToPlan = async (req, res) => {
         userId: user.id,
         planId: plan.id,
         carTypeId: plan.carTypeId,
+        carId: boundCarId,
+        carNumber: boundCarNumber,
+        carMake: boundCarMake,
+        carModel: boundCarModel,
         startDate,
         endDate,
         price: 0,
         washesTotal: plan.washesCount,
         washesRemaining: plan.washesCount,
+        washesBreakdown: JSON.stringify(initialWashesBreakdown),
         freeAddonsTotal: plan.freeAddonsCount,
         freeAddonsRemaining: plan.freeAddonsCount,
+        addonsBreakdown: JSON.stringify(initialAddonsBreakdown),
         status: 'ACTIVE',
         paymentStatus: 'PAID'
       },
       include: {
         plan: true,
-        carType: true
+        carType: true,
+        car: true
       }
     });
 
@@ -1634,7 +1931,7 @@ export const verifySubscriptionPayment = async (req, res) => {
 
     const subscription = await prisma.userSubscription.findUnique({
       where: { id: Number(subscriptionId) },
-      include: { plan: true, carType: true }
+      include: { plan: true, carType: true, car: true }
     });
 
     if (!subscription) {
@@ -1658,7 +1955,8 @@ export const verifySubscriptionPayment = async (req, res) => {
       },
       include: {
         plan: true,
-        carType: true
+        carType: true,
+        car: true
       }
     });
 

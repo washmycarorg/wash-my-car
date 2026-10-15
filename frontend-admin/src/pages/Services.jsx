@@ -178,10 +178,15 @@ const Services = () => {
   const handleSavePriceCell = async () => {
     if (!editingCell) return;
     try {
+      const numPrice = Number(editingCell.price) || 0;
+      const numActual = editingCell.actualPrice !== '' && editingCell.actualPrice !== undefined
+        ? Number(editingCell.actualPrice)
+        : numPrice;
       await saveWashPrice({
         carTypeId: editingCell.carTypeId,
         washTypeId: editingCell.washTypeId,
-        price: Number(editingCell.price),
+        actualPrice: numActual,
+        price: numPrice,
         payoutType: editingCell.payoutType,
         payoutValue: Number(editingCell.payoutValue),
         companyCost: Number(editingCell.companyCost || 0)
@@ -196,6 +201,7 @@ const Services = () => {
 
   const getPriceInfo = (carTypeId, washTypeId) => {
     return prices.find(p => p.carTypeId === carTypeId && p.washTypeId === washTypeId) || {
+      actualPrice: 0,
       price: 0,
       payoutType: 'PERCENTAGE',
       payoutValue: 50.0,
@@ -329,14 +335,36 @@ const Services = () => {
                             margin: '0 auto'
                           }}>
                             <div>
-                              <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, textAlign: 'left' }}>Price (₹)</label>
+                              <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#64748B', textAlign: 'left' }}>
+                                Actual Price (Standard / MRP) (₹)
+                              </label>
                               <input 
                                 type="number" 
                                 className="form-input" 
-                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.85rem', marginBottom: 0 }}
-                                value={editingCell.price}
+                                placeholder="e.g. 699"
+                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.85rem', marginBottom: '2px' }}
+                                value={editingCell.actualPrice ?? ''}
+                                onChange={e => setEditingCell({ ...editingCell, actualPrice: e.target.value })}
+                              />
+                              <span style={{ fontSize: '0.62rem', color: '#94A3B8', display: 'block', textAlign: 'left' }}>
+                                Strike-through price on user portal
+                              </span>
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#0369A1', textAlign: 'left' }}>
+                                Giving Price (Our Offer Price) (₹)
+                              </label>
+                              <input 
+                                type="number" 
+                                className="form-input" 
+                                placeholder="e.g. 499"
+                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.85rem', marginBottom: '2px', fontWeight: 700 }}
+                                value={editingCell.price ?? ''}
                                 onChange={e => setEditingCell({ ...editingCell, price: e.target.value })}
                               />
+                              <span style={{ fontSize: '0.62rem', color: '#94A3B8', display: 'block', textAlign: 'left' }}>
+                                Final base price charged to customer
+                              </span>
                             </div>
                             <div>
                               <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, textAlign: 'left' }}>Commission Type</label>
@@ -384,6 +412,7 @@ const Services = () => {
                             onClick={() => setEditingCell({
                               carTypeId: ct.id,
                               washTypeId: wt.id,
+                              actualPrice: priceInfo.actualPrice || priceInfo.price || '',
                               price: priceInfo.price,
                               payoutType: priceInfo.payoutType,
                               payoutValue: priceInfo.payoutValue,
@@ -397,24 +426,43 @@ const Services = () => {
                               background: priceInfo.price > 0 ? '#F0FDF4' : '#FFF7ED',
                               transition: 'all 0.2s',
                               display: 'inline-block',
-                              minWidth: '120px'
+                              minWidth: '130px'
                             }}
                             className="hover:border-primary-blue"
                           >
-                            <div style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--primary-navy)' }}>
+                            {priceInfo.actualPrice > priceInfo.price && (
+                              <div style={{ fontSize: '0.75rem', color: '#94A3B8', textDecoration: 'line-through' }}>
+                                ₹{priceInfo.actualPrice}
+                              </div>
+                            )}
+                            <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--primary-navy)' }}>
                               ₹{priceInfo.price}
                             </div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                            {priceInfo.actualPrice > priceInfo.price && (
+                              <span style={{
+                                fontSize: '0.62rem',
+                                fontWeight: 800,
+                                background: '#DCFCE7',
+                                color: '#166534',
+                                padding: '1px 5px',
+                                borderRadius: '4px',
+                                display: 'inline-block',
+                                marginTop: '1px'
+                              }}>
+                                Save ₹{priceInfo.actualPrice - priceInfo.price}
+                              </span>
+                            )}
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
                               Emp: {priceInfo.payoutType === 'PERCENTAGE' ? `${priceInfo.payoutValue}%` : `₹${priceInfo.payoutValue}`}
                             </div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                               Co. Cost: ₹{priceInfo.companyCost || 0}
                             </div>
                             {priceInfo.price > 0 && (() => {
                               const empPayout = priceInfo.payoutType === 'PERCENTAGE' ? (priceInfo.price * priceInfo.payoutValue) / 100 : priceInfo.payoutValue;
                               const netProfit = priceInfo.price - empPayout - (priceInfo.companyCost || 0);
                               return (
-                                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: netProfit >= 0 ? 'var(--success)' : 'var(--danger)', marginTop: '0.1rem' }}>
+                                <div style={{ fontSize: '0.72rem', fontWeight: 600, color: netProfit >= 0 ? 'var(--success)' : 'var(--danger)', marginTop: '0.1rem' }}>
                                   Net: ₹{netProfit}
                                 </div>
                               );

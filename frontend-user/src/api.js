@@ -330,11 +330,12 @@ export const getMySubscriptions = async () => {
   return res.json();
 };
 
-export const subscribeToPlan = async (planId) => {
+export const subscribeToPlan = async (payload) => {
+  const body = typeof payload === 'object' ? payload : { planId: payload };
   const res = await fetch(`${API_URL}/users/subscriptions/subscribe`, {
     method: 'POST',
     headers: getHeaders(),
-    body: JSON.stringify({ planId })
+    body: JSON.stringify(body)
   });
   if (!res.ok) {
     const errorText = await res.text();

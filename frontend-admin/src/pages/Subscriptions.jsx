@@ -6,7 +6,10 @@ import {
   deleteSubscriptionPlan, 
   getSubscribers,
   getCarTypes,
-  getAddons
+  getWashTypes,
+  getAddons,
+  getSettings,
+  updateSettings
 } from '../api';
 import { 
   Crown, Plus, Edit2, Trash2, CheckCircle, XCircle, 
@@ -14,12 +17,21 @@ import {
   AlertCircle, Check, X, RefreshCw
 } from 'lucide-react';
 
+const DEFAULT_SUBSCRIPTION_TERMS = `1. Non-Refundable Policy: Once subscribed, the subscription pass amount is strictly non-refundable under any circumstances.
+2. Single Vehicle Binding: This VIP Pass is exclusively linked and valid for the single registered vehicle (Registration number, make & model) chosen during purchase. Benefits cannot be shared or transferred to any other vehicle.
+3. Doorstep Infrastructure Requirements: Customer agrees to provide domestic water tap connection, electricity plug point within reachable distance, and adequate clear workspace around the vehicle for safe technician cleaning.
+4. Service Availability & Demand Holds: In cases of severe weather, technical equipment maintenance, high seasonal demand, or technician shortage, bookings may occasionally be placed on hold or rescheduled with prior intimation.
+5. Plan Validity & Limit Expiration: All included washes and complimentary add-ons are valid strictly within the duration time span specified in the plan (e.g., 30 days). Any unused quota expires automatically upon plan end date. If all included wash limits are completed before the end date, the pass will expire earlier.`;
+
 const Subscriptions = () => {
-  const [activeTab, setActiveTab] = useState('plans'); // 'plans' | 'subscribers'
+  const [activeTab, setActiveTab] = useState('plans'); // 'plans' | 'subscribers' | 'terms'
   const [plans, setPlans] = useState([]);
   const [subscribers, setSubscribers] = useState([]);
   const [carTypes, setCarTypes] = useState([]);
+  const [washTypes, setWashTypes] = useState([]);
   const [addonsList, setAddonsList] = useState([]);
+  const [subscriptionTermsText, setSubscriptionTermsText] = useState(DEFAULT_SUBSCRIPTION_TERMS);
+  const [termsSaving, setTermsSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -40,12 +52,12 @@ const Subscriptions = () => {
     price: '',
     originalPrice: '',
     washesCount: 4,
-    freeAddonsCount: 2,
+    includedWashes: [],
+    freeAddonsCount: 0,
+    includedAddons: [],
     freeAddonIds: '',
     badge: 'MOST POPULAR',
     features: [
-      '4 Complete Doorstep Foam Washes',
-      '2 Free Add-on Services (Bike wash/Sanitization)',
       'Priority Slot Dispatch',
       'Zero Rescheduling Fee'
     ],
@@ -56,17 +68,25 @@ const Subscriptions = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [plansData, subscribersData, carTypesData, addonsData] = await Promise.all([
+      const [plansData, subscribersData, carTypesData, washTypesData, addonsData, settingsData] = await Promise.all([
         getSubscriptionPlans().catch(() => []),
         getSubscribers().catch(() => []),
         getCarTypes().catch(() => []),
-        getAddons().catch(() => [])
+        getWashTypes().catch(() => []),
+        getAddons().catch(() => []),
+        getSettings().catch(() => ({}))
       ]);
 
       setPlans(Array.isArray(plansData) ? plansData : []);
       setSubscribers(Array.isArray(subscribersData) ? subscribersData : []);
       setCarTypes(Array.isArray(carTypesData) ? carTypesData : []);
+      setWashTypes(Array.isArray(washTypesData) ? washTypesData : []);
       setAddonsList(Array.isArray(addonsData) ? addonsData : []);
+      if (settingsData && settingsData.subscriptionTermsText) {
+        setSubscriptionTermsText(settingsData.subscriptionTermsText);
+      } else {
+        setSubscriptionTermsText(DEFAULT_SUBSCRIPTION_TERMS);
+      }
     } catch (err) {
       setError(err.message || 'Failed to load subscription data');
     } finally {
@@ -74,12 +94,67 @@ const Subscriptions = () => {
     }
   };
 
+  const handleSaveTerms = async () => {
+    if (!subscriptionTermsText.trim()) {
+      alert('Subscription terms cannot be empty.');
+      return;
+    }
+    setTermsSaving(true);
+    setError(null);
+    try {
+      await updateSettings({ subscriptionTermsText: subscriptionTermsText.trim() });
+      setSuccessMsg('Subscription terms & conditions updated successfully!');
+      setTimeout(() => setSuccessMsg(null), 4000);
+    } catch (err) {
+      alert(err.message || 'Failed to update subscription terms');
+    } finally {
+      setTermsSaving(false);
+    }
+  };
+
   useEffect(() => {
     loadData();
   }, []);
 
+  const handleUpdateWashCount = (washTypeId, count) => {
+    const wt = washTypes.find(w => Number(w.id) === Number(washTypeId));
+    const list = [...(formData.includedWashes || [])];
+    const idx = list.findIndex(w => Number(w.washTypeId) === Number(washTypeId));
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], count: Number(count) };
+    } else {
+      list.push({ washTypeId: Number(washTypeId), washTypeName: wt?.name || 'Wash', count: Number(count) });
+    }
+    const totalW = list.reduce((sum, item) => sum + (Number(item.count) || 0), 0);
+    setFormData(prev => ({ ...prev, includedWashes: list, washesCount: totalW }));
+  };
+
+  const handleUpdateAddonCount = (addonId, count) => {
+    const ad = addonsList.find(a => Number(a.id) === Number(addonId));
+    const list = [...(formData.includedAddons || [])];
+    const idx = list.findIndex(a => Number(a.addonId) === Number(addonId));
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], count: Number(count) };
+    } else {
+      list.push({ addonId: Number(addonId), addonName: ad?.name || 'Add-on', count: Number(count) });
+    }
+    const totalA = list.reduce((sum, item) => sum + (Number(item.count) || 0), 0);
+    setFormData(prev => ({ ...prev, includedAddons: list, freeAddonsCount: totalA }));
+  };
+
   const openCreateModal = () => {
     setEditingPlan(null);
+    const defaultWashes = washTypes.map((wt, idx) => ({
+      washTypeId: wt.id,
+      washTypeName: wt.name,
+      count: idx === 0 ? 4 : 0
+    }));
+    const defaultAddons = addonsList.map(a => ({
+      addonId: a.id,
+      addonName: a.name,
+      count: 0
+    }));
+
     setFormData({
       name: '',
       description: '',
@@ -89,14 +164,14 @@ const Subscriptions = () => {
       price: '',
       originalPrice: '',
       washesCount: 4,
-      freeAddonsCount: 2,
+      includedWashes: defaultWashes,
+      freeAddonsCount: 0,
+      includedAddons: defaultAddons,
       freeAddonIds: '',
       badge: 'MOST POPULAR',
       features: [
-        '4 Complete Doorstep Foam Washes',
-        '2 Free Add-on Services (Bike wash/Sanitization)',
-        'Priority Slot Dispatch',
-        'Zero Rescheduling Fee'
+        'Priority Doorstep Slot Dispatch',
+        'Zero Cancellation & Rescheduling Fees'
       ],
       active: true
     });
@@ -113,6 +188,46 @@ const Subscriptions = () => {
       parsedFeatures = [plan.features];
     }
 
+    let parsedWashes = [];
+    try {
+      parsedWashes = typeof plan.includedWashes === 'string' ? JSON.parse(plan.includedWashes) : (plan.includedWashes || []);
+    } catch (e) {}
+    if (!Array.isArray(parsedWashes) || parsedWashes.length === 0) {
+      parsedWashes = washTypes.map((wt, idx) => ({
+        washTypeId: wt.id,
+        washTypeName: wt.name,
+        count: idx === 0 ? (plan.washesCount || 4) : 0
+      }));
+    } else {
+      // Ensure all current washTypes are present
+      washTypes.forEach(wt => {
+        if (!parsedWashes.some(pw => Number(pw.washTypeId) === Number(wt.id))) {
+          parsedWashes.push({ washTypeId: wt.id, washTypeName: wt.name, count: 0 });
+        }
+      });
+    }
+
+    let parsedAddons = [];
+    try {
+      parsedAddons = typeof plan.includedAddons === 'string' ? JSON.parse(plan.includedAddons) : (plan.includedAddons || []);
+    } catch (e) {}
+    if (!Array.isArray(parsedAddons) || parsedAddons.length === 0) {
+      parsedAddons = addonsList.map(a => ({
+        addonId: a.id,
+        addonName: a.name,
+        count: 0
+      }));
+    } else {
+      addonsList.forEach(a => {
+        if (!parsedAddons.some(pa => Number(pa.addonId) === Number(a.id))) {
+          parsedAddons.push({ addonId: a.id, addonName: a.name, count: 0 });
+        }
+      });
+    }
+
+    const totalW = parsedWashes.reduce((sum, item) => sum + (Number(item.count) || 0), 0);
+    const totalA = parsedAddons.reduce((sum, item) => sum + (Number(item.count) || 0), 0);
+
     setFormData({
       name: plan.name || '',
       description: plan.description || '',
@@ -121,8 +236,10 @@ const Subscriptions = () => {
       durationLabel: plan.durationLabel || '1 Month',
       price: plan.price || '',
       originalPrice: plan.originalPrice || '',
-      washesCount: plan.washesCount || 4,
-      freeAddonsCount: plan.freeAddonsCount || 0,
+      washesCount: totalW || plan.washesCount || 4,
+      includedWashes: parsedWashes,
+      freeAddonsCount: totalA || plan.freeAddonsCount || 0,
+      includedAddons: parsedAddons,
       freeAddonIds: plan.freeAddonIds || '',
       badge: plan.badge || '',
       features: Array.isArray(parsedFeatures) ? parsedFeatures : [],
@@ -155,6 +272,12 @@ const Subscriptions = () => {
       return;
     }
 
+    const totalW = (formData.includedWashes || []).reduce((sum, item) => sum + (Number(item.count) || 0), 0);
+    if (totalW <= 0) {
+      alert('Please configure at least 1 wash in this subscription pass.');
+      return;
+    }
+
     setActionLoading(true);
     setError(null);
     try {
@@ -166,8 +289,10 @@ const Subscriptions = () => {
         durationLabel: formData.durationLabel,
         price: Number(formData.price),
         originalPrice: formData.originalPrice ? Number(formData.originalPrice) : null,
-        washesCount: Number(formData.washesCount) || 0,
-        freeAddonsCount: Number(formData.freeAddonsCount) || 0,
+        washesCount: totalW,
+        includedWashes: formData.includedWashes,
+        freeAddonsCount: (formData.includedAddons || []).reduce((sum, item) => sum + (Number(item.count) || 0), 0),
+        includedAddons: formData.includedAddons,
         freeAddonIds: formData.freeAddonIds,
         badge: formData.badge,
         features: formData.features,
@@ -345,6 +470,25 @@ const Subscriptions = () => {
         >
           <Users size={18} /> Active Members & Subscribers ({subscribers.length})
         </button>
+
+        <button
+          onClick={() => setActiveTab('terms')}
+          style={{
+            padding: '0.75rem 1.25rem',
+            background: 'transparent',
+            border: 'none',
+            borderBottom: activeTab === 'terms' ? '3px solid #D97706' : '3px solid transparent',
+            color: activeTab === 'terms' ? '#B45309' : '#64748B',
+            fontWeight: activeTab === 'terms' ? 700 : 500,
+            fontSize: '0.95rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <Shield size={18} /> Terms & Policy Setup
+        </button>
       </div>
 
       {/* TAB 1: Subscription Plans */}
@@ -418,6 +562,16 @@ const Subscriptions = () => {
                 } catch (e) {
                   parsedFeatures = [plan.features];
                 }
+
+                let parsedIncludedWashes = [];
+                try {
+                  parsedIncludedWashes = typeof plan.includedWashes === 'string' ? JSON.parse(plan.includedWashes) : (plan.includedWashes || []);
+                } catch (e) {}
+
+                let parsedIncludedAddons = [];
+                try {
+                  parsedIncludedAddons = typeof plan.includedAddons === 'string' ? JSON.parse(plan.includedAddons) : (plan.includedAddons || []);
+                } catch (e) {}
 
                 return (
                   <div
@@ -549,6 +703,49 @@ const Subscriptions = () => {
                         </div>
                       </div>
 
+                      {/* Package Breakdown Badges */}
+                      {(parsedIncludedWashes.some(w => Number(w.count) > 0) || parsedIncludedAddons.some(a => Number(a.count) > 0)) && (
+                        <div style={{
+                          background: '#F8FAFC',
+                          border: '1px solid #E2E8F0',
+                          borderRadius: '10px',
+                          padding: '0.65rem 0.75rem',
+                          marginBottom: '1rem',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.4rem'
+                        }}>
+                          {parsedIncludedWashes.filter(w => Number(w.count) > 0).length > 0 && (
+                            <div>
+                              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#92400E', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                Included Washes Breakdown:
+                              </div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginTop: '0.2rem' }}>
+                                {parsedIncludedWashes.filter(w => Number(w.count) > 0).map((w, idx) => (
+                                  <span key={idx} style={{ background: '#FEF3C7', color: '#78350F', border: '1px solid #FDE68A', fontSize: '0.72rem', fontWeight: 700, padding: '2px 7px', borderRadius: '6px' }}>
+                                    {w.count}x {w.washTypeName}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {parsedIncludedAddons.filter(a => Number(a.count) > 0).length > 0 && (
+                            <div>
+                              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                Included Free Add-ons:
+                              </div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginTop: '0.2rem' }}>
+                                {parsedIncludedAddons.filter(a => Number(a.count) > 0).map((a, idx) => (
+                                  <span key={idx} style={{ background: '#DCFCE7', color: '#14532D', border: '1px solid #BBF7D0', fontSize: '0.72rem', fontWeight: 700, padding: '2px 7px', borderRadius: '6px' }}>
+                                    {a.count}x Free {a.addonName}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       {/* Features Bullet List */}
                       <div style={{ flex: 1, marginBottom: '1.25rem' }}>
                         <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>
@@ -630,7 +827,7 @@ const Subscriptions = () => {
                 <thead>
                   <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase' }}>
                     <th style={{ padding: '0.85rem 1rem' }}>User / Contact</th>
-                    <th style={{ padding: '0.85rem 1rem' }}>Vehicle</th>
+                    <th style={{ padding: '0.85rem 1rem' }}>Bound Vehicle</th>
                     <th style={{ padding: '0.85rem 1rem' }}>Subscription Plan</th>
                     <th style={{ padding: '0.85rem 1rem' }}>Washes Left</th>
                     <th style={{ padding: '0.85rem 1rem' }}>Free Add-ons</th>
@@ -648,9 +845,28 @@ const Subscriptions = () => {
                           <div style={{ fontSize: '0.8rem', color: '#64748B' }}>{sub.user?.phone || 'No Phone'}</div>
                         </td>
                         <td style={{ padding: '0.85rem 1rem' }}>
-                          <span style={{ background: '#E0F2FE', color: '#0369A1', fontSize: '0.75rem', fontWeight: 700, padding: '3px 8px', borderRadius: '12px' }}>
-                            {sub.carType?.name || 'Standard'}
-                          </span>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                            <div style={{ fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                              <Car size={14} color="#D97706" />
+                              <span>{sub.carNumber || sub.car?.carNumber || 'Unassigned Car'}</span>
+                            </div>
+                            {(sub.carMake || sub.carModel || sub.car?.make) && (
+                              <div style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>
+                                {[sub.carMake || sub.car?.make, sub.carModel || sub.car?.model].filter(Boolean).join(' ')}
+                              </div>
+                            )}
+                            <span style={{
+                              background: '#E0F2FE',
+                              color: '#0369A1',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              padding: '2px 7px',
+                              borderRadius: '8px',
+                              alignSelf: 'flex-start'
+                            }}>
+                              {sub.carType?.name || 'Standard'}
+                            </span>
+                          </div>
                         </td>
                         <td style={{ padding: '0.85rem 1rem' }}>
                           <div style={{ fontWeight: 600, color: '#1E293B' }}>{sub.plan?.name || 'VIP Pass'}</div>
@@ -688,6 +904,112 @@ const Subscriptions = () => {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* TAB 3: Subscription Terms & Conditions Setup */}
+      {activeTab === 'terms' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* Information Card */}
+          <div style={{
+            background: 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)',
+            border: '1.5px solid #FCD34D',
+            borderRadius: '16px',
+            padding: '1.5rem',
+            color: '#78350F'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
+              <Shield size={22} color="#D97706" />
+              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#92400E' }}>
+                VIP Subscription Terms & Customer Agreement Configuration
+              </h3>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.88rem', lineHeight: 1.6, color: '#92400E' }}>
+              Customers must review and check an agreement box acknowledging these exact legal terms before Razorpay checkout or VIP pass activation. You can update or amend these policies anytime.
+            </p>
+          </div>
+
+          {/* Editor Container */}
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: '16px',
+            border: '1.5px solid #E2E8F0',
+            padding: '1.5rem',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.05)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div>
+                <label style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1E293B', display: 'block', margin: 0 }}>
+                  Subscription Terms & Conditions (Shown to Users Before Payment)
+                </label>
+                <span style={{ fontSize: '0.8rem', color: '#64748B' }}>
+                  Keep numbered clauses clear, professional, and transparent.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSubscriptionTermsText(DEFAULT_SUBSCRIPTION_TERMS)}
+                className="btn btn-outline"
+                style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem', color: '#D97706', borderColor: '#FCD34D' }}
+              >
+                Reset to Recommended Standard
+              </button>
+            </div>
+
+            <textarea
+              rows={12}
+              value={subscriptionTermsText}
+              onChange={(e) => setSubscriptionTermsText(e.target.value)}
+              placeholder="Enter official VIP membership terms and conditions..."
+              style={{
+                width: '100%',
+                padding: '1rem',
+                borderRadius: '12px',
+                border: '1.5px solid #CBD5E1',
+                fontSize: '0.92rem',
+                lineHeight: 1.6,
+                fontFamily: 'inherit',
+                color: '#1E293B',
+                boxSizing: 'border-box',
+                resize: 'vertical'
+              }}
+            />
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div style={{ fontSize: '0.8rem', color: '#64748B' }}>
+                Character count: <strong>{subscriptionTermsText.length}</strong>
+              </div>
+              <button
+                type="button"
+                onClick={handleSaveTerms}
+                disabled={termsSaving}
+                style={{
+                  background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.75rem 2rem',
+                  borderRadius: '10px',
+                  fontWeight: 800,
+                  fontSize: '0.92rem',
+                  cursor: termsSaving ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  boxShadow: '0 4px 14px rgba(245, 158, 11, 0.35)'
+                }}
+              >
+                {termsSaving ? (
+                  <>
+                    <RefreshCw className="animate-spin" size={16} /> Saving Terms...
+                  </>
+                ) : (
+                  <>
+                    <Check size={18} /> Save Subscription Terms & Policy
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -846,38 +1168,263 @@ const Subscriptions = () => {
                 </div>
               </div>
 
-              {/* Row 3: Washes Count & Free Add-ons Count */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                    Doorstep Washes Included *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min="1"
-                    placeholder="e.g. 4"
-                    value={formData.washesCount}
-                    onChange={e => setFormData({ ...formData, washesCount: e.target.value })}
-                    style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.9rem' }}
-                  />
-                  <span style={{ fontSize: '0.72rem', color: '#64748B' }}>Total doorstep washes user gets in this pass.</span>
+              {/* Washes Included by Wash Type */}
+              <div style={{
+                background: '#FFFBEB',
+                border: '1.5px solid #FCD34D',
+                borderRadius: '12px',
+                padding: '1rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.75rem'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 800, color: '#92400E', margin: 0 }}>
+                      Washes Included by Package Type *
+                    </label>
+                    <span style={{ fontSize: '0.76rem', color: '#78350F' }}>
+                      Assign specific quantities for each wash package (e.g. 3 Basic Wash + 2 Full Detail).
+                    </span>
+                  </div>
+                  <span style={{
+                    background: (formData.washesCount || 0) > 0 ? '#D97706' : '#EF4444',
+                    color: '#FFFFFF',
+                    fontSize: '0.8rem',
+                    fontWeight: 800,
+                    padding: '3px 10px',
+                    borderRadius: '12px'
+                  }}>
+                    Total: {formData.washesCount || 0} Washes
+                  </span>
                 </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                    Free Add-ons Included *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    placeholder="e.g. 2"
-                    value={formData.freeAddonsCount}
-                    onChange={e => setFormData({ ...formData, freeAddonsCount: e.target.value })}
-                    style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.9rem' }}
-                  />
-                  <span style={{ fontSize: '0.72rem', color: '#64748B' }}>How many add-on services are free for this pass.</span>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.65rem' }}>
+                  {washTypes.map(wt => {
+                    const entry = (formData.includedWashes || []).find(w => Number(w.washTypeId) === Number(wt.id));
+                    const count = Number(entry?.count) || 0;
+                    return (
+                      <div
+                        key={wt.id}
+                        style={{
+                          background: count > 0 ? '#FFFFFF' : '#FFFDF5',
+                          border: count > 0 ? '1.5px solid #F59E0B' : '1px solid #FEF3C7',
+                          borderRadius: '10px',
+                          padding: '0.7rem 0.85rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '0.5rem',
+                          boxShadow: count > 0 ? '0 2px 6px rgba(245, 158, 11, 0.15)' : 'none'
+                        }}
+                      >
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontWeight: 700, fontSize: '0.85rem', color: count > 0 ? '#78350F' : '#334155' }}>
+                            {wt.name}
+                          </div>
+                          {wt.quickByte && (
+                            <div style={{ fontSize: '0.7rem', color: '#B45309', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              ⚡ {wt.quickByte}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Counter Controller */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateWashCount(wt.id, Math.max(0, count - 1))}
+                            disabled={count <= 0}
+                            style={{
+                              width: '26px',
+                              height: '26px',
+                              borderRadius: '6px',
+                              border: '1px solid #CBD5E1',
+                              background: count <= 0 ? '#F1F5F9' : '#FFFFFF',
+                              color: count <= 0 ? '#94A3B8' : '#1E293B',
+                              fontWeight: 800,
+                              fontSize: '1rem',
+                              cursor: count <= 0 ? 'not-allowed' : 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: 0
+                            }}
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            min="0"
+                            max="99"
+                            value={count}
+                            onChange={e => handleUpdateWashCount(wt.id, Math.max(0, parseInt(e.target.value, 10) || 0))}
+                            style={{
+                              width: '38px',
+                              textAlign: 'center',
+                              padding: '2px 4px',
+                              borderRadius: '6px',
+                              border: count > 0 ? '1.5px solid #F59E0B' : '1px solid #CBD5E1',
+                              fontWeight: 800,
+                              fontSize: '0.88rem',
+                              color: count > 0 ? '#B45309' : '#334155',
+                              background: count > 0 ? '#FEF3C7' : '#FFFFFF'
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateWashCount(wt.id, count + 1)}
+                            style={{
+                              width: '26px',
+                              height: '26px',
+                              borderRadius: '6px',
+                              border: '1px solid #F59E0B',
+                              background: '#FEF3C7',
+                              color: '#92400E',
+                              fontWeight: 800,
+                              fontSize: '1rem',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: 0
+                            }}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Complimentary Free Add-ons */}
+              <div style={{
+                background: '#F0FDF4',
+                border: '1.5px solid #86EFAC',
+                borderRadius: '12px',
+                padding: '1rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.75rem'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 800, color: '#166534', margin: 0 }}>
+                      Complimentary Free Add-ons (Optional)
+                    </label>
+                    <span style={{ fontSize: '0.76rem', color: '#14532D' }}>
+                      Choose which add-ons are free and how many redemptions the subscriber gets (0 = None/Standard Price).
+                    </span>
+                  </div>
+                  <span style={{
+                    background: (formData.freeAddonsCount || 0) > 0 ? '#16A34A' : '#94A3B8',
+                    color: '#FFFFFF',
+                    fontSize: '0.8rem',
+                    fontWeight: 800,
+                    padding: '3px 10px',
+                    borderRadius: '12px'
+                  }}>
+                    Total: {formData.freeAddonsCount || 0} Free Uses
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.65rem' }}>
+                  {addonsList.map(addon => {
+                    const entry = (formData.includedAddons || []).find(a => Number(a.addonId) === Number(addon.id));
+                    const count = Number(entry?.count) || 0;
+                    return (
+                      <div
+                        key={addon.id}
+                        style={{
+                          background: count > 0 ? '#FFFFFF' : '#F9FDF9',
+                          border: count > 0 ? '1.5px solid #10B981' : '1px solid #DCFCE7',
+                          borderRadius: '10px',
+                          padding: '0.7rem 0.85rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '0.5rem',
+                          boxShadow: count > 0 ? '0 2px 6px rgba(16, 185, 129, 0.15)' : 'none'
+                        }}
+                      >
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontWeight: 700, fontSize: '0.85rem', color: count > 0 ? '#166534' : '#334155' }}>
+                            {addon.name}
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: '#64748B' }}>
+                            Standard Price: ₹{addon.price}
+                          </div>
+                        </div>
+
+                        {/* Counter Controller */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateAddonCount(addon.id, Math.max(0, count - 1))}
+                            disabled={count <= 0}
+                            style={{
+                              width: '26px',
+                              height: '26px',
+                              borderRadius: '6px',
+                              border: '1px solid #CBD5E1',
+                              background: count <= 0 ? '#F1F5F9' : '#FFFFFF',
+                              color: count <= 0 ? '#94A3B8' : '#1E293B',
+                              fontWeight: 800,
+                              fontSize: '1rem',
+                              cursor: count <= 0 ? 'not-allowed' : 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: 0
+                            }}
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            min="0"
+                            max="99"
+                            value={count}
+                            onChange={e => handleUpdateAddonCount(addon.id, Math.max(0, parseInt(e.target.value, 10) || 0))}
+                            style={{
+                              width: '38px',
+                              textAlign: 'center',
+                              padding: '2px 4px',
+                              borderRadius: '6px',
+                              border: count > 0 ? '1.5px solid #10B981' : '1px solid #CBD5E1',
+                              fontWeight: 800,
+                              fontSize: '0.88rem',
+                              color: count > 0 ? '#15803D' : '#334155',
+                              background: count > 0 ? '#DCFCE7' : '#FFFFFF'
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateAddonCount(addon.id, count + 1)}
+                            style={{
+                              width: '26px',
+                              height: '26px',
+                              borderRadius: '6px',
+                              border: '1px solid #10B981',
+                              background: '#DCFCE7',
+                              color: '#15803D',
+                              fontWeight: 800,
+                              fontSize: '1rem',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: 0
+                            }}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 

@@ -598,7 +598,9 @@ export const getWashPrices = async (req, res) => {
 
 export const saveWashPrice = async (req, res) => {
   try {
-    const { carTypeId, washTypeId, price, payoutType, payoutValue, companyCost } = req.body;
+    const { carTypeId, washTypeId, actualPrice, price, payoutType, payoutValue, companyCost } = req.body;
+    const numPrice = Number(price);
+    const numActual = actualPrice !== undefined && actualPrice !== '' ? Number(actualPrice) : numPrice;
     const washPrice = await prisma.washPrice.upsert({
       where: {
         carTypeId_washTypeId: {
@@ -607,7 +609,8 @@ export const saveWashPrice = async (req, res) => {
         }
       },
       update: {
-        price: Number(price),
+        actualPrice: numActual,
+        price: numPrice,
         payoutType,
         payoutValue: Number(payoutValue),
         companyCost: companyCost !== undefined ? Number(companyCost) : 0.0
@@ -615,7 +618,8 @@ export const saveWashPrice = async (req, res) => {
       create: {
         carTypeId: Number(carTypeId),
         washTypeId: Number(washTypeId),
-        price: Number(price),
+        actualPrice: numActual,
+        price: numPrice,
         payoutType,
         payoutValue: Number(payoutValue),
         companyCost: companyCost !== undefined ? Number(companyCost) : 0.0
@@ -1093,7 +1097,8 @@ export const updateSystemSettings = async (req, res) => {
       dashboardAdBadge,
       subscriptionBannerTitle,
       subscriptionBannerSubtitle,
-      subscriptionBannerImage
+      subscriptionBannerImage,
+      subscriptionTermsText
     } = req.body;
     
     const settings = await prisma.systemSettings.upsert({
@@ -1112,6 +1117,7 @@ export const updateSystemSettings = async (req, res) => {
         ...(referralStreakBonus !== undefined && { referralStreakBonus: String(referralStreakBonus) }),
         ...(referralStreakConfig !== undefined && { referralStreakConfig: typeof referralStreakConfig === 'object' ? JSON.stringify(referralStreakConfig) : String(referralStreakConfig) }),
         ...(bookingTermsText !== undefined && { bookingTermsText: String(bookingTermsText) }),
+        ...(subscriptionTermsText !== undefined && { subscriptionTermsText: String(subscriptionTermsText) }),
         ...(dashboardAdImage !== undefined && { dashboardAdImage: String(dashboardAdImage) }),
         ...(dashboardAdTitle !== undefined && { dashboardAdTitle: String(dashboardAdTitle) }),
         ...(dashboardAdSubtitle !== undefined && { dashboardAdSubtitle: String(dashboardAdSubtitle) }),
@@ -1139,6 +1145,7 @@ export const updateSystemSettings = async (req, res) => {
           { count: 3, points: 100 }
         ]),
         bookingTermsText: bookingTermsText || "1. Access Requirements: Customer agrees to provide adequate water tap access and a standard electric plug point for the technician to perform the doorstep car wash service safely.\n2. Vehicle Parking: The vehicle must be parked in a well-lit area with sufficient clearance around all sides.\n3. Valuable Items: Please remove all personal belongings and valuables from inside the car prior to service commencement.",
+        subscriptionTermsText: subscriptionTermsText || "1. Non-Refundable: Once subscribed, the subscription pass amount is strictly non-refundable.\n2. Vehicle Binding: This pass is exclusively valid for the registered vehicle selected at purchase. Benefits cannot be transferred to another car.\n3. Doorstep Requirements: Customer agrees to provide domestic water tap access, electricity socket, and adequate space around the vehicle for safe technician operation.\n4. Service Availability: Due to sudden heavy weather, high regional demand, or technician/equipment unavailability, service bookings may occasionally be placed on hold or rescheduled with prior notice.\n5. Validity & Expiry: All wash quotas and free add-ons are strictly valid within the plan's duration span. Any unused limits will expire at the end of validity, and the pass will expire earlier if all included wash limits are completed.",
         dashboardAdImage: dashboardAdImage || "https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=1600&q=85",
         dashboardAdTitle: dashboardAdTitle || "Special Weekend Doorstep Detail & Snow Foam Spa",
         dashboardAdSubtitle: dashboardAdSubtitle || "Get sparkling exterior foam wash & deep interior cabin sanitize with spot-free purified water at your doorstep.",
@@ -1188,7 +1195,9 @@ export const createSubscriptionPlan = async (req, res) => {
       price, 
       originalPrice, 
       washesCount = 4, 
+      includedWashes,
       freeAddonsCount = 2, 
+      includedAddons,
       freeAddonIds = '', 
       features, 
       badge = 'MOST POPULAR',
@@ -1197,6 +1206,30 @@ export const createSubscriptionPlan = async (req, res) => {
 
     if (!name || !carTypeId || price === undefined || price === null) {
       return res.status(400).json({ error: 'Plan name, car type, and price are required.' });
+    }
+
+    let finalWashesCount = Number(washesCount) || 4;
+    let includedWashesStr = '[]';
+    if (includedWashes) {
+      try {
+        const arr = typeof includedWashes === 'string' ? JSON.parse(includedWashes || '[]') : includedWashes;
+        if (Array.isArray(arr) && arr.length > 0) {
+          includedWashesStr = JSON.stringify(arr);
+          finalWashesCount = arr.reduce((sum, item) => sum + (Number(item.count) || 0), 0);
+        }
+      } catch (e) {}
+    }
+
+    let finalFreeAddonsCount = Number(freeAddonsCount) || 0;
+    let includedAddonsStr = '[]';
+    if (includedAddons) {
+      try {
+        const arr = typeof includedAddons === 'string' ? JSON.parse(includedAddons || '[]') : includedAddons;
+        if (Array.isArray(arr) && arr.length > 0) {
+          includedAddonsStr = JSON.stringify(arr);
+          finalFreeAddonsCount = arr.reduce((sum, item) => sum + (Number(item.count) || 0), 0);
+        }
+      } catch (e) {}
     }
 
     const plan = await prisma.subscriptionPlan.create({
@@ -1208,8 +1241,10 @@ export const createSubscriptionPlan = async (req, res) => {
         durationLabel: String(durationLabel || '1 Month'),
         price: Number(price),
         originalPrice: originalPrice ? Number(originalPrice) : null,
-        washesCount: Number(washesCount) || 4,
-        freeAddonsCount: Number(freeAddonsCount) || 0,
+        washesCount: finalWashesCount,
+        includedWashes: includedWashesStr,
+        freeAddonsCount: finalFreeAddonsCount,
+        includedAddons: includedAddonsStr,
         freeAddonIds: Array.isArray(freeAddonIds) ? freeAddonIds.join(',') : String(freeAddonIds || ''),
         features: Array.isArray(features) ? JSON.stringify(features) : (typeof features === 'string' ? features : '[]'),
         badge: badge ? String(badge).trim() : null,
@@ -1238,12 +1273,42 @@ export const updateSubscriptionPlan = async (req, res) => {
       price, 
       originalPrice, 
       washesCount, 
+      includedWashes,
       freeAddonsCount, 
+      includedAddons,
       freeAddonIds, 
       features, 
       badge, 
       active 
     } = req.body;
+
+    let finalWashesCount = washesCount !== undefined ? Number(washesCount) : undefined;
+    let includedWashesStr = undefined;
+    if (includedWashes !== undefined) {
+      try {
+        const arr = typeof includedWashes === 'string' ? JSON.parse(includedWashes || '[]') : includedWashes;
+        if (Array.isArray(arr) && arr.length > 0) {
+          includedWashesStr = JSON.stringify(arr);
+          finalWashesCount = arr.reduce((sum, item) => sum + (Number(item.count) || 0), 0);
+        } else {
+          includedWashesStr = '[]';
+        }
+      } catch (e) {}
+    }
+
+    let finalFreeAddonsCount = freeAddonsCount !== undefined ? Number(freeAddonsCount) : undefined;
+    let includedAddonsStr = undefined;
+    if (includedAddons !== undefined) {
+      try {
+        const arr = typeof includedAddons === 'string' ? JSON.parse(includedAddons || '[]') : includedAddons;
+        if (Array.isArray(arr) && arr.length > 0) {
+          includedAddonsStr = JSON.stringify(arr);
+          finalFreeAddonsCount = arr.reduce((sum, item) => sum + (Number(item.count) || 0), 0);
+        } else {
+          includedAddonsStr = '[]';
+        }
+      } catch (e) {}
+    }
 
     const updated = await prisma.subscriptionPlan.update({
       where: { id: Number(id) },
@@ -1255,8 +1320,10 @@ export const updateSubscriptionPlan = async (req, res) => {
         ...(durationLabel !== undefined && { durationLabel: String(durationLabel) }),
         ...(price !== undefined && { price: Number(price) }),
         ...(originalPrice !== undefined && { originalPrice: originalPrice ? Number(originalPrice) : null }),
-        ...(washesCount !== undefined && { washesCount: Number(washesCount) }),
-        ...(freeAddonsCount !== undefined && { freeAddonsCount: Number(freeAddonsCount) }),
+        ...(finalWashesCount !== undefined && { washesCount: finalWashesCount }),
+        ...(includedWashesStr !== undefined && { includedWashes: includedWashesStr }),
+        ...(finalFreeAddonsCount !== undefined && { freeAddonsCount: finalFreeAddonsCount }),
+        ...(includedAddonsStr !== undefined && { includedAddons: includedAddonsStr }),
         ...(freeAddonIds !== undefined && { freeAddonIds: Array.isArray(freeAddonIds) ? freeAddonIds.join(',') : String(freeAddonIds || '') }),
         ...(features !== undefined && { features: Array.isArray(features) ? JSON.stringify(features) : String(features) }),
         ...(badge !== undefined && { badge: badge ? String(badge).trim() : null }),
@@ -1307,7 +1374,8 @@ export const getAdminSubscribers = async (req, res) => {
           select: { id: true, name: true, phone: true, email: true }
         },
         plan: true,
-        carType: true
+        carType: true,
+        car: true
       },
       orderBy: { createdAt: 'desc' }
     });

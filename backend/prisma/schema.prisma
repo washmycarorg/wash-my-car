@@ -81,7 +81,8 @@ model WashPrice {
   carType     CarType  @relation(fields: [carTypeId], references: [id], onDelete: Cascade)
   washTypeId  Int
   washType    WashType @relation(fields: [washTypeId], references: [id], onDelete: Cascade)
-  price       Float
+  actualPrice Float    @default(0.0) // Actual / Standard price (MRP)
+  price       Float                  // Giving / Offer price
   payoutType  String   @default("PERCENTAGE") // PERCENTAGE or AMOUNT
   payoutValue Float   @default(50.0)         // 50% or flat price
   companyCost Float    @default(0.0)
@@ -100,6 +101,7 @@ model Car {
   carTypeId Int
   carType   CarType   @relation(fields: [carTypeId], references: [id])
   bookings  Booking[]
+  userSubscriptions UserSubscription[]
 }
 
 model Service {
@@ -161,7 +163,13 @@ model Booking {
   address       String
   serviceAreaId Int
   serviceArea   ServiceArea  @relation(fields: [serviceAreaId], references: [id])
-  price         Float
+  actualPrice   Float?       @default(0.0) // Actual / Standard price
+  planDiscount  Float?       @default(0.0) // Savings from actualPrice - givingPrice
+  couponDiscount Float?      @default(0.0) // Coupon savings
+  addonDiscount Float?       @default(0.0) // Free or discounted addon savings
+  pointsDiscount Float?      @default(0.0) // Loyalty coins cash discount
+  totalSavings  Float?       @default(0.0) // Total amount saved by user
+  price         Float                      // Final price payable
   addonsTotal   Float        @default(0.0)
   employeePayout Float       @default(0.0)
   companyCost   Float       @default(0.0)
@@ -170,6 +178,8 @@ model Booking {
   pointsEarned   Int       @default(0)
   paymentStatus String       @default("PENDING")
   paymentMethod String       @default("ONLINE")
+  userSubscriptionId Int?
+  subscriptionCovered Boolean? @default(false)
   
   // Addons attached to booking
   addons         BookingAddon[]
@@ -316,6 +326,7 @@ model SystemSettings {
   subscriptionBannerTitle    String? @default("Exclusive VIP Car Care Membership")
   subscriptionBannerSubtitle String? @default("Save up to 40% with monthly doorstep passes, complimentary add-ons & priority scheduling.")
   subscriptionBannerImage    String? @default("https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=1600&q=85")
+  subscriptionTermsText      String? @default("1. Non-Refundable: Once subscribed, the subscription pass amount is strictly non-refundable.\n2. Vehicle Binding: This pass is exclusively valid for the registered vehicle selected at purchase. Benefits cannot be transferred to another car.\n3. Doorstep Requirements: Customer agrees to provide domestic water tap access, electricity socket, and adequate space around the vehicle for safe technician operation.\n4. Service Availability: Due to sudden heavy weather, high regional demand, or technician/equipment unavailability, service bookings may occasionally be placed on hold or rescheduled with prior notice.\n5. Validity & Expiry: All wash quotas and free add-ons are strictly valid within the plan's duration span. Any unused limits will expire at the end of validity, and the pass will expire earlier if all included wash limits are completed.")
 
   // Dispatch & Smart Route Slot Settings
   activeWorkers        Int     @default(1)     // Current field workers count (default 1)
@@ -431,7 +442,9 @@ model SubscriptionPlan {
   price               Float
   originalPrice       Float?
   washesCount         Int                @default(4)
+  includedWashes      String?            @default("[]") // JSON string: [{ washTypeId: 1, washTypeName: "Basic", count: 3 }]
   freeAddonsCount     Int                @default(2)
+  includedAddons      String?            @default("[]") // JSON string: [{ addonId: 1, addonName: "Helmet Wash", count: 2 }]
   freeAddonIds        String?            @default("") // Comma-separated addon IDs or empty for all
   features            String?            @default("[\"4 Doorstep Foam Washes\",\"2 Free Premium Add-ons\",\"Priority Slot Dispatch\",\"Zero Cancellation Fees\"]")
   badge               String?            @default("MOST POPULAR")
@@ -449,13 +462,20 @@ model UserSubscription {
   plan                SubscriptionPlan  @relation(fields: [planId], references: [id], onDelete: Cascade)
   carTypeId           Int
   carType             CarType           @relation(fields: [carTypeId], references: [id], onDelete: Cascade)
+  carId               Int?
+  car                 Car?              @relation(fields: [carId], references: [id], onDelete: SetNull)
+  carNumber           String?
+  carMake             String?
+  carModel            String?
   startDate           DateTime          @default(now())
   endDate             DateTime
   price               Float
   washesTotal         Int               @default(4)
   washesRemaining     Int               @default(4)
+  washesBreakdown     String?           @default("[]") // JSON string: [{ washTypeId: 1, washTypeName: "Basic", total: 3, remaining: 3 }]
   freeAddonsTotal     Int               @default(2)
   freeAddonsRemaining Int               @default(2)
+  addonsBreakdown     String?           @default("[]") // JSON string: [{ addonId: 1, addonName: "Helmet Wash", total: 2, remaining: 2 }]
   status              String            @default("ACTIVE") // ACTIVE, EXPIRED, CANCELLED
   paymentStatus       String            @default("PAID")   // PAID, PENDING
   razorpayOrderId     String?

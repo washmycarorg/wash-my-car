@@ -21,7 +21,8 @@ import {
   getSettings,
   getProfile,
   getAddons,
-  getAvailableSlots
+  getAvailableSlots,
+  getMySubscriptions
 } from '../api';
 import SearchableDropdown from '../components/SearchableDropdown';
 import { INDIAN_CAR_BRANDS } from '../data/indianCars';
@@ -164,6 +165,7 @@ const BookSlot = () => {
 
   // Plan Prices Map: { [washTypeId]: price }
   const [planPrices, setPlanPrices] = useState({});
+  const [actualPrices, setActualPrices] = useState({});
   const [loadingPrices, setLoadingPrices] = useState(false);
 
   // STEP 1: Vehicle States
@@ -220,6 +222,7 @@ const BookSlot = () => {
   const [redeemPoints, setRedeemPoints] = useState(false);
   const [loading, setLoading] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(null);
+  const [userSubscriptions, setUserSubscriptions] = useState([]);
 
   // Initial Data Fetch
   useEffect(() => {
@@ -231,8 +234,9 @@ const BookSlot = () => {
       getSavedAddresses().catch(() => []),
       getAddons().catch(() => []),
       getSettings().catch(() => null),
-      getProfile().catch(() => null)
-    ]).then(([carsT, washT, areas, cars, addrs, addonsList, settingsRes, profileRes]) => {
+      getProfile().catch(() => null),
+      getMySubscriptions().catch(() => ({ activeSubscriptions: [], activeSubscription: null }))
+    ]).then(([carsT, washT, areas, cars, addrs, addonsList, settingsRes, profileRes, subRes]) => {
       setCarTypes(carsT);
       setWashTypes(washT);
       setServiceAreas(areas);
@@ -244,6 +248,11 @@ const BookSlot = () => {
       if (profileRes) {
         setUserProfile(profileRes);
         setUserPoints(profileRes.points || 0);
+      }
+
+      if (subRes) {
+        const subs = subRes.activeSubscriptions || (subRes.activeSubscription ? [subRes.activeSubscription] : []);
+        setUserSubscriptions(subs);
       }
 
       // Default selections
@@ -364,13 +373,22 @@ const BookSlot = () => {
       Promise.all(
         washTypes.map(wt => 
           getWashPrice(selectedCarTypeId, wt.id)
-            .then(res => ({ id: wt.id, price: res.price || 0 }))
-            .catch(() => ({ id: wt.id, price: 0 }))
+            .then(res => ({
+              id: wt.id, 
+              price: Number(res.price) || 0,
+              actualPrice: Number(res.actualPrice) || Number(res.price) || 0
+            }))
+            .catch(() => ({ id: wt.id, price: 0, actualPrice: 0 }))
         )
       ).then(results => {
         const priceMap = {};
-        results.forEach(r => { priceMap[r.id] = r.price; });
+        const actualMap = {};
+        results.forEach(r => { 
+          priceMap[r.id] = r.price; 
+          actualMap[r.id] = r.actualPrice;
+        });
         setPlanPrices(priceMap);
+        setActualPrices(actualMap);
         setLoadingPrices(false);
       });
     }
@@ -892,8 +910,77 @@ const BookSlot = () => {
     }
   };
 
+  // Active User Subscription for Selected Vehicle (Strict vehicle binding verification)
+  const now = new Date();
+  const normCarNum = (n) => (n || '').replace(/[^A-Z0-9]/gi, '').toUpperCase();
+  const currentSelectedCar = carSource === 'saved' ? savedCars.find(c => c.id.toString() === selectedSavedCarId) : null;
+  const currentBookingCarNumberNorm = normCarNum(carSource === 'saved' ? (currentSelectedCar?.carNumber || carNumber) : carNumber);
+  const currentBookingCarId = carSource === 'saved' && selectedSavedCarId ? Number(selectedSavedCarId) : null;
+
+  const activeSubscription = userSubscriptions.find(sub => {
+    if (sub.status !== 'ACTIVE' || Number(sub.washesRemaining) <= 0 || new Date(sub.endDate) <= now) return false;
+    if (Number(sub.carTypeId) !== Number(selectedCarTypeId)) return false;
+
+    // Check strict vehicle binding:
+    if (currentBookingCarId && sub.carId && Number(sub.carId) === currentBookingCarId) return true;
+    if (sub.carNumber && currentBookingCarNumberNorm && normCarNum(sub.carNumber) === currentBookingCarNumberNorm) return true;
+    if (sub.car?.carNumber && currentBookingCarNumberNorm && normCarNum(sub.car.carNumber) === currentBookingCarNumberNorm) return true;
+    return false;
+  }) || null;
+
+  let subWashesList = [];
+  try {
+    subWashesList = typeof activeSubscription?.washesBreakdown === 'string'
+      ? JSON.parse(activeSubscription.washesBreakdown)
+      : (activeSubscription?.washesBreakdown || []);
+  } catch (e) {
+    subWashesList = [];
+  }
+
+  let subAddonsList = [];
+  try {
+    subAddonsList = typeof activeSubscription?.addonsBreakdown === 'string'
+      ? JSON.parse(activeSubscription.addonsBreakdown)
+      : (activeSubscription?.addonsBreakdown || []);
+  } catch (e) {
+    subAddonsList = [];
+  }
+
+  // Helper: check if a specific washTypeId is covered by the active subscription pass
+  const getSubWashCoverage = (washTypeId) => {
+    if (!activeSubscription) return null;
+    if (subWashesList && subWashesList.length > 0) {
+      const match = subWashesList.find(w => (Number(w.washTypeId) === Number(washTypeId) || w.washTypeId === null) && Number(w.remaining) > 0);
+      if (match) return { isCovered: true, remaining: Number(match.remaining), planName: activeSubscription.plan?.name || 'VIP Pass' };
+    } else if (Number(activeSubscription.washesRemaining) > 0) {
+      return { isCovered: true, remaining: Number(activeSubscription.washesRemaining), planName: activeSubscription.plan?.name || 'VIP Pass' };
+    }
+    return null;
+  };
+
+  // Helper: check if a specific addonId is covered as complimentary free by active subscription
+  const getSubAddonCoverage = (addonId) => {
+    if (!activeSubscription) return null;
+    if (subAddonsList && subAddonsList.length > 0) {
+      const match = subAddonsList.find(a => (Number(a.addonId) === Number(addonId) || a.addonId === null) && Number(a.remaining) > 0);
+      if (match) return { isFree: true, remaining: Number(match.remaining), planName: activeSubscription.plan?.name || 'VIP Pass' };
+    } else if (Number(activeSubscription.freeAddonsRemaining) > 0) {
+      return { isFree: true, remaining: Number(activeSubscription.freeAddonsRemaining), planName: activeSubscription.plan?.name || 'VIP Pass' };
+    }
+    return null;
+  };
+
   // Price Calculations & Add-on Coupon Breakdown
   const baseWashPrice = planPrices[selectedWashTypeId] || 0;
+  const actualWashPrice = (actualPrices[selectedWashTypeId] && actualPrices[selectedWashTypeId] > baseWashPrice)
+    ? actualPrices[selectedWashTypeId]
+    : baseWashPrice;
+  const planDiscount = Math.max(0, actualWashPrice - baseWashPrice);
+
+  // VIP Wash Coverage check
+  const currentWashVipCoverage = getSubWashCoverage(selectedWashTypeId);
+  const isWashCoveredBySub = Boolean(currentWashVipCoverage?.isCovered);
+  const subWashDiscount = isWashCoveredBySub ? baseWashPrice : 0;
   
   const selectedAddonsList = availableAddons.filter(a => selectedAddonIds.includes(a.id));
   const addonsTotal = selectedAddonsList.reduce((sum, a) => sum + (a.price || 0), 0);
@@ -903,39 +990,64 @@ const BookSlot = () => {
 
   // Helper to determine exact pricing, discount & perk status of an add-on
   const getAddonPricing = (addon) => {
-    if (!addon) return { originalPrice: 0, effectivePrice: 0, discount: 0, isFree: false, isDiscounted: false };
+    if (!addon) return { originalPrice: 0, effectivePrice: 0, discount: 0, isFree: false, isDiscounted: false, isVipFree: false };
     const orig = Number(addon.price) || 0;
+
+    // 1. VIP Subscription Free Add-on check
+    const vipAddonPerk = getSubAddonCoverage(addon.id);
+    if (vipAddonPerk?.isFree) {
+      return {
+        originalPrice: orig,
+        effectivePrice: 0,
+        discount: orig,
+        isFree: true,
+        isDiscounted: true,
+        isVipFree: true,
+        vipPlanName: vipAddonPerk.planName,
+        vipRemaining: vipAddonPerk.remaining
+      };
+    }
+
     if (!activeCoupon) {
-      return { originalPrice: orig, effectivePrice: orig, discount: 0, isFree: false, isDiscounted: false };
+      return { originalPrice: orig, effectivePrice: orig, discount: 0, isFree: false, isDiscounted: false, isVipFree: false };
     }
 
-    // 1. 100% Free Add-on Perk
+    // 2. 100% Free Add-on Perk via Coupon
     if (activeCoupon.freeAddonId && Number(activeCoupon.freeAddonId) === Number(addon.id)) {
-      return { originalPrice: orig, effectivePrice: 0, discount: orig, isFree: true, isDiscounted: true };
+      return { originalPrice: orig, effectivePrice: 0, discount: orig, isFree: true, isDiscounted: true, isVipFree: false };
     }
 
-    // 2. Discounted Add-on Perk
+    // 3. Discounted Add-on Perk via Coupon
     if (activeCoupon.discountAddonId && Number(activeCoupon.discountAddonId) === Number(addon.id)) {
       if (activeCoupon.addonDiscountType === 'FREE') {
-        return { originalPrice: orig, effectivePrice: 0, discount: orig, isFree: true, isDiscounted: true };
+        return { originalPrice: orig, effectivePrice: 0, discount: orig, isFree: true, isDiscounted: true, isVipFree: false };
       } else if (activeCoupon.addonDiscountType === 'FLAT') {
         const disc = Math.min(orig, Number(activeCoupon.addonDiscountValue) || 0);
-        return { originalPrice: orig, effectivePrice: Math.max(0, orig - disc), discount: disc, isFree: disc >= orig, isDiscounted: disc > 0 };
+        return { originalPrice: orig, effectivePrice: Math.max(0, orig - disc), discount: disc, isFree: disc >= orig, isDiscounted: disc > 0, isVipFree: false };
       } else if (activeCoupon.addonDiscountType === 'PERCENTAGE') {
         const disc = (orig * (Number(activeCoupon.addonDiscountValue) || 0)) / 100;
-        return { originalPrice: orig, effectivePrice: Math.max(0, orig - disc), discount: disc, isFree: disc >= orig, isDiscounted: disc > 0 };
+        return { originalPrice: orig, effectivePrice: Math.max(0, orig - disc), discount: disc, isFree: disc >= orig, isDiscounted: disc > 0, isVipFree: false };
       }
     }
 
-    return { originalPrice: orig, effectivePrice: orig, discount: 0, isFree: false, isDiscounted: false };
+    return { originalPrice: orig, effectivePrice: orig, discount: 0, isFree: false, isDiscounted: false, isVipFree: false };
   };
   
   let washCouponDiscount = 0;
-  let totalAddonSavings = 0;
+  let totalCouponAddonSavings = 0;
+  let totalVipAddonSavings = 0;
   let freeAddonBonus = null;
   let discountedAddonBonus = null;
 
-  if (activeCoupon) {
+  selectedAddonsList.forEach(a => {
+    const pricing = getAddonPricing(a);
+    if (pricing.isVipFree) {
+      totalVipAddonSavings += pricing.discount;
+    }
+  });
+
+  // Coupons cannot be applied if wash is already covered by VIP subscription
+  if (activeCoupon && !isWashCoveredBySub) {
     if (activeCoupon.discountType === 'FLAT') {
       washCouponDiscount = activeCoupon.discountAmount || 0;
     } else if (activeCoupon.discountType === 'PERCENTAGE') {
@@ -947,11 +1059,11 @@ const BookSlot = () => {
       washCouponDiscount = 0;
     }
 
-    // Add-on perks
+    // Coupon Add-on perks
     selectedAddonsList.forEach(a => {
       const pricing = getAddonPricing(a);
-      if (pricing.discount > 0) {
-        totalAddonSavings += pricing.discount;
+      if (!pricing.isVipFree && pricing.discount > 0) {
+        totalCouponAddonSavings += pricing.discount;
         if (pricing.isFree) {
           freeAddonBonus = a.name;
         } else {
@@ -961,9 +1073,11 @@ const BookSlot = () => {
     });
   }
 
+  const totalSubDiscount = subWashDiscount + totalVipAddonSavings;
   const totalAddonsEffective = selectedAddonsList.reduce((sum, a) => sum + getAddonPricing(a).effectivePrice, 0);
-  const couponDiscount = washCouponDiscount + totalAddonSavings;
-  const subtotalAfterCoupon = Math.max(0, (baseWashPrice - washCouponDiscount) + totalAddonsEffective);
+  const couponDiscount = washCouponDiscount + totalCouponAddonSavings;
+  const washPayableAfterSubAndCoupon = Math.max(0, baseWashPrice - subWashDiscount - washCouponDiscount);
+  const subtotalAfterDiscounts = Math.max(0, washPayableAfterSubAndCoupon + totalAddonsEffective);
 
   // Royalty Points Calculation
   let pointsDiscount = 0;
@@ -972,16 +1086,17 @@ const BookSlot = () => {
 
   if (redeemPoints && userPoints > 0) {
     const maxCashValue = userPoints / ratio;
-    if (maxCashValue >= subtotalAfterCoupon) {
-      pointsDiscount = subtotalAfterCoupon;
-      pointsToRedeem = Math.ceil(subtotalAfterCoupon * ratio);
+    if (maxCashValue >= subtotalAfterDiscounts) {
+      pointsDiscount = subtotalAfterDiscounts;
+      pointsToRedeem = Math.ceil(subtotalAfterDiscounts * ratio);
     } else {
       pointsDiscount = maxCashValue;
       pointsToRedeem = userPoints;
     }
   }
 
-  const finalPayable = Math.max(0, subtotalAfterCoupon - pointsDiscount);
+  const finalPayable = Math.max(0, subtotalAfterDiscounts - pointsDiscount);
+  const totalSavings = Math.round((planDiscount + totalSubDiscount + couponDiscount + pointsDiscount) * 100) / 100;
 
   // Stepper Validations & Navigation
   const handleNextFromStep1 = () => {
@@ -1279,7 +1394,7 @@ const BookSlot = () => {
             borderRadius: '16px',
             padding: '1.25rem',
             textAlign: 'left',
-            marginBottom: '2rem',
+            marginBottom: '1.25rem',
             display: 'flex',
             flexDirection: 'column',
             gap: '0.6rem'
@@ -1298,11 +1413,87 @@ const BookSlot = () => {
                 <span style={{ fontWeight: 700, color: 'var(--primary-blue)', letterSpacing: '0.05em' }}>{carNumber}</span>
               </div>
             )}
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Total Amount Paid</span>
-              <span style={{ fontWeight: 800, color: '#16A34A', fontSize: '1.05rem' }}>₹{finalPayable}</span>
+
+            {/* Savings & Price Breakdown */}
+            <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '0.6rem', marginTop: '0.2rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.85rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Actual Standard Price</span>
+                <span style={{ color: '#94A3B8', textDecoration: planDiscount > 0 ? 'line-through' : 'none', fontWeight: 600 }}>
+                  ₹{actualWashPrice}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Giving Offer Price</span>
+                <span style={{ color: 'var(--primary-navy)', fontWeight: 700 }}>₹{baseWashPrice}</span>
+              </div>
+              {subWashDiscount > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#B45309', fontWeight: 700 }}>
+                  <span>• 👑 VIP Subscription Pass Benefit</span>
+                  <span>-₹{subWashDiscount.toFixed(2)} (Wash Covered)</span>
+                </div>
+              )}
+              {totalVipAddonSavings > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#B45309', fontWeight: 700 }}>
+                  <span>• 👑 VIP Complimentary Add-on Savings</span>
+                  <span>-₹{totalVipAddonSavings.toFixed(2)}</span>
+                </div>
+              )}
+              {planDiscount > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#059669', fontWeight: 600 }}>
+                  <span>• Plan Special Offer Discount</span>
+                  <span>-₹{planDiscount.toFixed(2)}</span>
+                </div>
+              )}
+              {washCouponDiscount > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#059669', fontWeight: 600 }}>
+                  <span>• Coupon Discount ({selectedCouponCode})</span>
+                  <span>-₹{washCouponDiscount.toFixed(2)}</span>
+                </div>
+              )}
+              {totalAddonSavings > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#059669', fontWeight: 600 }}>
+                  <span>• Free / Offer Add-on Savings</span>
+                  <span>-₹{totalAddonSavings.toFixed(2)}</span>
+                </div>
+              )}
+              {pointsDiscount > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#D97706', fontWeight: 600 }}>
+                  <span>• Reward Coins Redeemed ({pointsToRedeem} pts)</span>
+                  <span>-₹{pointsDiscount.toFixed(2)}</span>
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', borderTop: '1px solid #E2E8F0', paddingTop: '0.5rem' }}>
+              <span style={{ color: 'var(--text-muted)', fontWeight: 700 }}>Total Amount Paid</span>
+              <span style={{ fontWeight: 800, color: '#16A34A', fontSize: '1.15rem' }}>₹{finalPayable}</span>
             </div>
           </div>
+
+          {/* Celebratory Total Savings Banner */}
+          {totalSavings > 0 && (
+            <div style={{
+              background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+              color: 'white',
+              borderRadius: '16px',
+              padding: '1.25rem',
+              textAlign: 'center',
+              marginBottom: '2rem',
+              boxShadow: '0 10px 25px rgba(5, 150, 105, 0.25)',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                <Sparkles size={18} color="#FDE047" /> Congratulations! You Saved
+              </div>
+              <div style={{ fontSize: '2.1rem', fontWeight: 900, margin: '0.3rem 0', color: '#FEF08A' }}>
+                ₹{totalSavings.toFixed(2)}
+              </div>
+              <div style={{ fontSize: '0.8rem', opacity: 0.95, lineHeight: 1.4 }}>
+                Total savings applied from package special offer, promotional coupons & loyalty reward coins!
+              </div>
+            </div>
+          )}
 
           <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
             <button
@@ -1730,16 +1921,25 @@ const BookSlot = () => {
             {washTypes.map(plan => {
               const isSelected = selectedWashTypeId === plan.id.toString();
               const planPrice = planPrices[plan.id] || 0;
+              const cov = getSubWashCoverage(plan.id);
+              const isVipCovered = Boolean(cov?.isCovered);
+
+              let cardBorder = isSelected ? '2px solid var(--primary-blue)' : '1px solid #E2E8F0';
+              let cardBg = isSelected ? '#F0F9FF' : 'white';
+              if (isVipCovered) {
+                cardBorder = isSelected ? '2px solid #D97706' : '1.5px solid #FCD34D';
+                cardBg = isSelected ? '#FEFCE8' : '#FFFDF5';
+              }
 
               return (
                 <div
                   key={plan.id}
                   onClick={() => setSelectedWashTypeId(plan.id.toString())}
                   style={{
-                    border: isSelected ? '2px solid var(--primary-blue)' : '1px solid #E2E8F0',
+                    border: cardBorder,
                     borderRadius: '16px',
                     padding: '1.25rem 1.5rem',
-                    background: isSelected ? '#F0F9FF' : 'white',
+                    background: cardBg,
                     boxShadow: isSelected ? '0 8px 20px rgba(2, 132, 199, 0.12)' : '0 1px 4px rgba(0,0,0,0.04)',
                     cursor: 'pointer',
                     transition: 'all 0.2s',
@@ -1752,6 +1952,25 @@ const BookSlot = () => {
                         <h4 style={{ margin: 0, color: 'var(--primary-navy)', fontSize: '1.1rem', fontWeight: 800 }}>
                           {plan.name}
                         </h4>
+
+                        {/* VIP Pass Coverage Badge */}
+                        {isVipCovered && (
+                          <span style={{
+                            background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)',
+                            color: '#92400E',
+                            border: '1px solid #F59E0B',
+                            padding: '0.15rem 0.6rem',
+                            borderRadius: '12px',
+                            fontSize: '0.75rem',
+                            fontWeight: 800,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.25rem'
+                          }}>
+                            👑 {cov.planName} ({cov.remaining} left)
+                          </span>
+                        )}
+
                         {/* Quick Byte Pill */}
                         {plan.quickByte && (
                           <span style={{
@@ -1813,16 +2032,61 @@ const BookSlot = () => {
 
                     {/* Price and Checkmark */}
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--primary-navy)' }}>
-                        {loadingPrices ? '...' : `₹${planPrice}`}
-                      </div>
+                      {isVipCovered ? (
+                        <div>
+                          <div style={{ fontSize: '0.85rem', color: '#94A3B8', textDecoration: 'line-through', fontWeight: 600 }}>
+                            ₹{actualPrices[plan.id] || planPrice}
+                          </div>
+                          <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#D97706' }}>
+                            ₹0 FREE
+                          </div>
+                          <span style={{
+                            fontSize: '0.68rem',
+                            fontWeight: 800,
+                            background: '#FEF3C7',
+                            color: '#92400E',
+                            padding: '2px 7px',
+                            borderRadius: '6px',
+                            display: 'inline-block',
+                            marginTop: '2px'
+                          }}>
+                            VIP COVERED
+                          </span>
+                        </div>
+                      ) : (
+                        <div>
+                          {actualPrices[plan.id] > planPrice && (
+                            <div style={{ fontSize: '0.85rem', color: '#94A3B8', textDecoration: 'line-through', fontWeight: 600 }}>
+                              ₹{actualPrices[plan.id]}
+                            </div>
+                          )}
+                          <div style={{ fontSize: '1.25rem', fontWeight: 800, color: actualPrices[plan.id] > planPrice ? '#059669' : 'var(--primary-navy)' }}>
+                            {loadingPrices ? '...' : `₹${planPrice}`}
+                          </div>
+                          {actualPrices[plan.id] > planPrice && (
+                            <span style={{
+                              fontSize: '0.68rem',
+                              fontWeight: 800,
+                              background: '#DCFCE7',
+                              color: '#15803D',
+                              padding: '2px 7px',
+                              borderRadius: '6px',
+                              display: 'inline-block',
+                              marginTop: '2px'
+                            }}>
+                              Save ₹{actualPrices[plan.id] - planPrice}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
                       <div style={{
                         marginTop: '0.4rem',
                         width: '24px',
                         height: '24px',
                         borderRadius: '50%',
                         border: isSelected ? 'none' : '2px solid #CBD5E1',
-                        background: isSelected ? 'var(--primary-blue)' : 'white',
+                        background: isSelected ? (isVipCovered ? '#D97706' : 'var(--primary-blue)') : 'white',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -2279,13 +2543,17 @@ const BookSlot = () => {
                 Number(c.freeAddonId) === Number(addon.id) || Number(c.discountAddonId) === Number(addon.id)
               );
 
-              const isFreeViaActiveCoupon = isSelected && pricing.isFree;
-              const isDiscountedViaActiveCoupon = isSelected && pricing.isDiscounted && !pricing.isFree;
+              const isVipFree = Boolean(pricing.isVipFree);
+              const isFreeViaActiveCoupon = isSelected && pricing.isFree && !isVipFree;
+              const isDiscountedViaActiveCoupon = isSelected && pricing.isDiscounted && !pricing.isFree && !isVipFree;
 
               // Border and background highlighting
               let cardBorder = '1px solid #E2E8F0';
               let cardBg = '#FFFFFF';
-              if (isFreeViaActiveCoupon) {
+              if (isVipFree) {
+                cardBorder = isSelected ? '2px solid #D97706' : '1.5px solid #FCD34D';
+                cardBg = isSelected ? '#FEFCE8' : '#FFFDF5';
+              } else if (isFreeViaActiveCoupon) {
                 cardBorder = '2px solid #10B981';
                 cardBg = '#F0FDF4';
               } else if (isDiscountedViaActiveCoupon) {
@@ -2320,7 +2588,7 @@ const BookSlot = () => {
                     width: '38px',
                     height: '38px',
                     borderRadius: '10px',
-                    background: isSelected ? '#DCFCE7' : (matchingOffer && !activeCoupon ? '#FEF3C7' : '#F8FAFC'),
+                    background: isVipFree ? '#FEF3C7' : isSelected ? '#DCFCE7' : (matchingOffer && !activeCoupon ? '#FEF3C7' : '#F8FAFC'),
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -2339,7 +2607,16 @@ const BookSlot = () => {
 
                       {/* Add-on Pricing Badge */}
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        {isFreeViaActiveCoupon ? (
+                        {isVipFree ? (
+                          <div>
+                            <span style={{ fontSize: '0.78rem', textDecoration: 'line-through', color: '#94A3B8', display: 'block' }}>
+                              ₹{pricing.originalPrice}
+                            </span>
+                            <span style={{ fontWeight: 800, color: '#D97706', fontSize: '0.95rem' }}>
+                              ₹0 FREE
+                            </span>
+                          </div>
+                        ) : isFreeViaActiveCoupon ? (
                           <div>
                             <span style={{ fontSize: '0.78rem', textDecoration: 'line-through', color: '#94A3B8', display: 'block' }}>
                               ₹{pricing.originalPrice}
@@ -2379,7 +2656,25 @@ const BookSlot = () => {
                     )}
 
                     {/* Promotional Badges */}
-                    {isFreeViaActiveCoupon && (
+                    {isVipFree && (
+                      <div style={{ marginTop: '0.4rem' }}>
+                        <span style={{
+                          fontSize: '0.72rem',
+                          background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)',
+                          color: '#92400E',
+                          border: '1px solid #F59E0B',
+                          padding: '0.15rem 0.5rem',
+                          borderRadius: '6px',
+                          fontWeight: 800,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.25rem'
+                        }}>
+                          👑 100% FREE with {pricing.vipPlanName} ({pricing.vipRemaining} left)
+                        </span>
+                      </div>
+                    )}
+                    {!isVipFree && isFreeViaActiveCoupon && (
                       <div style={{ marginTop: '0.4rem' }}>
                         <span style={{
                           fontSize: '0.72rem',
@@ -2396,7 +2691,7 @@ const BookSlot = () => {
                         </span>
                       </div>
                     )}
-                    {isDiscountedViaActiveCoupon && (
+                    {!isVipFree && isDiscountedViaActiveCoupon && (
                       <div style={{ marginTop: '0.4rem' }}>
                         <span style={{
                           fontSize: '0.72rem',
@@ -2413,7 +2708,7 @@ const BookSlot = () => {
                         </span>
                       </div>
                     )}
-                    {!activeCoupon && matchingOffer && (
+                    {!isVipFree && !activeCoupon && matchingOffer && (
                       <div style={{ marginTop: '0.4rem' }}>
                         <span style={{
                           fontSize: '0.72rem',
@@ -2439,7 +2734,7 @@ const BookSlot = () => {
                     height: '20px',
                     borderRadius: '6px',
                     border: isSelected ? 'none' : '2px solid #CBD5E1',
-                    background: isSelected ? '#10B981' : 'white',
+                    background: isSelected ? (isVipFree ? '#D97706' : '#10B981') : 'white',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -4131,8 +4426,36 @@ const BookSlot = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.9rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
                   <span>Base Wash Package ({selectedCarTypeObj?.name})</span>
-                  <span>₹{baseWashPrice}</span>
+                  <span>
+                    {planDiscount > 0 && (
+                      <span style={{ textDecoration: 'line-through', color: '#94A3B8', marginRight: '0.4rem', fontSize: '0.85rem' }}>
+                        ₹{actualWashPrice}
+                      </span>
+                    )}
+                    <strong style={{ color: 'var(--primary-navy)' }}>₹{baseWashPrice}</strong>
+                  </span>
                 </div>
+
+                {subWashDiscount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#92400E', fontWeight: 700 }}>
+                    <span>• 👑 VIP Pass Benefit ({currentWashVipCoverage?.planName})</span>
+                    <span>-₹{subWashDiscount.toFixed(2)} (Wash Covered)</span>
+                  </div>
+                )}
+
+                {totalVipAddonSavings > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#92400E', fontWeight: 700 }}>
+                    <span>• 👑 VIP Complimentary Add-on Savings</span>
+                    <span>-₹{totalVipAddonSavings.toFixed(2)}</span>
+                  </div>
+                )}
+
+                {planDiscount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#059669', fontWeight: 600 }}>
+                    <span>• Plan Special Offer Discount</span>
+                    <span>-₹{planDiscount.toFixed(2)}</span>
+                  </div>
+                )}
 
                 {selectedAddonsList.length > 0 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
@@ -4157,7 +4480,19 @@ const BookSlot = () => {
                           <div key={addon.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.83rem' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#334155' }}>
                               <span>• {addon.name}</span>
-                              {pricing.isFree && (
+                              {pricing.isVipFree && (
+                                <span style={{
+                                  background: '#FEF3C7',
+                                  color: '#92400E',
+                                  padding: '0.1rem 0.45rem',
+                                  borderRadius: '4px',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 800
+                                }}>
+                                  👑 FREE via VIP Pass
+                                </span>
+                              )}
+                              {!pricing.isVipFree && pricing.isFree && (
                                 <span style={{
                                   background: '#DCFCE7',
                                   color: '#166534',
@@ -4169,7 +4504,7 @@ const BookSlot = () => {
                                   🎁 FREE via {activeCoupon?.code}
                                 </span>
                               )}
-                              {pricing.isDiscounted && !pricing.isFree && (
+                              {!pricing.isVipFree && pricing.isDiscounted && !pricing.isFree && (
                                 <span style={{
                                   background: '#EFF6FF',
                                   color: '#1D4ED8',
@@ -4187,7 +4522,7 @@ const BookSlot = () => {
                               {pricing.isFree ? (
                                 <span>
                                   <span style={{ textDecoration: 'line-through', color: '#94A3B8', marginRight: '0.35rem', fontSize: '0.78rem' }}>₹{pricing.originalPrice}</span>
-                                  <strong style={{ color: '#16A34A', fontSize: '0.9rem' }}>₹0</strong>
+                                  <strong style={{ color: pricing.isVipFree ? '#D97706' : '#16A34A', fontSize: '0.9rem' }}>₹0</strong>
                                 </span>
                               ) : pricing.isDiscounted ? (
                                 <span>
@@ -4235,10 +4570,30 @@ const BookSlot = () => {
                       Inclusive of all taxes & doorstep service fees
                     </span>
                   </div>
-                  <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#0284C7' }}>
+                  <div style={{ fontSize: '1.6rem', fontWeight: 900, color: (finalPayable === 0 && (isWashCoveredBySub || totalVipAddonSavings > 0)) ? '#D97706' : '#0284C7' }}>
                     ₹{finalPayable}
                   </div>
                 </div>
+
+                {totalSavings > 0 && (
+                  <div style={{
+                    marginTop: '0.75rem',
+                    background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)',
+                    border: '1px solid #A7F3D0',
+                    borderRadius: '10px',
+                    padding: '0.65rem 0.85rem',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <span style={{ color: '#065F46', fontWeight: 700, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      🎉 Total You Save on this Booking
+                    </span>
+                    <span style={{ color: '#047857', fontWeight: 900, fontSize: '1.05rem' }}>
+                      ₹{totalSavings.toFixed(2)}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Submit Buttons */}
@@ -4261,11 +4616,21 @@ const BookSlot = () => {
                     padding: '0.85rem',
                     fontSize: '1.05rem',
                     fontWeight: 800,
-                    background: 'linear-gradient(135deg, #0284C7 0%, #06B6D4 100%)',
-                    boxShadow: '0 8px 24px rgba(6, 182, 212, 0.4)'
+                    background: (finalPayable === 0 && (isWashCoveredBySub || totalVipAddonSavings > 0))
+                      ? 'linear-gradient(135deg, #D97706 0%, #B45309 100%)'
+                      : 'linear-gradient(135deg, #0284C7 0%, #06B6D4 100%)',
+                    boxShadow: (finalPayable === 0 && (isWashCoveredBySub || totalVipAddonSavings > 0))
+                      ? '0 8px 24px rgba(217, 119, 6, 0.4)'
+                      : '0 8px 24px rgba(6, 182, 212, 0.4)'
                   }}
                 >
-                  {loading ? 'Processing Booking...' : `Pay & Confirm Booking (₹${finalPayable})`}
+                  {loading 
+                    ? 'Processing Booking...' 
+                    : (finalPayable === 0 && (isWashCoveredBySub || totalVipAddonSavings > 0))
+                      ? '👑 Confirm VIP Booking (₹0 - Direct Slot Booking)'
+                      : finalPayable === 0 
+                        ? 'Confirm Booking (₹0)' 
+                        : `Pay & Confirm Booking (₹${finalPayable})`}
                 </button>
               </div>
             </div>

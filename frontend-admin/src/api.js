@@ -362,7 +362,10 @@ export const deleteAllocation = async (id) => {
 
 export const getSettings = async () => {
   const res = await fetch(`${API_URL}/admin/settings`, { headers: getHeaders() });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.error || errorBody.message || 'Failed to fetch settings');
+  }
   return res.json();
 };
 
@@ -372,7 +375,10 @@ export const updateSettings = async (data) => {
     headers: getHeaders(),
     body: JSON.stringify(data)
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.error || errorBody.message || 'Failed to update settings');
+  }
   return res.json();
 };
 

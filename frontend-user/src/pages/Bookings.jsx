@@ -206,7 +206,14 @@ const Bookings = () => {
           {/* Price + expand */}
           <div style={{ textAlign: 'right', flexShrink: 0 }}>
             <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--primary-navy)' }}>₹{booking.price?.toFixed ? booking.price.toFixed(2) : booking.price}</div>
-            <ChevronDown size={16} color="var(--text-muted)" style={{ transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', marginTop: '4px' }} />
+            {booking.totalSavings > 0 && (
+              <div style={{ fontSize: '0.72rem', color: '#15803D', fontWeight: 700, background: '#DCFCE7', padding: '0.1rem 0.4rem', borderRadius: '4px', marginTop: '2px', display: 'inline-block' }}>
+                Saved ₹{booking.totalSavings}
+              </div>
+            )}
+            <div>
+              <ChevronDown size={16} color="var(--text-muted)" style={{ transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', marginTop: '4px' }} />
+            </div>
           </div>
         </div>
 
@@ -282,37 +289,58 @@ const Bookings = () => {
 
             {/* Payment Breakdown */}
             <div style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '0.75rem 1rem' }}>
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Payment Breakdown</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Payment Breakdown
+                </span>
+                {booking.totalSavings > 0 && (
+                  <span style={{ fontSize: '0.75rem', color: '#166534', background: '#DCFCE7', padding: '0.15rem 0.5rem', borderRadius: '12px', fontWeight: 700 }}>
+                    🎉 You Saved ₹{booking.totalSavings}
+                  </span>
+                )}
+              </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.88rem' }}>
+                {booking.actualPrice > 0 && booking.actualPrice > ((booking.originalPrice ?? booking.price) - (booking.addonsTotal || 0)) && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>Actual Standard Price</span>
+                    <span style={{ color: '#94A3B8', textDecoration: 'line-through' }}>₹{booking.actualPrice}</span>
+                  </div>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Base Wash Price</span>
-                  <span style={{ color: 'var(--primary-navy)' }}>₹{(booking.originalPrice ?? booking.price) - (booking.addonsTotal || 0)}</span>
+                  <span style={{ color: 'var(--text-muted)' }}>Giving Offer Price</span>
+                  <span style={{ color: 'var(--primary-navy)', fontWeight: 600 }}>₹{(booking.originalPrice ?? booking.price) - (booking.addonsTotal || 0)}</span>
                 </div>
-                {booking.addonsTotal > 0 && (
+                {booking.planDiscount > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#047857' }}>
-                    <span>Add-ons Total</span>
+                    <span>• Plan Special Offer Discount</span>
+                    <span>-₹{booking.planDiscount}</span>
+                  </div>
+                )}
+                {booking.addonsTotal > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#0369A1' }}>
+                    <span>• Add-ons Total</span>
                     <span>+₹{booking.addonsTotal}</span>
                   </div>
                 )}
                 {booking.appliedOfferCode && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--accent-teal)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--accent-teal)' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                       <Tag size={12} /> Coupon ({booking.appliedOfferCode})
                     </span>
-                    <span style={{ color: 'var(--accent-teal)', fontWeight: 600 }}>Applied</span>
+                    <span style={{ fontWeight: 600 }}>{booking.couponDiscount ? `-₹${booking.couponDiscount}` : 'Applied'}</span>
                   </div>
                 )}
                 {booking.pointsRedeemed > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#B45309', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                      <Gift size={12} /> Points Redeemed ({booking.pointsRedeemed} pts)
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#B45309' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <Gift size={12} /> Reward Coins ({booking.pointsRedeemed} pts)
                     </span>
-                    <span style={{ color: '#B45309', fontWeight: 600 }}>Cash used</span>
+                    <span style={{ fontWeight: 600 }}>{booking.pointsDiscount ? `-₹${booking.pointsDiscount}` : 'Cash used'}</span>
                   </div>
                 )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #F1F5F9', paddingTop: '0.35rem', fontWeight: 700 }}>
                   <span style={{ color: 'var(--primary-navy)' }}>Final Paid</span>
-                  <span style={{ color: 'var(--primary-navy)' }}>₹{booking.price?.toFixed ? booking.price.toFixed(2) : booking.price}</span>
+                  <span style={{ color: 'var(--primary-navy)', fontSize: '1rem' }}>₹{booking.price?.toFixed ? booking.price.toFixed(2) : booking.price}</span>
                 </div>
               </div>
             </div>

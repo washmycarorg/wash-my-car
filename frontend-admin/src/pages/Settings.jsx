@@ -5,9 +5,19 @@ import {
   Minus, Sparkles, Flame, Check, X, Award, Crown, Power, Calendar, CalendarX, AlertTriangle
 } from 'lucide-react';
 
+const parseBool = (val, defaultVal = true) => {
+  if (val === undefined || val === null) return defaultVal;
+  if (typeof val === 'boolean') return val;
+  if (typeof val === 'string') return val.toLowerCase() === 'true';
+  if (typeof val === 'number') return val !== 0;
+  return Boolean(val);
+};
+
 const SettingsPage = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [toggleLoading, setToggleLoading] = useState({});
+  const [toast, setToast] = useState(null);
   const [streakTiers, setStreakTiers] = useState([
     { count: 1, points: 50 },
     { count: 2, points: 75 },
@@ -43,6 +53,43 @@ const SettingsPage = () => {
     subscriptionBannerImage: "https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=1600&q=85"
   });
 
+  const handleInstantToggle = async (field, newValue) => {
+    setSettings(prev => ({ ...prev, [field]: newValue }));
+    setToggleLoading(prev => ({ ...prev, [field]: true }));
+
+    const labels = {
+      bookingsEnabled: 'Customer Slot Bookings',
+      subscriptionsEnabled: 'VIP Subscriptions Feature',
+      autoAssignment: 'Automatic Employee Assignment',
+      pointsRedemption: 'Points Cash Redemption',
+      pointsReward: 'Points Earning Rewards',
+      referralEnabled: 'Referral Program'
+    };
+    const title = labels[field] || field;
+
+    try {
+      const res = await updateSettings({ [field]: newValue });
+      if (res && res[field] !== undefined) {
+        setSettings(prev => ({ ...prev, [field]: parseBool(res[field], newValue) }));
+      }
+      setToast({
+        type: 'success',
+        message: `${title} is now ${newValue ? 'ENABLED / ACCEPTING' : 'PAUSED / DISABLED'}. Saved to database!`
+      });
+      setTimeout(() => setToast(null), 3500);
+    } catch (err) {
+      console.error(`Failed to update ${field}:`, err);
+      setSettings(prev => ({ ...prev, [field]: !newValue }));
+      setToast({
+        type: 'error',
+        message: `Failed to update ${title}: ${err.message}`
+      });
+      setTimeout(() => setToast(null), 5000);
+    } finally {
+      setToggleLoading(prev => ({ ...prev, [field]: false }));
+    }
+  };
+
   useEffect(() => {
     getSettings()
       .then(res => {
@@ -69,14 +116,14 @@ const SettingsPage = () => {
         setStreakTiers(loadedTiers);
 
         setSettings({
-          bookingsEnabled: res.bookingsEnabled !== undefined ? !!res.bookingsEnabled : true,
-          subscriptionsEnabled: res.subscriptionsEnabled !== undefined ? !!res.subscriptionsEnabled : true,
-          autoAssignment: !!res.autoAssignment,
-          pointsRedemption: !!res.pointsRedemption,
-          pointsReward: !!res.pointsReward,
-          pointsToCashRatio: res.pointsToCashRatio,
-          rewardPointsRatio: res.rewardPointsRatio,
-          referralEnabled: res.referralEnabled !== undefined ? !!res.referralEnabled : true,
+          bookingsEnabled: parseBool(res.bookingsEnabled, true),
+          subscriptionsEnabled: parseBool(res.subscriptionsEnabled, true),
+          autoAssignment: parseBool(res.autoAssignment, true),
+          pointsRedemption: parseBool(res.pointsRedemption, true),
+          pointsReward: parseBool(res.pointsReward, true),
+          pointsToCashRatio: res.pointsToCashRatio ?? 4,
+          rewardPointsRatio: res.rewardPointsRatio ?? 0.1,
+          referralEnabled: parseBool(res.referralEnabled, true),
           referralRewardPoints: res.referralRewardPoints ?? 50,
           referralMaxLimit: res.referralMaxLimit ?? 10,
           referralStreakBonus: res.referralStreakBonus ?? 25,
@@ -93,7 +140,11 @@ const SettingsPage = () => {
         setLoading(false);
       })
       .catch(err => {
-        console.error(err);
+        console.error('Failed to load settings:', err);
+        setToast({
+          type: 'error',
+          message: `Failed to load settings from server: ${err.message}`
+        });
         setLoading(false);
       });
   }, []);
@@ -252,11 +303,48 @@ const SettingsPage = () => {
 
   return (
     <div style={{ maxWidth: '680px', margin: '0 auto', paddingBottom: '3rem' }}>
+      {/* Real-time floating toast feedback */}
+      {toast && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          zIndex: 9999,
+          background: toast.type === 'error' ? '#EF4444' : '#10B981',
+          color: 'white',
+          padding: '0.85rem 1.25rem',
+          borderRadius: '10px',
+          fontWeight: 700,
+          fontSize: '0.9rem',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.6rem',
+          animation: 'fadeIn 0.25s ease'
+        }}>
+          {toast.type === 'error' ? <AlertTriangle size={18} /> : <Check size={18} />}
+          <span>{toast.message}</span>
+        </div>
+      )}
+
       <div className="card animate-fade-in" style={{ padding: '2.5rem' }}>
-        <h3 style={{ marginBottom: '0.5rem', color: 'var(--primary-navy)' }}>System Operations & Rules</h3>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '2rem' }}>
-          Configure employee auto-assignment workflows, customer loyalty points, referral bonuses, and dashboard promotions.
-        </p>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
+          <div>
+            <h3 style={{ marginBottom: '0.35rem', color: 'var(--primary-navy)' }}>System Operations & Rules</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: 0 }}>
+              Master availability switches, employee assignment, loyalty points, referral bonuses, and ads.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="btn btn-primary"
+            style={{ padding: '0.55rem 1.2rem', fontSize: '0.85rem', fontWeight: 700, flexShrink: 0 }}
+          >
+            {saving ? 'Saving...' : 'Save All Settings'}
+          </button>
+        </div>
 
         <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           
@@ -279,7 +367,7 @@ const SettingsPage = () => {
                   <Power size={20} color="#38BDF8" /> Master System Controls
                 </span>
                 <span style={{ fontSize: '0.78rem', color: '#94A3B8' }}>
-                  Global availability switches directly affecting customer booking and VIP access.
+                  Live switches save automatically to the database when toggled.
                 </span>
               </div>
             </div>
@@ -305,10 +393,10 @@ const SettingsPage = () => {
                     fontWeight: 800,
                     padding: '2px 8px',
                     borderRadius: '10px',
-                    background: settings.bookingsEnabled ? '#059669' : '#DC2626',
+                    background: toggleLoading.bookingsEnabled ? '#2563EB' : settings.bookingsEnabled ? '#059669' : '#DC2626',
                     color: 'white'
                   }}>
-                    {settings.bookingsEnabled ? 'ACCEPTING BOOKINGS' : 'PAUSED (BLOCKED)'}
+                    {toggleLoading.bookingsEnabled ? 'SAVING...' : settings.bookingsEnabled ? 'ACCEPTING BOOKINGS' : 'PAUSED (BLOCKED)'}
                   </span>
                 </div>
                 <span style={{ fontSize: '0.78rem', color: '#CBD5E1', lineHeight: 1.4, display: 'block' }}>
@@ -316,16 +404,17 @@ const SettingsPage = () => {
                 </span>
               </div>
 
-              <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '56px', height: '30px', flexShrink: 0 }}>
+              <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '56px', height: '30px', flexShrink: 0, opacity: toggleLoading.bookingsEnabled ? 0.6 : 1 }}>
                 <input
                   type="checkbox"
+                  disabled={toggleLoading.bookingsEnabled}
                   checked={settings.bookingsEnabled}
-                  onChange={e => setSettings({ ...settings, bookingsEnabled: e.target.checked })}
+                  onChange={e => handleInstantToggle('bookingsEnabled', e.target.checked)}
                   style={{ opacity: 0, width: 0, height: 0 }}
                 />
                 <span className="slider" style={{
                   position: 'absolute',
-                  cursor: 'pointer',
+                  cursor: toggleLoading.bookingsEnabled ? 'wait' : 'pointer',
                   inset: 0,
                   backgroundColor: settings.bookingsEnabled ? '#10B981' : '#64748B',
                   transition: '0.3s',
@@ -369,10 +458,10 @@ const SettingsPage = () => {
                     fontWeight: 800,
                     padding: '2px 8px',
                     borderRadius: '10px',
-                    background: settings.subscriptionsEnabled ? '#D97706' : '#475569',
+                    background: toggleLoading.subscriptionsEnabled ? '#2563EB' : settings.subscriptionsEnabled ? '#D97706' : '#475569',
                     color: 'white'
                   }}>
-                    {settings.subscriptionsEnabled ? 'GOLD DOCK & BANNER ON' : 'DISABLED'}
+                    {toggleLoading.subscriptionsEnabled ? 'SAVING...' : settings.subscriptionsEnabled ? 'GOLD DOCK & BANNER ON' : 'DISABLED'}
                   </span>
                 </div>
                 <span style={{ fontSize: '0.78rem', color: '#CBD5E1', lineHeight: 1.4, display: 'block' }}>
@@ -380,16 +469,17 @@ const SettingsPage = () => {
                 </span>
               </div>
 
-              <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '56px', height: '30px', flexShrink: 0 }}>
+              <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '56px', height: '30px', flexShrink: 0, opacity: toggleLoading.subscriptionsEnabled ? 0.6 : 1 }}>
                 <input
                   type="checkbox"
+                  disabled={toggleLoading.subscriptionsEnabled}
                   checked={settings.subscriptionsEnabled}
-                  onChange={e => setSettings({ ...settings, subscriptionsEnabled: e.target.checked })}
+                  onChange={e => handleInstantToggle('subscriptionsEnabled', e.target.checked)}
                   style={{ opacity: 0, width: 0, height: 0 }}
                 />
                 <span className="slider" style={{
                   position: 'absolute',
-                  cursor: 'pointer',
+                  cursor: toggleLoading.subscriptionsEnabled ? 'wait' : 'pointer',
                   inset: 0,
                   backgroundColor: settings.subscriptionsEnabled ? '#F59E0B' : '#64748B',
                   transition: '0.3s',
@@ -474,16 +564,17 @@ const SettingsPage = () => {
               <span style={{ fontWeight: 600, color: 'var(--primary-navy)', display: 'block' }}>Automatic Employee Assignment</span>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>If enabled, bookings are auto-assigned on checkout. Otherwise, manual assign.</span>
             </div>
-            <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '50px', height: '26px', flexShrink: 0 }}>
+            <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '50px', height: '26px', flexShrink: 0, opacity: toggleLoading.autoAssignment ? 0.6 : 1 }}>
               <input
                 type="checkbox"
+                disabled={toggleLoading.autoAssignment}
                 checked={settings.autoAssignment}
-                onChange={e => setSettings({ ...settings, autoAssignment: e.target.checked })}
+                onChange={e => handleInstantToggle('autoAssignment', e.target.checked)}
                 style={{ opacity: 0, width: 0, height: 0 }}
               />
               <span className="slider" style={{
                 position: 'absolute',
-                cursor: 'pointer',
+                cursor: toggleLoading.autoAssignment ? 'wait' : 'pointer',
                 inset: 0,
                 backgroundColor: settings.autoAssignment ? 'var(--accent-teal)' : '#CBD5E1',
                 transition: '0.3s',
@@ -520,16 +611,17 @@ const SettingsPage = () => {
               <span style={{ fontWeight: 600, color: 'var(--primary-navy)', display: 'block' }}>Points Cash Redemption</span>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Allow users to redeem points during booking checkout</span>
             </div>
-            <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '50px', height: '26px', flexShrink: 0 }}>
+            <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '50px', height: '26px', flexShrink: 0, opacity: toggleLoading.pointsRedemption ? 0.6 : 1 }}>
               <input
                 type="checkbox"
+                disabled={toggleLoading.pointsRedemption}
                 checked={settings.pointsRedemption}
-                onChange={e => setSettings({ ...settings, pointsRedemption: e.target.checked })}
+                onChange={e => handleInstantToggle('pointsRedemption', e.target.checked)}
                 style={{ opacity: 0, width: 0, height: 0 }}
               />
               <span className="slider" style={{
                 position: 'absolute',
-                cursor: 'pointer',
+                cursor: toggleLoading.pointsRedemption ? 'wait' : 'pointer',
                 inset: 0,
                 backgroundColor: settings.pointsRedemption ? 'var(--accent-teal)' : '#CBD5E1',
                 transition: '0.3s',
@@ -566,16 +658,17 @@ const SettingsPage = () => {
               <span style={{ fontWeight: 600, color: 'var(--primary-navy)', display: 'block' }}>Points Earning Rewards</span>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Reward points to users based on payment subtotals</span>
             </div>
-            <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '50px', height: '26px', flexShrink: 0 }}>
+            <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '50px', height: '26px', flexShrink: 0, opacity: toggleLoading.pointsReward ? 0.6 : 1 }}>
               <input
                 type="checkbox"
+                disabled={toggleLoading.pointsReward}
                 checked={settings.pointsReward}
-                onChange={e => setSettings({ ...settings, pointsReward: e.target.checked })}
+                onChange={e => handleInstantToggle('pointsReward', e.target.checked)}
                 style={{ opacity: 0, width: 0, height: 0 }}
               />
               <span className="slider" style={{
                 position: 'absolute',
-                cursor: 'pointer',
+                cursor: toggleLoading.pointsReward ? 'wait' : 'pointer',
                 inset: 0,
                 backgroundColor: settings.pointsReward ? 'var(--accent-teal)' : '#CBD5E1',
                 transition: '0.3s',
@@ -681,11 +774,12 @@ const SettingsPage = () => {
                       : 'Disabled: Referral code input is hidden on Register page and paused notice shows in Rewards.'}
                   </span>
                 </div>
-                <label style={{ position: 'relative', display: 'inline-block', width: '48px', height: '26px', cursor: 'pointer', flexShrink: 0, marginLeft: '1rem' }}>
+                <label style={{ position: 'relative', display: 'inline-block', width: '48px', height: '26px', cursor: toggleLoading.referralEnabled ? 'wait' : 'pointer', flexShrink: 0, marginLeft: '1rem', opacity: toggleLoading.referralEnabled ? 0.6 : 1 }}>
                   <input
                     type="checkbox"
+                    disabled={toggleLoading.referralEnabled}
                     checked={settings.referralEnabled}
-                    onChange={e => setSettings({ ...settings, referralEnabled: e.target.checked })}
+                    onChange={e => handleInstantToggle('referralEnabled', e.target.checked)}
                     style={{ opacity: 0, width: 0, height: 0 }}
                   />
                   <span style={{
