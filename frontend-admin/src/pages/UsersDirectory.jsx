@@ -92,7 +92,7 @@ const UsersDirectory = () => {
       </div>
 
       {/* Metric Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem', marginBottom: '1.75rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '1.25rem', marginBottom: '1.75rem' }}>
         <div className="card" style={{ padding: '1.25rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
@@ -169,7 +169,7 @@ const UsersDirectory = () => {
       </div>
 
       {/* Users Table */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="card p-0" style={{ padding: 0, overflow: 'hidden' }}>
         {loading ? (
           <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)' }}>
             <div style={{ width: '36px', height: '36px', border: '3px solid #E2E8F0', borderTopColor: 'var(--primary-blue)', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 1rem' }} />
@@ -182,7 +182,7 @@ const UsersDirectory = () => {
             <p style={{ margin: 0, fontSize: '0.88rem' }}>Try clearing or adjusting your search keyword and filter criteria.</p>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
+          <div className="table-responsive">
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
               <thead>
                 <tr style={{ background: '#F8FAFC', borderBottom: '1.5px solid #E2E8F0', color: 'var(--text-muted)', fontSize: '0.76rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -359,7 +359,7 @@ const UsersDirectory = () => {
           justifyContent: 'center',
           padding: '1rem'
         }}>
-          <div style={{
+          <div className="admin-modal-content" style={{
             background: 'white',
             borderRadius: '20px',
             width: '100%',

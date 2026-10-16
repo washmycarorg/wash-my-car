@@ -725,7 +725,7 @@ const Bookings = () => {
       </div>
 
       {/* Bookings Table Card */}
-      <div className="card" style={{ padding: 0, overflowX: 'auto', borderRadius: 'var(--radius-lg)', minHeight: '480px', paddingBottom: '5rem' }}>
+      <div className="card p-0" style={{ padding: 0, borderRadius: 'var(--radius-lg)', minHeight: '480px', paddingBottom: '3rem' }}>
         <div className="flex justify-between items-center p-6 border-b border-gray-200">
           <h3 style={{ margin: 0 }}>Slots Details & Assignment</h3>
           <button onClick={fetchData} className="btn btn-outline" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
@@ -733,7 +733,8 @@ const Bookings = () => {
           </button>
         </div>
         
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '1150px' }}>
+        <div className="table-responsive">
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '1150px' }}>
           <thead style={{ background: '#F8FAFC' }}>
             <tr>
               <th style={{ padding: '1rem 1.25rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.82rem', textTransform: 'uppercase' }}>Booking ID</th>
@@ -1064,11 +1065,12 @@ const Bookings = () => {
           })}
           {filteredBookings.length === 0 && (
             <tr>
-              <td colSpan="7" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>No wash orders found.</td>
+              <td colSpan="8" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>No wash orders found.</td>
             </tr>
           )}
         </tbody>
       </table>
+        </div>
     </div>
 
     {/* Verify Service Accuracy Modal */}
@@ -1084,7 +1086,7 @@ const Bookings = () => {
           zIndex: 1000,
           padding: '1rem'
         }}>
-          <div className="card" style={{ width: '100%', maxWidth: '750px', background: 'white', padding: '1.5rem', borderRadius: 'var(--radius-lg)', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div className="card admin-modal-content" style={{ width: '100%', maxWidth: '750px', background: 'white', padding: '1.5rem', borderRadius: 'var(--radius-lg)', maxHeight: '90vh', overflowY: 'auto' }}>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid #F1F5F9', paddingBottom: '0.75rem' }}>
               <h3 style={{ margin: 0, color: 'var(--primary-navy)' }}>
@@ -1119,7 +1121,7 @@ const Bookings = () => {
             </div>
 
             {/* Photos Comparison */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div className="admin-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
               <div>
                 <h4 style={{ fontSize: '0.9rem', color: 'var(--primary-navy)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                   <Image size={16} /> Before Servicing
@@ -1269,7 +1271,7 @@ const Bookings = () => {
           zIndex: 1100,
           padding: '1rem'
         }}>
-          <div style={{
+          <div className="admin-modal-content" style={{
             background: 'white',
             borderRadius: '16px',
             width: '100%',

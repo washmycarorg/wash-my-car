@@ -326,12 +326,12 @@ const Inventory = () => {
           </div>
 
           {/* Active Employee Allocations */}
-          <div className="card" style={{ padding: 0 }}>
+          <div className="card p-0" style={{ padding: 0 }}>
             <div style={{ padding: '1.25rem', borderBottom: '1px solid #E2E8F0' }}>
               <h3 style={{ margin: 0, color: 'var(--primary-navy)' }}>Employee Stock Allocations & Consumption</h3>
             </div>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <div className="table-responsive">
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '600px' }}>
                 <thead>
                   <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
                     <th style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', color: 'var(--primary-navy)' }}>Employee</th>

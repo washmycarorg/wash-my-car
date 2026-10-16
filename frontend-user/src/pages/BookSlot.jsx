@@ -419,8 +419,76 @@ const BookSlot = () => {
     }
   }, [selectedCarTypeId, selectedWashTypeId, currentStep]);
 
+  // Active User Subscription for Selected Vehicle (Strict vehicle binding verification)
+  const now = new Date();
+  const normCarNum = (n) => (n || '').replace(/[^A-Z0-9]/gi, '').toUpperCase();
+  const currentSelectedCar = carSource === 'saved' ? savedCars.find(c => c.id.toString() === selectedSavedCarId) : null;
+  const currentBookingCarNumberNorm = normCarNum(carSource === 'saved' ? (currentSelectedCar?.carNumber || carNumber) : carNumber);
+  const currentBookingCarId = carSource === 'saved' && selectedSavedCarId ? Number(selectedSavedCarId) : null;
+
+  const activeSubscription = userSubscriptions.find(sub => {
+    if (sub.status !== 'ACTIVE' || Number(sub.washesRemaining) <= 0 || new Date(sub.endDate) <= now) return false;
+    if (Number(sub.carTypeId) !== Number(selectedCarTypeId)) return false;
+
+    // Check strict vehicle binding:
+    if (currentBookingCarId && sub.carId && Number(sub.carId) === currentBookingCarId) return true;
+    if (sub.carNumber && currentBookingCarNumberNorm && normCarNum(sub.carNumber) === currentBookingCarNumberNorm) return true;
+    if (sub.car?.carNumber && currentBookingCarNumberNorm && normCarNum(sub.car.carNumber) === currentBookingCarNumberNorm) return true;
+    return false;
+  }) || null;
+
+  let subWashesList = [];
+  try {
+    subWashesList = typeof activeSubscription?.washesBreakdown === 'string'
+      ? JSON.parse(activeSubscription.washesBreakdown)
+      : (activeSubscription?.washesBreakdown || []);
+  } catch (e) {
+    subWashesList = [];
+  }
+
+  let subAddonsList = [];
+  try {
+    subAddonsList = typeof activeSubscription?.addonsBreakdown === 'string'
+      ? JSON.parse(activeSubscription.addonsBreakdown)
+      : (activeSubscription?.addonsBreakdown || []);
+  } catch (e) {
+    subAddonsList = [];
+  }
+
+  // Helper: check if a specific washTypeId is covered by the active subscription pass
+  const getSubWashCoverage = (washTypeId) => {
+    if (!activeSubscription) return null;
+    if (subWashesList && subWashesList.length > 0) {
+      const match = subWashesList.find(w => (Number(w.washTypeId) === Number(washTypeId) || w.washTypeId === null) && Number(w.remaining) > 0);
+      if (match) return { isCovered: true, remaining: Number(match.remaining), planName: activeSubscription.plan?.name || 'VIP Pass' };
+    } else if (Number(activeSubscription.washesRemaining) > 0) {
+      return { isCovered: true, remaining: Number(activeSubscription.washesRemaining), planName: activeSubscription.plan?.name || 'VIP Pass' };
+    }
+    return null;
+  };
+
+  // Helper: check if a specific addonId is covered as complimentary free by active subscription
+  const getSubAddonCoverage = (addonId) => {
+    if (!activeSubscription) return null;
+    if (subAddonsList && subAddonsList.length > 0) {
+      const match = subAddonsList.find(a => (Number(a.addonId) === Number(addonId) || a.addonId === null) && Number(a.remaining) > 0);
+      if (match) return { isFree: true, remaining: Number(match.remaining), planName: activeSubscription.plan?.name || 'VIP Pass' };
+    } else if (Number(activeSubscription.freeAddonsRemaining) > 0) {
+      return { isFree: true, remaining: Number(activeSubscription.freeAddonsRemaining), planName: activeSubscription.plan?.name || 'VIP Pass' };
+    }
+    return null;
+  };
+
+  // VIP Wash Coverage check
+  const currentWashVipCoverage = getSubWashCoverage(selectedWashTypeId);
+  const isWashCoveredBySub = Boolean(currentWashVipCoverage?.isCovered);
+
   const handleApplyCoupon = (codeToApply) => {
     setCouponError('');
+    if (isWashCoveredBySub) {
+      setCouponError('This wash is 100% covered by your active VIP subscription. Coupons cannot be applied.');
+      return;
+    }
     const code = (codeToApply || manualCouponInput).trim().toUpperCase();
     if (!code) {
       setCouponError('Please enter a coupon code.');
@@ -482,6 +550,13 @@ const BookSlot = () => {
     setAddonOfferNotice('');
   };
 
+  // If the booking becomes covered by active subscription, immediately remove any coupons or coupon-add-ons
+  useEffect(() => {
+    if (isWashCoveredBySub && (selectedCouponCode || autoAddedCouponAddonIds.length > 0)) {
+      handleRemoveCoupon();
+    }
+  }, [isWashCoveredBySub]);
+
   // Add-on selection toggle: checks for matching free/discounted coupon offers
   const handleToggleAddon = (addon) => {
     const isSelected = selectedAddonIds.includes(addon.id);
@@ -490,10 +565,10 @@ const BookSlot = () => {
       setSelectedAddonIds(prev => prev.filter(id => id !== addon.id));
       setAutoAddedCouponAddonIds(prev => prev.filter(id => id !== addon.id));
     } else {
-      // Check if any eligible coupon provides this addon for FREE or DISCOUNTED
-      const matchingCoupon = eligibleCoupons.find(c => 
+      // Check if any eligible coupon provides this addon for FREE or DISCOUNTED (only if NOT covered by subscription)
+      const matchingCoupon = !isWashCoveredBySub ? eligibleCoupons.find(c => 
         Number(c.freeAddonId) === Number(addon.id) || Number(c.discountAddonId) === Number(addon.id)
-      );
+      ) : null;
 
       // If matching coupon exists and no coupon is active (or current coupon has no addon perk), auto-apply it!
       if (matchingCoupon && (!selectedCouponCode || (selectedCouponCode !== matchingCoupon.code && (!activeCoupon?.freeAddonId && !activeCoupon?.discountAddonId)))) {
@@ -910,76 +985,12 @@ const BookSlot = () => {
     }
   };
 
-  // Active User Subscription for Selected Vehicle (Strict vehicle binding verification)
-  const now = new Date();
-  const normCarNum = (n) => (n || '').replace(/[^A-Z0-9]/gi, '').toUpperCase();
-  const currentSelectedCar = carSource === 'saved' ? savedCars.find(c => c.id.toString() === selectedSavedCarId) : null;
-  const currentBookingCarNumberNorm = normCarNum(carSource === 'saved' ? (currentSelectedCar?.carNumber || carNumber) : carNumber);
-  const currentBookingCarId = carSource === 'saved' && selectedSavedCarId ? Number(selectedSavedCarId) : null;
-
-  const activeSubscription = userSubscriptions.find(sub => {
-    if (sub.status !== 'ACTIVE' || Number(sub.washesRemaining) <= 0 || new Date(sub.endDate) <= now) return false;
-    if (Number(sub.carTypeId) !== Number(selectedCarTypeId)) return false;
-
-    // Check strict vehicle binding:
-    if (currentBookingCarId && sub.carId && Number(sub.carId) === currentBookingCarId) return true;
-    if (sub.carNumber && currentBookingCarNumberNorm && normCarNum(sub.carNumber) === currentBookingCarNumberNorm) return true;
-    if (sub.car?.carNumber && currentBookingCarNumberNorm && normCarNum(sub.car.carNumber) === currentBookingCarNumberNorm) return true;
-    return false;
-  }) || null;
-
-  let subWashesList = [];
-  try {
-    subWashesList = typeof activeSubscription?.washesBreakdown === 'string'
-      ? JSON.parse(activeSubscription.washesBreakdown)
-      : (activeSubscription?.washesBreakdown || []);
-  } catch (e) {
-    subWashesList = [];
-  }
-
-  let subAddonsList = [];
-  try {
-    subAddonsList = typeof activeSubscription?.addonsBreakdown === 'string'
-      ? JSON.parse(activeSubscription.addonsBreakdown)
-      : (activeSubscription?.addonsBreakdown || []);
-  } catch (e) {
-    subAddonsList = [];
-  }
-
-  // Helper: check if a specific washTypeId is covered by the active subscription pass
-  const getSubWashCoverage = (washTypeId) => {
-    if (!activeSubscription) return null;
-    if (subWashesList && subWashesList.length > 0) {
-      const match = subWashesList.find(w => (Number(w.washTypeId) === Number(washTypeId) || w.washTypeId === null) && Number(w.remaining) > 0);
-      if (match) return { isCovered: true, remaining: Number(match.remaining), planName: activeSubscription.plan?.name || 'VIP Pass' };
-    } else if (Number(activeSubscription.washesRemaining) > 0) {
-      return { isCovered: true, remaining: Number(activeSubscription.washesRemaining), planName: activeSubscription.plan?.name || 'VIP Pass' };
-    }
-    return null;
-  };
-
-  // Helper: check if a specific addonId is covered as complimentary free by active subscription
-  const getSubAddonCoverage = (addonId) => {
-    if (!activeSubscription) return null;
-    if (subAddonsList && subAddonsList.length > 0) {
-      const match = subAddonsList.find(a => (Number(a.addonId) === Number(addonId) || a.addonId === null) && Number(a.remaining) > 0);
-      if (match) return { isFree: true, remaining: Number(match.remaining), planName: activeSubscription.plan?.name || 'VIP Pass' };
-    } else if (Number(activeSubscription.freeAddonsRemaining) > 0) {
-      return { isFree: true, remaining: Number(activeSubscription.freeAddonsRemaining), planName: activeSubscription.plan?.name || 'VIP Pass' };
-    }
-    return null;
-  };
-
   // Price Calculations & Add-on Coupon Breakdown
   const baseWashPrice = planPrices[selectedWashTypeId] || 0;
   const actualWashPrice = (actualPrices[selectedWashTypeId] && actualPrices[selectedWashTypeId] > baseWashPrice)
     ? actualPrices[selectedWashTypeId]
     : baseWashPrice;
   const planDiscount = Math.max(0, actualWashPrice - baseWashPrice);
-
-  // VIP Wash Coverage check
-  const currentWashVipCoverage = getSubWashCoverage(selectedWashTypeId);
-  const isWashCoveredBySub = Boolean(currentWashVipCoverage?.isCovered);
   const subWashDiscount = isWashCoveredBySub ? baseWashPrice : 0;
   
   const selectedAddonsList = availableAddons.filter(a => selectedAddonIds.includes(a.id));
@@ -987,6 +998,7 @@ const BookSlot = () => {
   
   // Find active coupon
   const activeCoupon = eligibleCoupons.find(c => c.code === selectedCouponCode) || null;
+  const remainingCoupons = eligibleCoupons.filter(c => (c.code || '').toUpperCase() !== (selectedCouponCode || '').toUpperCase());
 
   // Helper to determine exact pricing, discount & perk status of an add-on
   const getAddonPricing = (addon) => {
@@ -1008,16 +1020,17 @@ const BookSlot = () => {
       };
     }
 
-    if (!activeCoupon) {
+    // Per policy: If wash is covered by active subscription, NO coupons can be applied (not even free add-on coupons)
+    if (!activeCoupon || isWashCoveredBySub) {
       return { originalPrice: orig, effectivePrice: orig, discount: 0, isFree: false, isDiscounted: false, isVipFree: false };
     }
 
-    // 2. 100% Free Add-on Perk via Coupon
+    // 2. 100% Free Add-on Perk via Coupon (only if booking is NOT covered by subscription)
     if (activeCoupon.freeAddonId && Number(activeCoupon.freeAddonId) === Number(addon.id)) {
       return { originalPrice: orig, effectivePrice: 0, discount: orig, isFree: true, isDiscounted: true, isVipFree: false };
     }
 
-    // 3. Discounted Add-on Perk via Coupon
+    // 3. Discounted Add-on Perk via Coupon (only if booking is NOT covered by subscription)
     if (activeCoupon.discountAddonId && Number(activeCoupon.discountAddonId) === Number(addon.id)) {
       if (activeCoupon.addonDiscountType === 'FREE') {
         return { originalPrice: orig, effectivePrice: 0, discount: orig, isFree: true, isDiscounted: true, isVipFree: false };
@@ -1083,7 +1096,7 @@ const BookSlot = () => {
   // Royalty Points Calculation
   let pointsDiscount = 0;
   let pointsToRedeem = 0;
-  const ratio = systemSettings?.pointsToCashRatio || 4.0;
+  const ratio = Number(systemSettings?.pointsToCashRatio) > 0 ? Number(systemSettings.pointsToCashRatio) : 1;
 
   if (redeemPoints && userPoints > 0) {
     const maxCashValue = userPoints / ratio;
@@ -1240,7 +1253,7 @@ const BookSlot = () => {
         carNumber: carNumber ? carNumber.trim() : null,
         saveAddress: addressSource === 'new' ? saveAddress : false,
         addressName: addressLabel,
-        couponCode: selectedCouponCode || null,
+        couponCode: isWashCoveredBySub ? null : (selectedCouponCode || null),
         redeemPoints: redeemPoints,
         addonIds: selectedAddonIds
       };
@@ -2485,8 +2498,8 @@ const BookSlot = () => {
             </button>
           </div>
 
-          {/* Add-on Promo Announcement Banner if eligible coupons offer add-on perks */}
-          {eligibleCoupons.some(c => c.freeAddonId || c.discountAddonId) && (
+          {/* Add-on Promo Announcement Banner if eligible coupons offer add-on perks (Non-subscription bookings only) */}
+          {!isWashCoveredBySub && eligibleCoupons.some(c => c.freeAddonId || c.discountAddonId) && (
             <div style={{
               marginBottom: '1rem',
               background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)',
@@ -2505,7 +2518,7 @@ const BookSlot = () => {
           )}
 
           {/* Active Add-on Offer Notice */}
-          {addonOfferNotice && (
+          {!isWashCoveredBySub && addonOfferNotice && (
             <div style={{
               marginBottom: '1rem',
               background: '#EFF6FF',
@@ -2540,9 +2553,9 @@ const BookSlot = () => {
             {availableAddons.map(addon => {
               const isSelected = selectedAddonIds.includes(addon.id);
               const pricing = getAddonPricing(addon);
-              const matchingOffer = eligibleCoupons.find(c => 
+              const matchingOffer = !isWashCoveredBySub ? eligibleCoupons.find(c => 
                 Number(c.freeAddonId) === Number(addon.id) || Number(c.discountAddonId) === Number(addon.id)
-              );
+              ) : null;
 
               const isVipFree = Boolean(pricing.isVipFree);
               const isFreeViaActiveCoupon = isSelected && pricing.isFree && !isVipFree;
@@ -2563,7 +2576,7 @@ const BookSlot = () => {
               } else if (isSelected) {
                 cardBorder = '2px solid #10B981';
                 cardBg = '#F0FDF4';
-              } else if (matchingOffer && !activeCoupon) {
+              } else if (!isWashCoveredBySub && matchingOffer && !activeCoupon) {
                 cardBorder = '1.5px dashed #F59E0B';
                 cardBg = '#FFFDF5';
               }
@@ -2640,7 +2653,7 @@ const BookSlot = () => {
                             <span style={{ fontWeight: 800, color: isSelected ? '#15803D' : 'var(--primary-navy)', fontSize: '0.92rem' }}>
                               +₹{addon.price}
                             </span>
-                            {!activeCoupon && matchingOffer && (
+                            {!isWashCoveredBySub && !activeCoupon && matchingOffer && (
                               <span style={{ fontSize: '0.7rem', color: '#059669', display: 'block', fontWeight: 700 }}>
                                 (Offer Avail.)
                               </span>
@@ -2675,7 +2688,7 @@ const BookSlot = () => {
                         </span>
                       </div>
                     )}
-                    {!isVipFree && isFreeViaActiveCoupon && (
+                    {!isWashCoveredBySub && !isVipFree && isFreeViaActiveCoupon && (
                       <div style={{ marginTop: '0.4rem' }}>
                         <span style={{
                           fontSize: '0.72rem',
@@ -2692,7 +2705,7 @@ const BookSlot = () => {
                         </span>
                       </div>
                     )}
-                    {!isVipFree && isDiscountedViaActiveCoupon && (
+                    {!isWashCoveredBySub && !isVipFree && isDiscountedViaActiveCoupon && (
                       <div style={{ marginTop: '0.4rem' }}>
                         <span style={{
                           fontSize: '0.72rem',
@@ -2709,7 +2722,7 @@ const BookSlot = () => {
                         </span>
                       </div>
                     )}
-                    {!isVipFree && !activeCoupon && matchingOffer && (
+                    {!isWashCoveredBySub && !isVipFree && !activeCoupon && matchingOffer && (
                       <div style={{ marginTop: '0.4rem' }}>
                         <span style={{
                           fontSize: '0.72rem',
@@ -3949,309 +3962,277 @@ const BookSlot = () => {
                     width: '36px',
                     height: '36px',
                     borderRadius: '10px',
-                    background: '#ECFDF5',
+                    background: isWashCoveredBySub ? '#FEF3C7' : '#ECFDF5',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: '#059669'
+                    color: isWashCoveredBySub ? '#D97706' : '#059669'
                   }}>
-                    <Tag size={18} />
+                    {isWashCoveredBySub ? <Crown size={18} /> : <Tag size={18} />}
                   </div>
                   <div>
                     <h3 style={{ margin: 0, color: 'var(--primary-navy)', fontSize: '1.05rem', fontWeight: 700 }}>
-                      Offers & Coupons
+                      {isWashCoveredBySub ? 'VIP Subscription Active' : 'Offers & Coupons'}
                     </h3>
                     <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                      Apply discounts and save on your wash
+                      {isWashCoveredBySub 
+                        ? 'Wash package is 100% covered under your VIP pass' 
+                        : 'Apply discounts and save on your wash'}
                     </p>
                   </div>
                 </div>
 
-                {eligibleCoupons.length > 0 && (
+                {!isWashCoveredBySub && (
+                  selectedCouponCode ? (
+                    remainingCoupons.length > 0 ? (
+                      <span style={{
+                        background: '#EFF6FF',
+                        color: '#1D4ED8',
+                        padding: '0.2rem 0.65rem',
+                        borderRadius: '12px',
+                        fontSize: '0.75rem',
+                        fontWeight: 700
+                      }}>
+                        {remainingCoupons.length} More {remainingCoupons.length === 1 ? 'Offer' : 'Offers'}
+                      </span>
+                    ) : (
+                      <span style={{
+                        background: '#DCFCE7',
+                        color: '#166534',
+                        padding: '0.2rem 0.65rem',
+                        borderRadius: '12px',
+                        fontSize: '0.75rem',
+                        fontWeight: 700
+                      }}>
+                        1 Applied
+                      </span>
+                    )
+                  ) : eligibleCoupons.length > 0 ? (
+                    <span style={{
+                      background: '#EFF6FF',
+                      color: '#1D4ED8',
+                      padding: '0.2rem 0.65rem',
+                      borderRadius: '12px',
+                      fontSize: '0.75rem',
+                      fontWeight: 700
+                    }}>
+                      {eligibleCoupons.length} {eligibleCoupons.length === 1 ? 'Offer' : 'Offers'}
+                    </span>
+                  ) : null
+                )}
+                {isWashCoveredBySub && (
                   <span style={{
-                    background: '#EFF6FF',
-                    color: '#1D4ED8',
+                    background: '#FEF3C7',
+                    color: '#92400E',
+                    border: '1px solid #F59E0B',
                     padding: '0.2rem 0.65rem',
                     borderRadius: '12px',
                     fontSize: '0.75rem',
-                    fontWeight: 700
+                    fontWeight: 800
                   }}>
-                    {eligibleCoupons.length} Offers
+                    👑 VIP COVERED
                   </span>
                 )}
               </div>
 
-              {/* Promo Code Input Bar */}
-              <div style={{ marginBottom: '1.25rem' }}>
-                <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.4rem', display: 'block' }}>
-                  Apply Promo Code
-                </label>
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'stretch' }}>
-                  <div style={{ position: 'relative', flex: 1 }}>
-                    <input
-                      type="text"
-                      className="form-input"
-                      placeholder="e.g. WC50, SAVE99, FESTIVE20"
-                      value={manualCouponInput}
-                      onChange={e => {
-                        setManualCouponInput(e.target.value.toUpperCase().replace(/\s+/g, ''));
-                        if (couponError) setCouponError('');
-                      }}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleApplyCoupon();
-                        }
-                      }}
-                      style={{
-                        margin: 0,
-                        textTransform: 'uppercase',
-                        fontWeight: 600,
-                        letterSpacing: '0.05em',
-                        paddingRight: manualCouponInput ? '2rem' : '0.85rem'
-                      }}
-                    />
-                    {manualCouponInput && (
-                      <button
-                        type="button"
-                        onClick={() => setManualCouponInput('')}
-                        style={{
-                          position: 'absolute',
-                          right: '0.6rem',
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          background: 'none',
-                          border: 'none',
-                          color: '#94A3B8',
-                          cursor: 'pointer',
-                          padding: '0.2rem'
-                        }}
-                      >
-                        <X size={16} />
-                      </button>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleApplyCoupon()}
-                    className="btn btn-primary"
-                    style={{
-                      padding: '0 1.25rem',
-                      fontWeight: 700,
-                      fontSize: '0.88rem',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    Apply
-                  </button>
-                </div>
-
-                {couponError && (
+              {/* If Covered by VIP Subscription: Inform user that coupons cannot be added to subscription wash */}
+              {isWashCoveredBySub ? (
+                <div style={{
+                  background: 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)',
+                  border: '1.5px solid #FCD34D',
+                  borderRadius: '14px',
+                  padding: '1.25rem',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '0.85rem',
+                  marginBottom: '1rem'
+                }}>
                   <div style={{
-                    marginTop: '0.5rem',
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '10px',
+                    background: '#F59E0B',
+                    color: '#FFFFFF',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '0.4rem',
-                    fontSize: '0.82rem',
-                    color: '#DC2626'
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    marginTop: '2px',
+                    boxShadow: '0 4px 10px rgba(245, 158, 11, 0.3)'
                   }}>
-                    <AlertCircle size={14} />
-                    <span>{couponError}</span>
+                    <Crown size={22} />
                   </div>
-                )}
-              </div>
-
-              {/* Active Applied Coupon Banner */}
-              {activeCoupon && (
-                <div style={{
-                  marginBottom: '1.25rem',
-                  background: 'linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)',
-                  border: '1.5px solid #86EFAC',
-                  borderRadius: '12px',
-                  padding: '1rem',
-                  boxShadow: '0 2px 8px rgba(22, 163, 74, 0.08)'
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem' }}>
-                    <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'flex-start' }}>
-                      <div style={{
-                        width: '28px',
-                        height: '28px',
-                        borderRadius: '50%',
-                        background: '#16A34A',
-                        color: '#FFF',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                        marginTop: '0.1rem'
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <h4 style={{ margin: 0, color: '#92400E', fontSize: '1rem', fontWeight: 800 }}>
+                        {currentWashVipCoverage?.planName || 'VIP Subscription Pass'} Active
+                      </h4>
+                      <span style={{
+                        background: '#FEF3C7',
+                        color: '#B45309',
+                        border: '1px solid #F59E0B',
+                        padding: '0.15rem 0.55rem',
+                        borderRadius: '6px',
+                        fontSize: '0.72rem',
+                        fontWeight: 800
                       }}>
-                        <Check size={16} strokeWidth={3} />
-                      </div>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                          <span style={{ fontWeight: 800, color: '#14532D', fontSize: '0.98rem' }}>
-                            {activeCoupon.code}
-                          </span>
-                          <span style={{
-                            background: '#16A34A',
-                            color: '#FFF',
-                            fontSize: '0.72rem',
-                            fontWeight: 700,
-                            padding: '0.15rem 0.5rem',
-                            borderRadius: '10px'
-                          }}>
-                            APPLIED
-                          </span>
+                        {currentWashVipCoverage?.remaining} WASHES REMAINING
+                      </span>
+                    </div>
+                    <p style={{ margin: '0.45rem 0 0', color: '#78350F', fontSize: '0.85rem', lineHeight: 1.5 }}>
+                      This wash is <strong>100% covered (₹0 Free)</strong> under your active subscription for <strong>{carNumber || currentSelectedCar?.carNumber || 'your registered car'}</strong>. Promotional coupons (including free add-on coupons) cannot be added for subscription wash bookings.
+                    </p>
+                    <div style={{
+                      marginTop: '0.65rem',
+                      fontSize: '0.76rem',
+                      color: '#92400E',
+                      background: 'rgba(255, 255, 255, 0.75)',
+                      padding: '0.45rem 0.7rem',
+                      borderRadius: '8px',
+                      border: '1px dashed #F59E0B',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      lineHeight: 1.4
+                    }}>
+                      <span>ℹ️</span>
+                      <span>Booking a wash for another car not covered by this subscription? You can apply coupons normally.</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Non-Subscription Bookings: Full Coupon System Active */
+                <>
+                  {/* Promo Code Input Bar */}
+                  <div style={{ marginBottom: '1.25rem' }}>
+                    <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.4rem', display: 'block' }}>
+                      Apply Promo Code
+                    </label>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'stretch' }}>
+                      <div style={{ position: 'relative', flex: 1 }}>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="e.g. WC50, SAVE99, FESTIVE20"
+                          value={manualCouponInput}
+                          onChange={e => {
+                            setManualCouponInput(e.target.value.toUpperCase().replace(/\s+/g, ''));
+                            if (couponError) setCouponError('');
+                          }}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleApplyCoupon();
+                            }
+                          }}
+                          style={{
+                            margin: 0,
+                            textTransform: 'uppercase',
+                            fontWeight: 600,
+                            letterSpacing: '0.05em',
+                            paddingRight: manualCouponInput ? '2rem' : '0.85rem'
+                          }}
+                        />
+                        {manualCouponInput && (
                           <button
                             type="button"
-                            onClick={() => setInfoModalCoupon(activeCoupon)}
+                            onClick={() => setManualCouponInput('')}
                             style={{
-                              background: '#DCFCE7',
-                              border: '1px solid #86EFAC',
-                              color: '#166534',
-                              borderRadius: '6px',
-                              padding: '0.15rem 0.5rem',
-                              fontSize: '0.72rem',
-                              fontWeight: 700,
+                              position: 'absolute',
+                              right: '0.6rem',
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              background: 'none',
+                              border: 'none',
+                              color: '#94A3B8',
                               cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.25rem'
+                              padding: '0.2rem'
                             }}
                           >
-                            <Info size={12} /> Details
+                            <X size={16} />
                           </button>
-                        </div>
-                        <div style={{ color: '#166534', fontSize: '0.85rem', fontWeight: 600, marginTop: '0.2rem' }}>
-                          🎉 You save ₹{couponDiscount.toFixed(2)} with this offer!
-                        </div>
-                        {freeAddonBonus && (
-                          <div style={{ marginTop: '0.4rem', fontWeight: 700, color: '#166534', background: '#DCFCE7', border: '1px solid #86EFAC', padding: '0.35rem 0.65rem', borderRadius: '8px', fontSize: '0.8rem', width: 'fit-content', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                            <Check size={14} color="#16A34A" strokeWidth={3} />
-                            <span>🎁 Free Add-on Perk: <strong>"{freeAddonBonus}"</strong> was automatically added to your cart for ₹0 FREE!</span>
-                          </div>
-                        )}
-                        {discountedAddonBonus && (
-                          <div style={{ marginTop: '0.4rem', fontWeight: 700, color: '#1E40AF', background: '#EFF6FF', border: '1px solid #BFDBFE', padding: '0.35rem 0.65rem', borderRadius: '8px', fontSize: '0.8rem', width: 'fit-content', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                            <Sparkles size={14} color="#2563EB" />
-                            <span>✨ Add-on Perk: Special discount applied on <strong>"{discountedAddonBonus}"</strong>!</span>
-                          </div>
                         )}
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => handleApplyCoupon()}
+                        className="btn btn-primary"
+                        style={{
+                          padding: '0 1.25rem',
+                          fontWeight: 700,
+                          fontSize: '0.88rem',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        Apply
+                      </button>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={handleRemoveCoupon}
-                      style={{
-                        background: 'rgba(239, 68, 68, 0.1)',
-                        border: 'none',
-                        color: '#DC2626',
-                        fontSize: '0.78rem',
-                        fontWeight: 700,
-                        padding: '0.35rem 0.65rem',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap'
-                      }}
-                    >
-                      Remove
-                    </button>
+                    {couponError && (
+                      <div style={{
+                        marginTop: '0.5rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        fontSize: '0.82rem',
+                        color: '#DC2626'
+                      }}>
+                        <AlertCircle size={14} />
+                        <span>{couponError}</span>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
 
-              {/* Eligible Coupons List */}
-              <div style={{ marginBottom: '1.25rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>
-                    Available Offers for Your Car Wash
-                  </span>
-                  {eligibleCoupons.length > 0 && (
-                    <span style={{ fontSize: '0.75rem', color: '#64748B' }}>
-                      Tap Apply to redeem
-                    </span>
-                  )}
-                </div>
-
-                {loadingCoupons ? (
-                  <div style={{ padding: '1rem', textAlign: 'center', color: '#94A3B8', fontSize: '0.85rem' }}>
-                    Loading available offers...
-                  </div>
-                ) : eligibleCoupons.length === 0 ? (
-                  <div style={{
-                    padding: '1rem',
-                    textAlign: 'center',
-                    background: '#F8FAFC',
-                    borderRadius: '10px',
-                    border: '1px dashed #CBD5E1',
-                    color: '#64748B',
-                    fontSize: '0.82rem'
-                  }}>
-                    No special coupons available for the chosen package right now.
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                    {eligibleCoupons.map(coupon => {
-                      const isApplied = selectedCouponCode === coupon.code;
-                      const discountTag = coupon.discountType === 'FLAT'
-                        ? `₹${coupon.discountAmount} FLAT OFF`
-                        : coupon.discountType === 'NONE'
-                          ? (coupon.freeAddonId ? '🎁 FREE ADD-ON' : '⚡ ADD-ON DISCOUNT')
-                          : `${coupon.discountPct}% OFF${coupon.limitOption === 'UP_TO' && coupon.maxDiscountAmount ? ` (UP TO ₹${coupon.maxDiscountAmount})` : ''}`;
-
-                      return (
-                        <div
-                          key={coupon.id || coupon.code}
-                          style={{
+                  {/* Active Applied Coupon Banner */}
+                  {activeCoupon && (
+                    <div style={{
+                      marginBottom: '1.25rem',
+                      background: 'linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)',
+                      border: '1.5px solid #86EFAC',
+                      borderRadius: '12px',
+                      padding: '1rem',
+                      boxShadow: '0 2px 8px rgba(22, 163, 74, 0.08)'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem' }}>
+                        <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'flex-start' }}>
+                          <div style={{
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '50%',
+                            background: '#16A34A',
+                            color: '#FFF',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '0.85rem 1rem',
-                            borderRadius: '12px',
-                            border: isApplied ? '2px solid #16A34A' : '1px solid #E2E8F0',
-                            background: isApplied ? '#F0FDF4' : '#FFFFFF',
-                            boxShadow: isApplied ? '0 2px 6px rgba(22, 163, 74, 0.1)' : '0 1px 3px rgba(0,0,0,0.02)',
-                            transition: 'all 0.2s ease',
-                            gap: '0.75rem'
-                          }}
-                        >
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
-                              <span style={{
-                                fontWeight: 800,
-                                fontSize: '0.88rem',
-                                color: isApplied ? '#166534' : 'var(--primary-blue)',
-                                background: isApplied ? '#DCFCE7' : '#EFF6FF',
-                                padding: '0.2rem 0.55rem',
-                                borderRadius: '6px',
-                                border: isApplied ? '1px dashed #16A34A' : '1px dashed #3B82F6',
-                                letterSpacing: '0.04em'
-                              }}>
-                                {coupon.code}
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                            marginTop: '0.1rem'
+                          }}>
+                            <Check size={16} strokeWidth={3} />
+                          </div>
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                              <span style={{ fontWeight: 800, color: '#14532D', fontSize: '0.98rem' }}>
+                                {activeCoupon.code}
                               </span>
                               <span style={{
-                                fontSize: '0.76rem',
+                                background: '#16A34A',
+                                color: '#FFF',
+                                fontSize: '0.72rem',
                                 fontWeight: 700,
-                                color: '#047857',
-                                background: '#D1FAE5',
                                 padding: '0.15rem 0.5rem',
-                                borderRadius: '6px'
+                                borderRadius: '10px'
                               }}>
-                                {discountTag}
+                                APPLIED
                               </span>
                               <button
                                 type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setInfoModalCoupon(coupon);
-                                }}
+                                onClick={() => setInfoModalCoupon(activeCoupon)}
                                 style={{
-                                  background: '#F1F5F9',
-                                  border: '1px solid #CBD5E1',
-                                  color: '#0284C7',
-                                  padding: '0.15rem 0.5rem',
+                                  background: '#DCFCE7',
+                                  border: '1px solid #86EFAC',
+                                  color: '#166534',
                                   borderRadius: '6px',
+                                  padding: '0.15rem 0.5rem',
                                   fontSize: '0.72rem',
                                   fontWeight: 700,
                                   cursor: 'pointer',
@@ -4263,72 +4244,326 @@ const BookSlot = () => {
                                 <Info size={12} /> Details
                               </button>
                             </div>
-                            <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#1E293B' }}>
-                              {coupon.title}
+                            <div style={{ color: '#166534', fontSize: '0.85rem', fontWeight: 600, marginTop: '0.2rem' }}>
+                              🎉 You save ₹{couponDiscount.toFixed(2)} with this offer!
                             </div>
-
-                            {/* Free or Discounted Add-on Perk Indicator */}
-                            {coupon.freeAddonId && (
-                              <div style={{ marginTop: '0.3rem', fontSize: '0.74rem', color: '#047857', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                                <span>🎁 Includes FREE Add-on:</span>
-                                <span style={{ textDecoration: 'underline' }}>
-                                  {availableAddons.find(a => Number(a.id) === Number(coupon.freeAddonId))?.name || 'Add-on'} (Auto-added with ₹0 value)
-                                </span>
+                            {freeAddonBonus && (
+                              <div style={{ marginTop: '0.4rem', fontWeight: 700, color: '#166534', background: '#DCFCE7', border: '1px solid #86EFAC', padding: '0.35rem 0.65rem', borderRadius: '8px', fontSize: '0.8rem', width: 'fit-content', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                <Check size={14} color="#16A34A" strokeWidth={3} />
+                                <span>🎁 Free Add-on Perk: <strong>"{freeAddonBonus}"</strong> was automatically added to your cart for ₹0 FREE!</span>
                               </div>
                             )}
-                            {coupon.discountAddonId && (
-                              <div style={{ marginTop: '0.3rem', fontSize: '0.74rem', color: '#1D4ED8', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                                <span>⚡ Includes Discounted Add-on:</span>
-                                <span>
-                                  {availableAddons.find(a => Number(a.id) === Number(coupon.discountAddonId))?.name || 'Add-on'} ({coupon.addonDiscountType === 'FREE' ? '100% FREE' : coupon.addonDiscountType === 'FLAT' ? `₹${coupon.addonDiscountValue} OFF` : `${coupon.addonDiscountValue}% OFF`})
-                                </span>
+                            {discountedAddonBonus && (
+                              <div style={{ marginTop: '0.4rem', fontWeight: 700, color: '#1E40AF', background: '#EFF6FF', border: '1px solid #BFDBFE', padding: '0.35rem 0.65rem', borderRadius: '8px', fontSize: '0.8rem', width: 'fit-content', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                <Sparkles size={14} color="#2563EB" />
+                                <span>✨ Add-on Perk: Special discount applied on <strong>"{discountedAddonBonus}"</strong>!</span>
                               </div>
-                            )}
-                          </div>
-
-                          <div style={{ flexShrink: 0 }}>
-                            {isApplied ? (
-                              <button
-                                type="button"
-                                onClick={handleRemoveCoupon}
-                                className="btn"
-                                style={{
-                                  background: '#DCFCE7',
-                                  color: '#166534',
-                                  border: '1px solid #86EFAC',
-                                  padding: '0.45rem 0.85rem',
-                                  fontSize: '0.78rem',
-                                  fontWeight: 700,
-                                  borderRadius: '8px',
-                                  cursor: 'pointer'
-                                }}
-                              >
-                                Applied ✓
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleApplyCoupon(coupon.code)}
-                                className="btn btn-outline"
-                                style={{
-                                  padding: '0.45rem 1rem',
-                                  fontSize: '0.8rem',
-                                  fontWeight: 700,
-                                  borderRadius: '8px',
-                                  borderColor: 'var(--primary-blue)',
-                                  color: 'var(--primary-blue)'
-                                }}
-                              >
-                                APPLY
-                              </button>
                             )}
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+
+                        <button
+                          type="button"
+                          onClick={handleRemoveCoupon}
+                          style={{
+                            background: 'rgba(239, 68, 68, 0.1)',
+                            border: 'none',
+                            color: '#DC2626',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            padding: '0.35rem 0.65rem',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Eligible Coupons List - If coupon is applied, show only remaining coupons */}
+                  {selectedCouponCode ? (
+                    remainingCoupons.length > 0 && (
+                      <div style={{ marginBottom: '1.25rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>
+                            Other Available Offers ({remainingCoupons.length})
+                          </span>
+                          <span style={{ fontSize: '0.75rem', color: '#64748B' }}>
+                            Tap Apply to switch offer
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                          {remainingCoupons.map(coupon => {
+                            const discountTag = coupon.discountType === 'FLAT'
+                              ? `₹${coupon.discountAmount} FLAT OFF`
+                              : coupon.discountType === 'NONE'
+                                ? (coupon.freeAddonId ? '🎁 FREE ADD-ON' : '⚡ ADD-ON DISCOUNT')
+                                : `${coupon.discountPct}% OFF${coupon.limitOption === 'UP_TO' && coupon.maxDiscountAmount ? ` (UP TO ₹${coupon.maxDiscountAmount})` : ''}`;
+
+                            return (
+                              <div
+                                key={coupon.id || coupon.code}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  padding: '0.85rem 1rem',
+                                  borderRadius: '12px',
+                                  border: '1px solid #E2E8F0',
+                                  background: '#FFFFFF',
+                                  boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                                  transition: 'all 0.2s ease',
+                                  gap: '0.75rem'
+                                }}
+                              >
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
+                                    <span style={{
+                                      fontWeight: 800,
+                                      fontSize: '0.88rem',
+                                      color: 'var(--primary-blue)',
+                                      background: '#EFF6FF',
+                                      padding: '0.2rem 0.55rem',
+                                      borderRadius: '6px',
+                                      border: '1px dashed #3B82F6',
+                                      letterSpacing: '0.04em'
+                                    }}>
+                                      {coupon.code}
+                                    </span>
+                                    <span style={{
+                                      fontSize: '0.76rem',
+                                      fontWeight: 700,
+                                      color: '#047857',
+                                      background: '#D1FAE5',
+                                      padding: '0.15rem 0.5rem',
+                                      borderRadius: '6px'
+                                    }}>
+                                      {discountTag}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setInfoModalCoupon(coupon);
+                                      }}
+                                      style={{
+                                        background: '#F1F5F9',
+                                        border: '1px solid #CBD5E1',
+                                        color: '#0284C7',
+                                        padding: '0.15rem 0.5rem',
+                                        borderRadius: '6px',
+                                        fontSize: '0.72rem',
+                                        fontWeight: 700,
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.25rem'
+                                      }}
+                                    >
+                                      <Info size={12} /> Details
+                                    </button>
+                                  </div>
+                                  <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#1E293B' }}>
+                                    {coupon.title}
+                                  </div>
+
+                                  {/* Free or Discounted Add-on Perk Indicator */}
+                                  {coupon.freeAddonId && (
+                                    <div style={{ marginTop: '0.3rem', fontSize: '0.74rem', color: '#047857', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                      <span>🎁 Includes FREE Add-on:</span>
+                                      <span style={{ textDecoration: 'underline' }}>
+                                        {availableAddons.find(a => Number(a.id) === Number(coupon.freeAddonId))?.name || 'Add-on'} (Auto-added with ₹0 value)
+                                      </span>
+                                    </div>
+                                  )}
+                                  {coupon.discountAddonId && (
+                                    <div style={{ marginTop: '0.3rem', fontSize: '0.74rem', color: '#1D4ED8', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                      <span>⚡ Includes Discounted Add-on:</span>
+                                      <span>
+                                        {availableAddons.find(a => Number(a.id) === Number(coupon.discountAddonId))?.name || 'Add-on'} ({coupon.addonDiscountType === 'FREE' ? '100% FREE' : coupon.addonDiscountType === 'FLAT' ? `₹${coupon.addonDiscountValue} OFF` : `${coupon.addonDiscountValue}% OFF`})
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div style={{ flexShrink: 0 }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleApplyCoupon(coupon.code)}
+                                    className="btn btn-outline"
+                                    style={{
+                                      padding: '0.45rem 1rem',
+                                      fontSize: '0.8rem',
+                                      fontWeight: 700,
+                                      borderRadius: '8px',
+                                      borderColor: 'var(--primary-blue)',
+                                      color: 'var(--primary-blue)'
+                                    }}
+                                  >
+                                    APPLY
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )
+                  ) : (
+                    /* No coupon currently applied: Show all eligible coupons */
+                    <div style={{ marginBottom: '1.25rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>
+                          Available Offers for Your Car Wash
+                        </span>
+                        {eligibleCoupons.length > 0 && (
+                          <span style={{ fontSize: '0.75rem', color: '#64748B' }}>
+                            Tap Apply to redeem
+                          </span>
+                        )}
+                      </div>
+
+                      {loadingCoupons ? (
+                        <div style={{ padding: '1rem', textAlign: 'center', color: '#94A3B8', fontSize: '0.85rem' }}>
+                          Loading available offers...
+                        </div>
+                      ) : eligibleCoupons.length === 0 ? (
+                        <div style={{
+                          padding: '1rem',
+                          textAlign: 'center',
+                          background: '#F8FAFC',
+                          borderRadius: '10px',
+                          border: '1px dashed #CBD5E1',
+                          color: '#64748B',
+                          fontSize: '0.82rem'
+                        }}>
+                          No special coupons available for the chosen package right now.
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                          {eligibleCoupons.map(coupon => {
+                            const discountTag = coupon.discountType === 'FLAT'
+                              ? `₹${coupon.discountAmount} FLAT OFF`
+                              : coupon.discountType === 'NONE'
+                                ? (coupon.freeAddonId ? '🎁 FREE ADD-ON' : '⚡ ADD-ON DISCOUNT')
+                                : `${coupon.discountPct}% OFF${coupon.limitOption === 'UP_TO' && coupon.maxDiscountAmount ? ` (UP TO ₹${coupon.maxDiscountAmount})` : ''}`;
+
+                            return (
+                              <div
+                                key={coupon.id || coupon.code}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  padding: '0.85rem 1rem',
+                                  borderRadius: '12px',
+                                  border: '1px solid #E2E8F0',
+                                  background: '#FFFFFF',
+                                  boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                                  transition: 'all 0.2s ease',
+                                  gap: '0.75rem'
+                                }}
+                              >
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
+                                    <span style={{
+                                      fontWeight: 800,
+                                      fontSize: '0.88rem',
+                                      color: 'var(--primary-blue)',
+                                      background: '#EFF6FF',
+                                      padding: '0.2rem 0.55rem',
+                                      borderRadius: '6px',
+                                      border: '1px dashed #3B82F6',
+                                      letterSpacing: '0.04em'
+                                    }}>
+                                      {coupon.code}
+                                    </span>
+                                    <span style={{
+                                      fontSize: '0.76rem',
+                                      fontWeight: 700,
+                                      color: '#047857',
+                                      background: '#D1FAE5',
+                                      padding: '0.15rem 0.5rem',
+                                      borderRadius: '6px'
+                                    }}>
+                                      {discountTag}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setInfoModalCoupon(coupon);
+                                      }}
+                                      style={{
+                                        background: '#F1F5F9',
+                                        border: '1px solid #CBD5E1',
+                                        color: '#0284C7',
+                                        padding: '0.15rem 0.5rem',
+                                        borderRadius: '6px',
+                                        fontSize: '0.72rem',
+                                        fontWeight: 700,
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.25rem'
+                                      }}
+                                    >
+                                      <Info size={12} /> Details
+                                    </button>
+                                  </div>
+                                  <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#1E293B' }}>
+                                    {coupon.title}
+                                  </div>
+
+                                  {/* Free or Discounted Add-on Perk Indicator */}
+                                  {coupon.freeAddonId && (
+                                    <div style={{ marginTop: '0.3rem', fontSize: '0.74rem', color: '#047857', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                      <span>🎁 Includes FREE Add-on:</span>
+                                      <span style={{ textDecoration: 'underline' }}>
+                                        {availableAddons.find(a => Number(a.id) === Number(coupon.freeAddonId))?.name || 'Add-on'} (Auto-added with ₹0 value)
+                                      </span>
+                                    </div>
+                                  )}
+                                  {coupon.discountAddonId && (
+                                    <div style={{ marginTop: '0.3rem', fontSize: '0.74rem', color: '#1D4ED8', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                      <span>⚡ Includes Discounted Add-on:</span>
+                                      <span>
+                                        {availableAddons.find(a => Number(a.id) === Number(coupon.discountAddonId))?.name || 'Add-on'} ({coupon.addonDiscountType === 'FREE' ? '100% FREE' : coupon.addonDiscountType === 'FLAT' ? `₹${coupon.addonDiscountValue} OFF` : `${coupon.addonDiscountValue}% OFF`})
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div style={{ flexShrink: 0 }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleApplyCoupon(coupon.code)}
+                                    className="btn btn-outline"
+                                    style={{
+                                      padding: '0.45rem 1rem',
+                                      fontSize: '0.8rem',
+                                      fontWeight: 700,
+                                      borderRadius: '8px',
+                                      borderColor: 'var(--primary-blue)',
+                                      color: 'var(--primary-blue)'
+                                    }}
+                                  >
+                                    APPLY
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
 
               {/* Loyalty Points Redemption */}
               {userPoints > 0 && systemSettings?.pointsRedemption && (

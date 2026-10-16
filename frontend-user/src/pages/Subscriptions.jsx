@@ -321,19 +321,10 @@ const Subscriptions = () => {
     : `${carMake} ${carModel}`.trim();
 
   return (
-    <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '1rem 1rem 5rem 1rem' }}>
+    <div style={{ maxWidth: '1100px', margin: '0 auto', paddingBottom: '3.5rem' }}>
       
       {/* 1. HERO BANNER */}
-      <div style={{
-        position: 'relative',
-        borderRadius: '24px',
-        overflow: 'hidden',
-        background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #2E1065 100%)',
-        padding: '2.5rem 1.75rem',
-        color: 'white',
-        boxShadow: '0 20px 45px -10px rgba(15, 23, 42, 0.4)',
-        marginBottom: '2rem'
-      }}>
+      <div className="sub-hero-card">
         <div style={{
           position: 'absolute',
           top: '-30px',
@@ -665,14 +656,7 @@ const Subscriptions = () => {
       )}
 
       {/* 3. STEP 1: VEHICLE INTERLINKING & SELECTION */}
-      <div id="vehicle-binding-section" style={{
-        background: '#FFFFFF',
-        borderRadius: '20px',
-        border: '1.5px solid #E2E8F0',
-        padding: '1.5rem',
-        marginBottom: '2rem',
-        boxShadow: '0 8px 24px rgba(0,0,0,0.04)'
-      }}>
+      <div id="vehicle-binding-section" className="sub-vehicle-card">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '4px' }}>
@@ -990,49 +974,24 @@ const Subscriptions = () => {
         )}
 
         {/* Selected Vehicle Confirmation Strip */}
-        <div style={{
-          marginTop: '1.25rem',
-          padding: '0.75rem 1rem',
-          background: '#F8FAFC',
-          borderRadius: '12px',
-          border: '1px solid #E2E8F0',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '0.5rem',
-          fontSize: '0.85rem'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ fontWeight: 700, color: '#475569' }}>Selected Pass Vehicle:</span>
-            <span style={{
-              background: '#0F172A',
-              color: '#FCD34D',
-              padding: '2px 8px',
-              borderRadius: '6px',
-              fontWeight: 800,
-              fontFamily: 'monospace'
-            }}>
+        <div className="sub-selected-strip">
+          <div className="sub-selected-info">
+            <span style={{ fontWeight: 700, color: '#475569', fontSize: '0.84rem' }}>Selected Pass Vehicle:</span>
+            <span className="sub-plate-badge">
+              <Car size={13} style={{ marginRight: '4px' }} />
               {currentActiveCarNumber || 'ENTER NUMBER ABOVE'}
             </span>
             {currentActiveCarTitle && (
-              <span style={{ fontWeight: 700, color: '#1E293B' }}>
+              <span style={{ fontWeight: 700, color: '#1E293B', fontSize: '0.85rem' }}>
                 • {currentActiveCarTitle}
               </span>
             )}
-            <span style={{
-              background: '#E0F2FE',
-              color: '#0369A1',
-              padding: '2px 8px',
-              borderRadius: '6px',
-              fontWeight: 700,
-              fontSize: '0.75rem'
-            }}>
+            <span className="sub-category-badge">
               {selectedCarTypeObj?.name || 'Class'}
             </span>
           </div>
 
-          <span style={{ fontSize: '0.75rem', color: '#16A34A', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '3px' }}>
+          <span className="sub-protection-badge">
             <Shield size={13} /> Only this car will be eligible for VIP benefits
           </span>
         </div>
@@ -1068,11 +1027,11 @@ const Subscriptions = () => {
           <p style={{ margin: 0, fontSize: '0.9rem' }}>Please select another vehicle or check back later.</p>
         </div>
       ) : (
-        <div style={{
+        <div className="sub-plans-grid" style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
           gap: '1.5rem',
-          marginBottom: '3rem'
+          marginBottom: '2.5rem'
         }}>
           {filteredPlans.map(plan => {
             let parsedFeatures = [];
@@ -1098,6 +1057,7 @@ const Subscriptions = () => {
             return (
               <div
                 key={plan.id}
+                className="sub-plan-card"
                 style={{
                   background: '#FFFFFF',
                   borderRadius: '24px',
@@ -1133,7 +1093,7 @@ const Subscriptions = () => {
                 )}
 
                 {/* Plan Header */}
-                <div style={{
+                <div className="sub-plan-header" style={{
                   padding: '2rem 1.75rem 1.25rem 1.75rem',
                   borderBottom: '1px solid #F1F5F9',
                   background: isBestValue ? 'linear-gradient(180deg, #FFFDF5 0%, #FFFFFF 100%)' : '#FFFFFF'
@@ -1186,7 +1146,7 @@ const Subscriptions = () => {
                 </div>
 
                 {/* Highlights Banner */}
-                <div style={{
+                <div className="sub-plan-highlights" style={{
                   padding: '1.25rem 1.75rem',
                   background: '#F8FAFC',
                   borderBottom: '1px solid #F1F5F9',
@@ -1218,7 +1178,7 @@ const Subscriptions = () => {
 
                 {/* Breakdown of Washes & Free Addons */}
                 {(parsedIncludedWashes.some(w => Number(w.count) > 0) || parsedIncludedAddons.some(a => Number(a.count) > 0)) && (
-                  <div style={{
+                  <div className="sub-plan-breakdown" style={{
                     padding: '0.85rem 1.75rem',
                     background: '#FFFDF5',
                     borderBottom: '1px solid #FEF3C7',
@@ -1258,7 +1218,7 @@ const Subscriptions = () => {
                 )}
 
                 {/* Checklist of Features */}
-                <div style={{ padding: '1.5rem 1.75rem', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                <div className="sub-plan-features" style={{ padding: '1.5rem 1.75rem', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                   <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>
                     Included Privileges:
                   </div>
@@ -1273,7 +1233,7 @@ const Subscriptions = () => {
                 </div>
 
                 {/* Action CTA */}
-                <div style={{ padding: '1.25rem 1.75rem 1.75rem 1.75rem' }}>
+                <div className="sub-plan-cta" style={{ padding: '1.25rem 1.75rem 1.75rem 1.75rem' }}>
                   <button
                     onClick={() => handleInitiateSubscribe(plan)}
                     disabled={isSubscribing}

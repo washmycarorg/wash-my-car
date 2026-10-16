@@ -25,10 +25,11 @@ const LeaveApprovals = () => {
   if (loading) return <div>Loading leaves...</div>;
 
   return (
-    <div className="card" style={{padding: 0, overflowX: 'auto'}}>
+    <div className="card p-0" style={{padding: 0}}>
       <div className="p-6 border-b border-gray-200">
         <h3 style={{margin: 0}}>Leave Requests</h3>
       </div>
+      <div className="table-responsive">
       <table style={{width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '600px'}}>
         <thead style={{background: '#F8FAFC'}}>
           <tr>
@@ -83,6 +84,7 @@ const LeaveApprovals = () => {
           )}
         </tbody>
       </table>
+      </div>
     </div>
   );
 };

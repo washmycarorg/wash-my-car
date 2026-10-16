@@ -5,7 +5,8 @@ import {
   Mail, Award, Clock, Menu, X, Sparkles, Star, ChevronRight, Check, 
   Compass, Shield, Tag, ChevronDown, MessageCircle, ArrowRight,
   Flame, Bike, Feather, Smartphone, ExternalLink, HelpCircle,
-  ChevronLeft, Copy, Send, User, Gift, Zap, Image, Upload, Trash2, Crown
+  ChevronLeft, Copy, Send, User, Gift, Zap, Image, Upload, Trash2, Crown,
+  RefreshCw, AlertCircle
 } from 'lucide-react';
 import { getHomeContent, getServiceAreas, getWashTypes, getAllWashPrices, getCarTypes, getAddons, getActiveCoupons, submitInquiry, getSettings } from '../api';
 
@@ -14,7 +15,7 @@ import logo from '../assets/wash my car.png';
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 const VIZAG_COORDS = { lat: 17.7042, lng: 83.2980 };
 
-const DEFAULT_HERO_SLIDES = [
+const FALLBACK_SLIDE = [
   {
     id: 'slide-1',
     kicker: 'WASH MY CAR ORG • DOORSTEP CAR WASH',
@@ -26,133 +27,85 @@ const DEFAULT_HERO_SLIDES = [
     ctaSecondary: 'Explore Packages',
     primaryLink: '/login',
     secondaryLink: '#packages'
-  },
-  {
-    id: 'slide-2',
-    kicker: 'DEEP INTERIOR & STEAM DETAILING',
-    title: 'SHOWROOM SHINE.\nAT YOUR DOORSTEP.',
-    subtitle: 'High-pressure snow foam wash, germ-free steam disinfection, and deep microfiber rejuvenation for cars and bikes.',
-    image: 'https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=2200&q=95',
-    badgeText: 'ANTI-BACTERIAL STEAM',
-    ctaPrimary: 'Book Interior Spa',
-    ctaSecondary: 'View Packages',
-    primaryLink: '/login',
-    secondaryLink: '#packages'
-  },
-  {
-    id: 'slide-3',
-    kicker: 'CERAMIC & PAINT SHIELD',
-    title: '9H CERAMIC &\nPOLYMER COATING',
-    subtitle: 'Ultra-gloss paint correction and protective nanotech coating that shields against UV rays, swirl marks, and hard water spots.',
-    image: 'https://images.unsplash.com/photo-1507136566006-cfc505b114fc?auto=format&fit=crop&w=2200&q=95',
-    badgeText: '3-YEAR PROTECTION',
-    ctaPrimary: 'Get Ceramic Quote',
-    ctaSecondary: 'Explore Plans',
-    primaryLink: '/login',
-    secondaryLink: '#packages'
-  },
-  {
-    id: 'slide-4',
-    kicker: 'SPECIAL LAUNCH OFFER',
-    title: 'FLAT 20% OFF\nYOUR FIRST SERVICE',
-    subtitle: 'Join over 10,000 happy vehicle owners across Visakhapatnam enjoying doorstep mobile car spa at unbeatable prices.',
-    image: 'https://images.unsplash.com/photo-1504215680853-026ed2a45def?auto=format&fit=crop&w=2200&q=95',
-    badgeText: 'LIMITED TIME OFFER',
-    ctaPrimary: 'Claim 20% Off',
-    ctaSecondary: 'Why Wash My Car Org',
-    primaryLink: '/register',
-    secondaryLink: '#why-us'
   }
 ];
+
+
+const parsePackageHighlights = (desc, quickByte, name) => {
+  if (!desc) {
+    return {
+      summary: quickByte ? quickByte.trim() : '',
+      points: []
+    };
+  }
+
+  // Strip invisible unicode zero-width spaces / soft hyphens
+  const cleanDesc = desc.replace(/[\u200B-\u200D\uFEFF\u2060\u00A0]/g, ' ').trim();
+  const hasBullets = cleanDesc.includes('-') || cleanDesc.includes('•') || cleanDesc.includes('–') || cleanDesc.includes('—');
+  let summary = quickByte ? quickByte.trim() : '';
+  let points = [];
+
+  if (hasBullets) {
+    const rawParts = cleanDesc.split(/[-•–—]/).map(p => p.trim()).filter(Boolean);
+    const startsWithBullet = cleanDesc.startsWith('-') || cleanDesc.startsWith('•') || cleanDesc.startsWith('–') || cleanDesc.startsWith('—');
+
+    if (!startsWithBullet && rawParts.length > 1) {
+      const first = rawParts[0].toLowerCase();
+      const n = (name || '').toLowerCase();
+      // If the first part is a plan title/intro like "Basic plan" or matches the name
+      if (first.includes('plan') || first === n || first.includes(n) || (first.length < 25 && !first.includes('wash') && !first.includes('clean') && !first.includes('polish'))) {
+        if (!summary) summary = rawParts[0];
+        points = rawParts.slice(1);
+      } else {
+        // First part is actually a service point (e.g. "Exterior foam wash")
+        points = rawParts;
+      }
+    } else {
+      points = rawParts;
+    }
+  } else if (cleanDesc.includes('\n')) {
+    const rawLines = cleanDesc.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (rawLines.length > 1) {
+      if (!summary) summary = rawLines[0];
+      points = rawLines.slice(1);
+    } else {
+      points = rawLines;
+    }
+  } else {
+    if (cleanDesc.toLowerCase().trim() !== (name || '').toLowerCase().trim()) {
+      points = [cleanDesc];
+    }
+  }
+
+  const formattedPoints = points.map(p => {
+    const cleaned = p.replace(/^[-•*–—\s]+/, '').trim();
+    if (!cleaned) return '';
+    return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+  }).filter(Boolean);
+
+  return {
+    summary: summary,
+    points: formattedPoints
+  };
+};
 
 const Home = () => {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [openFaqIndex, setOpenFaqIndex] = useState(0);
 
-  // Dynamic CMS State with rich defaults
-  const [cms, setCms] = useState({
-    heroSlides: DEFAULT_HERO_SLIDES,
-    heroKicker: "WASH MY CAR ORG • DOORSTEP CAR WASH",
-    heroTitle: "WE WASH.\nYOU RELAX.",
-    heroSubtitle: "Premium vehicle spa and car detailing at your doorstep. Save time, skip the queue, and let trained professionals care for your car.",
-    heroImage: "https://images.unsplash.com/photo-1504215680853-026ed2a45def?auto=format&fit=crop&w=2200&q=95",
-    heroBadgeText: "WATER EFFICIENT & RO CARE",
-    heroCtaPrimary: "Book Doorstep Wash",
-    heroCtaSecondary: "Explore Packages",
-
-    quickBarLive: "● LIVE DOORSTEP CAR WASH",
-    quickBarTitle: "App & Online Booking is Live.",
-    quickBarSubtitle: "Book doorstep vehicle detailing in seconds.",
-
-    servicesTitle: "EVERYDAY CARE. PREMIUM SHINE.",
-    servicesSubtitle: "One destination for your vehicle's everyday wash, interior deep steam, and premium shine.",
-
-    whyTitle: "SMARTER CAR CARE. BUILT AROUND YOU.",
-    whySubtitle: "Convenience-first automotive detailing with professional high-pressure equipment and deionized spot-free water.",
-    whyCard1Title: "YOUR CAR STAYS. WE COME TO YOU.",
-    whyCard1Text: "No queues. No driving to wash centres. Our technicians arrive at your home or office with high-pressure machines and spot-free deionized water.",
-    whyCard2Title: "Book in Seconds",
-    whyCard2Text: "Choose your wash package, select your slot, and track everything live.",
-    whyCard3Title: "Trained Specialists",
-    whyCard3Text: "Background-verified, trained vehicle care professionals using pH-neutral premium shampoos.",
-    whyCard4Title: "Water-Efficient Care",
-    whyCard4Text: "Eco-conscious steam & pressure washing saves up to 80% water compared to traditional washing.",
-
-    statCustomers: "10K+",
-    statCustomersLabel: "Happy Vehicle Owners",
-    statCities: "2+",
-    statCitiesLabel: "Service Hubs Live",
-    statDuration: "30–90",
-    statDurationLabel: "Minutes Service Time",
-    statPrice: "₹299+",
-    statPriceLabel: "Starting Wash Price",
-
-    partnerTitle: "BUILD THE NEXT CAR CARE BUSINESS",
-    partnerSubtitle: "Choose the operating model that fits your city — doorstep franchise partner or fixed branded outlet.",
-    doorstepPlanTitle: "Doorstep Franchise Partner",
-    doorstepPlanPrice: "₹1.8 LAKH",
-    doorstepPlanPerks: "Low investment,No shop required,Proven high margin model,Machinery & launch support",
-    outletPlanTitle: "Branded Outlet Partner",
-    outletPlanPrice: "₹3.5 LAKH",
-    outletPlanPerks: "Storefront branding,Interior setup,High-end pressure equipment,Technology & SOPs",
-    franchisePlans: [
-      {
-        id: "plan-1",
-        title: "Doorstep Franchise Partner",
-        price: "₹1.8 LAKH",
-        badge: "MOBILE DETAILING",
-        perks: "Low investment,No shop required,Proven high margin model,Machinery & launch support"
-      },
-      {
-        id: "plan-2",
-        title: "Branded Outlet Partner",
-        price: "₹3.5 LAKH",
-        badge: "PHYSICAL STUDIO",
-        perks: "Storefront branding,Interior setup,High-end pressure equipment,Technology & SOPs"
-      }
-    ],
-
-    contactPhone: "+91 98765 43210",
-    contactEmail: "washmycarorg@gmail.com",
-    contactAddress: "Sujatha Nagar, Visakhapatnam, Andhra Pradesh",
-    whatsappNumber: "+919876543210",
-
-    promoTitle: "Get 20% OFF Your First Doorstep Wash!",
-    promoText: "Claim Offer Now",
-
-    faqs: [
-      { q: "How do I book a doorstep car wash?", a: "Simply select your vehicle type, pick your package & optional add-ons (like Helmet or Bike wash), choose a date and time slot, and our trained technician will arrive equipped with high-pressure machines and spot-free deionized water." },
-      { q: "Do I need to provide water and electricity?", a: "Our mobile vans carry dedicated water storage and mobile generators. A domestic plug point is helpful, but our units are fully self-sufficient." },
-      { q: "Can I add add-on services like Helmet or Bike wash?", a: "Yes! While booking any car wash, you can easily attach add-on services such as Helmet wash, 2-wheeler wash, interior ozone sanitization, and engine bay steam cleaning directly into the checkout total." },
-      { q: "Where is Wash My Car Org currently available?", a: "We are actively serving Visakhapatnam and surrounding neighborhoods, with expanding operations across Andhra Pradesh and Telangana." },
-      { q: "How does employee assignment and tracking work?", a: "Once your booking is confirmed, our automated scheduling assigns an on-duty technician in your area. Technicians upload before & after service photos with verified GPS location tracking for complete peace of mind." }
-    ]
-  });
+  // Loading & Error States
+  const [pageLoading, setPageLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [cms, setCms] = useState(null);
 
   // Slider State (Pexa Car Care Carousel - Continuously Auto-scrolling)
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
-  const [touchStartX, setTouchStartX] = useState(0);
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+  const isDragging = useRef(false);
+  const dragStartX = useRef(0);
+  const [isSwipingActive, setIsSwipingActive] = useState(false);
 
   const [coupons, setCoupons] = useState([]);
   const [copiedCoupon, setCopiedCoupon] = useState('');
@@ -182,84 +135,151 @@ const Home = () => {
   const mapContainerRef = useRef(null);
   const googleMapInstance = useRef(null);
 
-  useEffect(() => {
-    getHomeContent()
-      .then(res => {
-        if (res) {
-          let faqsParsed = res.faqs;
-          if (typeof faqsParsed === 'string') {
-            try {
-              faqsParsed = JSON.parse(faqsParsed);
-            } catch (e) {
-              faqsParsed = null;
-            }
-          }
+  const loadHomePageData = async () => {
+    setPageLoading(true);
+    setLoadError(false);
 
-          let slidesParsed = res.heroSlides;
-          if (typeof slidesParsed === 'string') {
-            try {
-              slidesParsed = JSON.parse(slidesParsed);
-            } catch (e) {
-              slidesParsed = null;
-            }
-          }
+    try {
+      const [cmsRes, areasRes, typesRes, pricesRes, carsRes, addonsRes, couponsRes, settingsRes] = await Promise.all([
+        getHomeContent().catch(err => { console.warn("Could not load dynamic CMS contents:", err); return null; }),
+        getServiceAreas().catch(err => { console.warn("Could not load areas:", err); return []; }),
+        getWashTypes().catch(err => { console.warn("Could not load wash types:", err); return []; }),
+        getAllWashPrices().catch(err => { console.warn("Could not load prices:", err); return []; }),
+        getCarTypes().catch(err => { console.warn("Could not load car types:", err); return []; }),
+        getAddons().catch(err => { console.warn("Could not load addons:", err); return []; }),
+        getActiveCoupons().catch(err => { console.warn("Could not load coupons:", err); return []; }),
+        getSettings().catch(err => { console.warn("Could not load settings:", err); return null; })
+      ]);
 
-          let franchiseParsed = res.franchisePlans;
-          if (typeof franchiseParsed === 'string') {
-            try {
-              franchiseParsed = JSON.parse(franchiseParsed);
-            } catch (e) {
-              franchiseParsed = null;
-            }
-          }
-          if (!Array.isArray(franchiseParsed) || franchiseParsed.length === 0) {
-            franchiseParsed = [
-              {
-                id: 'plan-1',
-                title: res.doorstepPlanTitle || "Doorstep Franchise Partner",
-                price: res.doorstepPlanPrice || "₹1.8 LAKH",
-                badge: "MOBILE DETAILING",
-                perks: res.doorstepPlanPerks || "Low investment,No shop required,Proven high margin model,Machinery & launch support"
-              },
-              {
-                id: 'plan-2',
-                title: res.outletPlanTitle || "Branded Outlet Partner",
-                price: res.outletPlanPrice || "₹3.5 LAKH",
-                badge: "PHYSICAL STUDIO",
-                perks: res.outletPlanPerks || "Storefront branding,Interior setup,High-end pressure equipment,Technology & SOPs"
-              }
-            ];
-          }
+      if (!cmsRes && (!typesRes || typesRes.length === 0)) {
+        setLoadError(true);
+        setPageLoading(false);
+        return;
+      }
 
-          const resolvedSlides = Array.isArray(slidesParsed) && slidesParsed.length > 0
-            ? slidesParsed
-            : DEFAULT_HERO_SLIDES;
-
-          setCms(prev => ({
-            ...prev,
-            ...res,
-            heroSlides: resolvedSlides,
-            franchisePlans: franchiseParsed,
-            faqs: Array.isArray(faqsParsed) && faqsParsed.length > 0 ? faqsParsed : prev.faqs
-          }));
+      let faqsParsed = cmsRes?.faqs;
+      if (typeof faqsParsed === 'string') {
+        try {
+          faqsParsed = JSON.parse(faqsParsed);
+        } catch (e) {
+          faqsParsed = null;
         }
-      })
-      .catch(err => console.warn("Could not load dynamic CMS contents, using defaults:", err));
+      }
 
-    getServiceAreas().then(setAreas).catch(console.warn);
-    getWashTypes().then(setWashTypes).catch(console.warn);
-    getAllWashPrices().then(setWashPrices).catch(console.warn);
-    getCarTypes().then(setCarTypes).catch(console.warn);
-    getAddons().then(setAddons).catch(console.warn);
-    getActiveCoupons().then(setCoupons).catch(console.warn);
-    getSettings().then(setSettings).catch(console.warn);
+      let slidesParsed = cmsRes?.heroSlides;
+      if (typeof slidesParsed === 'string') {
+        try {
+          slidesParsed = JSON.parse(slidesParsed);
+        } catch (e) {
+          slidesParsed = null;
+        }
+      }
+
+      let franchiseParsed = cmsRes?.franchisePlans;
+      if (typeof franchiseParsed === 'string') {
+        try {
+          franchiseParsed = JSON.parse(franchiseParsed);
+        } catch (e) {
+          franchiseParsed = null;
+        }
+      }
+      if (!Array.isArray(franchiseParsed) || franchiseParsed.length === 0) {
+        if (cmsRes?.doorstepPlanTitle) {
+          franchiseParsed = [
+            {
+              id: 'plan-1',
+              title: cmsRes.doorstepPlanTitle,
+              price: cmsRes.doorstepPlanPrice || "₹1.8 LAKH",
+              badge: "MOBILE DETAILING",
+              perks: cmsRes.doorstepPlanPerks || "Low investment,No shop required,High profit margins,Full machinery & launch support"
+            }
+          ];
+          if (cmsRes?.outletPlanTitle && cmsRes.outletPlanTitle.trim()) {
+            franchiseParsed.push({
+              id: 'plan-2',
+              title: cmsRes.outletPlanTitle,
+              price: cmsRes.outletPlanPrice || "₹3.5 LAKH",
+              badge: "PHYSICAL STUDIO",
+              perks: cmsRes.outletPlanPerks || "Storefront branding,Interior setup,High-end pressure equipment,Technology & SOPs"
+            });
+          }
+        } else {
+          franchiseParsed = [];
+        }
+      }
+
+      let resolvedSlides = [];
+      if (Array.isArray(slidesParsed) && slidesParsed.length > 0) {
+        resolvedSlides = slidesParsed;
+      } else if (cmsRes?.heroTitle) {
+        resolvedSlides = [
+          {
+            id: 'slide-1',
+            kicker: cmsRes.heroKicker || "WASH MY CAR ORG • DOORSTEP CAR WASH",
+            title: cmsRes.heroTitle || "WE WASH.\nYOU RELAX.",
+            subtitle: cmsRes.heroSubtitle || "Fast, affordable, and eco-friendly car cleaning in Visakhapatnam.",
+            image: cmsRes.heroImage || "https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=2200&q=95",
+            badgeText: cmsRes.heroBadgeText || "WATER EFFICIENT & SPOT-FREE CARE",
+            ctaPrimary: cmsRes.heroCtaPrimary || "Book Doorstep Wash",
+            ctaSecondary: cmsRes.heroCtaSecondary || "Explore Packages",
+            primaryLink: "/login",
+            secondaryLink: "#packages"
+          }
+        ];
+      } else {
+        resolvedSlides = FALLBACK_SLIDE;
+      }
+
+      setCms({
+        ...cmsRes,
+        heroSlides: resolvedSlides,
+        franchisePlans: franchiseParsed,
+        faqs: Array.isArray(faqsParsed) && faqsParsed.length > 0 ? faqsParsed : []
+      });
+
+      setAreas(areasRes || []);
+      setWashTypes(typesRes || []);
+      setWashPrices(pricesRes || []);
+      setCarTypes(carsRes || []);
+      setAddons(addonsRes || []);
+      setCoupons(couponsRes || []);
+      setSettings(settingsRes || null);
+      setPageLoading(false);
+    } catch (err) {
+      console.error("Failed to load home page data:", err);
+      setLoadError(true);
+      setPageLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadHomePageData();
   }, []);
 
-  const slides = Array.isArray(cms.heroSlides) && cms.heroSlides.length > 0
+  const slides = Array.isArray(cms?.heroSlides) && cms.heroSlides.length > 0
     ? cms.heroSlides
-    : DEFAULT_HERO_SLIDES;
+    : FALLBACK_SLIDE;
 
-  const activeSlide = slides[currentSlideIndex] || slides[0] || DEFAULT_HERO_SLIDES[0];
+  const activeSlide = slides[currentSlideIndex] || slides[0] || FALLBACK_SLIDE[0];
+
+  const socialLinks = React.useMemo(() => {
+    if (!settings?.socialLinks) {
+      return [
+        { id: 'instagram', platform: 'Instagram', enabled: true, name: '@washmycarorg', url: 'https://instagram.com/' },
+        { id: 'facebook', platform: 'Facebook', enabled: true, name: 'Wash My Car Org', url: 'https://facebook.com/' },
+        { id: 'whatsapp', platform: 'WhatsApp', enabled: true, name: '+91 98765 43210', url: 'https://wa.me/919876543210' },
+        { id: 'linkedin', platform: 'LinkedIn', enabled: false, name: 'Wash My Car Org', url: 'https://linkedin.com/' },
+        { id: 'twitter', platform: 'Twitter (X)', enabled: false, name: '@washmycarorg', url: 'https://x.com/' }
+      ];
+    }
+    try {
+      const parsed = typeof settings.socialLinks === 'string' ? JSON.parse(settings.socialLinks) : settings.socialLinks;
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {
+      console.warn('Could not parse social links:', e);
+    }
+    return [];
+  }, [settings?.socialLinks]);
 
   const nextSlide = () => {
     setCurrentSlideIndex(prev => (prev === slides.length - 1 ? 0 : prev + 1));
@@ -403,18 +423,54 @@ const Home = () => {
   };
 
 
-  // Touch Swipe for Mobile
+  // Swipe Gestures for Mobile Touch and Desktop Drag
   const handleTouchStart = (e) => {
-    setTouchStartX(e.touches[0].clientX);
+    if (!e.touches || e.touches.length === 0) return;
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
   };
 
   const handleTouchEnd = (e) => {
+    if (!e.changedTouches || e.changedTouches.length === 0) return;
     const touchEndX = e.changedTouches[0].clientX;
-    const diff = touchStartX - touchEndX;
-    if (diff > 50) {
-      nextSlide();
-    } else if (diff < -50) {
-      prevSlide();
+    const touchEndY = e.changedTouches[0].clientY;
+    const diffX = touchStartX.current - touchEndX;
+    const diffY = touchStartY.current - touchEndY;
+    // Only trigger horizontal slide change if horizontal swipe delta is larger than vertical scrolling delta
+    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 40) {
+      if (diffX > 0) {
+        nextSlide();
+      } else {
+        prevSlide();
+      }
+    }
+  };
+
+  const handleMouseDown = (e) => {
+    if (e.target.closest('button, a, input, select, textarea')) return;
+    isDragging.current = true;
+    dragStartX.current = e.clientX;
+    setIsSwipingActive(true);
+  };
+
+  const handleMouseUp = (e) => {
+    if (!isDragging.current) return;
+    isDragging.current = false;
+    setIsSwipingActive(false);
+    const diffX = dragStartX.current - e.clientX;
+    if (Math.abs(diffX) > 45) {
+      if (diffX > 0) {
+        nextSlide();
+      } else {
+        prevSlide();
+      }
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (isDragging.current) {
+      isDragging.current = false;
+      setIsSwipingActive(false);
     }
   };
 
@@ -504,7 +560,305 @@ const Home = () => {
     loadGoogleMaps();
   }, [areas]);
 
-  const cleanWhatsappNumber = (cms.whatsappNumber || '+919876543210').replace(/\D/g, '');
+  const cleanWhatsappNumber = (cms?.whatsappNumber || '+919876543210').replace(/\D/g, '');
+
+  // 1. SUPER BEAUTIFUL CAR-WASH THEMED LUXURY LOADING SCREEN
+  if (pageLoading) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: 'radial-gradient(circle at 50% 35%, #0B1E3F 0%, #081329 45%, #04091A 100%)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: 'Outfit, sans-serif',
+        color: '#FFFFFF',
+        padding: '2rem',
+        position: 'relative',
+        overflow: 'hidden'
+      }}>
+        {/* Animated ambient water ripples & glows */}
+        <div style={{
+          position: 'absolute',
+          top: '20%',
+          left: '25%',
+          width: '350px',
+          height: '350px',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(14, 165, 233, 0.16) 0%, transparent 70%)',
+          filter: 'blur(30px)',
+          pointerEvents: 'none',
+          animation: 'washPulseGlow 4s ease-in-out infinite'
+        }} />
+        <div style={{
+          position: 'absolute',
+          bottom: '25%',
+          right: '25%',
+          width: '300px',
+          height: '300px',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(56, 189, 248, 0.12) 0%, transparent 70%)',
+          filter: 'blur(25px)',
+          pointerEvents: 'none',
+          animation: 'washPulseGlow 5s ease-in-out infinite 1s'
+        }} />
+
+        {/* Central Logo & Orbital Wash Ring */}
+        <div style={{ position: 'relative', width: '130px', height: '130px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.75rem' }}>
+          {/* Rotating Outer Foam Ring */}
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            borderRadius: '50%',
+            border: '2.5px solid transparent',
+            borderTopColor: '#38BDF8',
+            borderRightColor: '#0EA5E9',
+            animation: 'washSpin 1.4s linear infinite',
+            boxShadow: '0 0 20px rgba(56, 189, 248, 0.3)'
+          }} />
+
+          {/* Counter-rotating dashed accent ring */}
+          <div style={{
+            position: 'absolute',
+            inset: '-8px',
+            borderRadius: '50%',
+            border: '1.5px dashed rgba(56, 189, 248, 0.45)',
+            animation: 'washSpinReverse 6s linear infinite'
+          }} />
+
+          {/* Floating water droplet micro-badge */}
+          <div style={{
+            position: 'absolute',
+            top: '-6px',
+            right: '-6px',
+            width: '28px',
+            height: '28px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #0EA5E9, #0284C7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 0 10px rgba(14, 165, 233, 0.6)',
+            animation: 'washBubbleFloat 3s ease-in-out infinite',
+            zIndex: 3
+          }}>
+            <Droplets size={15} color="#FFFFFF" />
+          </div>
+
+          {/* Center Brand Logo Card */}
+          <div style={{
+            width: '90px',
+            height: '90px',
+            borderRadius: '22px',
+            background: '#FFFFFF',
+            padding: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5), 0 0 25px rgba(14, 165, 233, 0.35)',
+            position: 'relative',
+            zIndex: 2,
+            animation: 'washPulseScale 2.5s ease-in-out infinite'
+          }}>
+            <img src={logo} alt="Wash My Car Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+          </div>
+        </div>
+
+        {/* Brand Name Typography */}
+        <div style={{ textAlign: 'center', marginBottom: '1.25rem', zIndex: 2 }}>
+          <div style={{
+            fontSize: '1.5rem',
+            fontWeight: 900,
+            letterSpacing: '1px',
+            lineHeight: 1.2
+          }}>
+            <span style={{ color: '#FFFFFF' }}>WASH </span>
+            <span style={{ color: '#38BDF8' }}>MY </span>
+            <span style={{ color: '#FFFFFF' }}>CAR </span>
+            <span style={{ color: '#38BDF8' }}>ORG</span>
+          </div>
+          <div style={{
+            fontSize: '0.72rem',
+            color: '#94A3B8',
+            fontWeight: 800,
+            letterSpacing: '2px',
+            marginTop: '0.35rem'
+          }}>
+            DOORSTEP VEHICLE SPA & DETAILING
+          </div>
+        </div>
+
+        {/* Dynamic Status / Progress Bar */}
+        <div style={{ width: '220px', zIndex: 2, textAlign: 'center' }}>
+          <div style={{
+            width: '100%',
+            height: '4px',
+            background: 'rgba(255, 255, 255, 0.1)',
+            borderRadius: '999px',
+            overflow: 'hidden',
+            position: 'relative',
+            marginBottom: '0.75rem'
+          }}>
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              width: '40%',
+              background: 'linear-gradient(90deg, #0284C7, #38BDF8, #4ADE80)',
+              borderRadius: '999px',
+              animation: 'washProgressBar 1.6s ease-in-out infinite'
+            }} />
+          </div>
+
+          <div style={{
+            fontSize: '0.82rem',
+            color: '#CBD5E1',
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.4rem'
+          }}>
+            <Sparkles size={14} color="#FACC15" />
+            <span>Connecting to Doorstep Hub...</span>
+          </div>
+        </div>
+
+        {/* Bottom Feature Pill */}
+        <div style={{
+          position: 'absolute',
+          bottom: '2rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          background: 'rgba(255, 255, 255, 0.05)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          padding: '0.45rem 1rem',
+          borderRadius: '20px',
+          fontSize: '0.74rem',
+          color: '#94A3B8',
+          fontWeight: 700
+        }}>
+          <span>💧 Spot-Free Pure Water</span>
+          <span>•</span>
+          <span>⚡ High-Pressure Foam</span>
+        </div>
+
+        {/* Injected Animations */}
+        <style>{`
+          @keyframes washSpin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+          @keyframes washSpinReverse {
+            0% { transform: rotate(360deg); }
+            100% { transform: rotate(0deg); }
+          }
+          @keyframes washPulseScale {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.04); }
+          }
+          @keyframes washPulseGlow {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 0.9; transform: scale(1.1); }
+          }
+          @keyframes washProgressBar {
+            0% { left: -40%; width: 30%; }
+            50% { width: 55%; }
+            100% { left: 110%; width: 30%; }
+          }
+          @keyframes washBubbleFloat {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-4px) scale(1.1); }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
+  // 2. ERROR / OFFLINE CONNECTION SCREEN
+  if (loadError || !cms) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: '#0F172A',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: 'Outfit, sans-serif',
+        color: '#FFFFFF',
+        padding: '2rem',
+        textAlign: 'center'
+      }}>
+        <div style={{
+          width: '70px',
+          height: '70px',
+          borderRadius: '50%',
+          background: 'rgba(239, 68, 68, 0.15)',
+          border: '1.5px solid rgba(239, 68, 68, 0.4)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#EF4444',
+          marginBottom: '1.25rem'
+        }}>
+          <AlertCircle size={32} />
+        </div>
+
+        <h2 style={{ fontSize: '1.6rem', fontWeight: 900, margin: '0 0 0.5rem', color: '#FFFFFF' }}>
+          Unable to Connect to Wash Server
+        </h2>
+        <p style={{ color: '#94A3B8', fontSize: '0.95rem', maxWidth: '420px', lineHeight: 1.6, margin: '0 0 1.75rem' }}>
+          We could not load real-time wash packages and admin settings. Please verify your internet connection or server status.
+        </p>
+
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <button
+            onClick={() => loadHomePageData()}
+            style={{
+              background: 'linear-gradient(135deg, #0EA5E9, #0284C7)',
+              color: 'white',
+              border: 'none',
+              padding: '0.75rem 1.6rem',
+              borderRadius: '25px',
+              fontWeight: 800,
+              fontSize: '0.92rem',
+              cursor: 'pointer',
+              boxShadow: '0 4px 15px rgba(14, 165, 233, 0.4)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem'
+            }}
+          >
+            <RefreshCw size={16} />
+            <span>Retry Connection</span>
+          </button>
+
+          <a
+            href={`https://wa.me/${cleanWhatsappNumber}?text=Hi%20Wash%20My%20Car%20Org%2C%20I%20have%20an%20inquiry.`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              background: '#22C55E',
+              color: 'white',
+              padding: '0.75rem 1.4rem',
+              borderRadius: '25px',
+              fontWeight: 700,
+              fontSize: '0.92rem',
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem'
+            }}
+          >
+            <MessageCircle size={16} /> WhatsApp Support
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ fontFamily: 'Outfit, sans-serif', color: '#0F172A', background: '#F8FAFC', scrollBehavior: 'smooth', overflowX: 'hidden' }}>
@@ -641,8 +995,12 @@ const Home = () => {
 
       {/* 2. PEXA CAR CARE-STYLE HERO CAROUSEL (SLIDER FRONT PAGE) */}
       <header
+        className="hero-carousel-header"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
         style={{
           position: 'relative',
           minHeight: '88vh',
@@ -651,7 +1009,10 @@ const Home = () => {
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
-          padding: '4rem 6% 6rem'
+          padding: '4rem 6% 6rem',
+          userSelect: 'none',
+          touchAction: 'pan-y',
+          cursor: isSwipingActive ? 'grabbing' : 'default'
         }}
       >
         {/* Dynamic Background Slides with Smooth Crossfade */}
@@ -700,83 +1061,8 @@ const Home = () => {
         <div style={{ position: 'absolute', top: '10%', left: '5%', width: '400px', height: '400px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(14,165,233,0.22), transparent 70%)', pointerEvents: 'none', zIndex: 2 }} />
         <div style={{ position: 'absolute', top: '20%', right: '10%', width: '500px', height: '500px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(56,189,248,0.18), transparent 70%)', pointerEvents: 'none', zIndex: 2 }} />
 
-        {/* PEXA-STYLE PREV / NEXT ARROW CONTROLS */}
-        <button
-          onClick={prevSlide}
-          aria-label="Previous Slide"
-          style={{
-            position: 'absolute',
-            top: '50%',
-            left: '1.25rem',
-            transform: 'translateY(-50%)',
-            zIndex: 20,
-            background: 'rgba(15, 23, 42, 0.75)',
-            backdropFilter: 'blur(12px)',
-            border: '1.5px solid rgba(255, 255, 255, 0.25)',
-            color: 'white',
-            width: '46px',
-            height: '46px',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            boxShadow: '0 8px 25px rgba(0,0,0,0.4)',
-            transition: 'all 0.2s'
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.background = '#0EA5E9';
-            e.currentTarget.style.transform = 'translateY(-50%) scale(1.1)';
-            e.currentTarget.style.borderColor = '#38BDF8';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.background = 'rgba(15, 23, 42, 0.75)';
-            e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
-            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.25)';
-          }}
-        >
-          <ChevronLeft size={24} />
-        </button>
-
-        <button
-          onClick={nextSlide}
-          aria-label="Next Slide"
-          style={{
-            position: 'absolute',
-            top: '50%',
-            right: '1.25rem',
-            transform: 'translateY(-50%)',
-            zIndex: 20,
-            background: 'rgba(15, 23, 42, 0.75)',
-            backdropFilter: 'blur(12px)',
-            border: '1.5px solid rgba(255, 255, 255, 0.25)',
-            color: 'white',
-            width: '46px',
-            height: '46px',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            boxShadow: '0 8px 25px rgba(0,0,0,0.4)',
-            transition: 'all 0.2s'
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.background = '#0EA5E9';
-            e.currentTarget.style.transform = 'translateY(-50%) scale(1.1)';
-            e.currentTarget.style.borderColor = '#38BDF8';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.background = 'rgba(15, 23, 42, 0.75)';
-            e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
-            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.25)';
-          }}
-        >
-          <ChevronRight size={24} />
-        </button>
-
         {/* Slide Content Box */}
-        <div style={{
+        <div className="hero-content-grid" style={{
           maxWidth: '1240px',
           margin: '0 auto',
           width: '100%',
@@ -931,120 +1217,174 @@ const Home = () => {
             </div>
           </div>
 
-          {/* Right Column: High-End Vehicle Spa Showcase & Floating Phone Mockup */}
-          <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '440px' }}>
+          {/* Right Column: High-End Vehicle Spa Showcase with Clean Non-Overlapping Layout */}
+          <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', maxWidth: '520px', gap: '0.85rem' }}>
             
-            {/* Hero Main Photo Frame showing Active Slide */}
-            <div style={{
-              width: '100%',
-              maxWidth: '520px',
-              height: '380px',
-              borderRadius: '28px',
-              background: `linear-gradient(145deg, rgba(14,165,233,0.2), rgba(15,23,42,0.85)), url(${activeSlide.image || cms.heroImage}) center/cover no-repeat`,
-              boxShadow: '0 30px 60px rgba(0,0,0,0.55)',
-              border: '1.5px solid rgba(255,255,255,0.2)',
-              position: 'relative',
-              overflow: 'hidden',
-              transition: 'background-image 0.5s ease-in-out'
-            }}>
-              {/* Overlay Badge inside photo */}
+            {/* 1. Hero Main Photo Frame (100% Full Unobstructed Car Image) */}
+            <div 
+              className="hero-mockup-frame" 
+              style={{
+                width: '100%',
+                height: '280px',
+                borderRadius: '24px',
+                backgroundImage: `url(${activeSlide.image || cms?.heroImage || 'https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=2200&q=95'})`,
+                backgroundPosition: 'center',
+                backgroundSize: 'cover',
+                backgroundRepeat: 'no-repeat',
+                boxShadow: '0 20px 45px -10px rgba(0,0,0,0.65), 0 0 35px rgba(14,165,233,0.18)',
+                border: '1.5px solid rgba(255,255,255,0.22)',
+                position: 'relative',
+                overflow: 'hidden',
+                transition: 'background-image 0.6s ease-in-out'
+              }}
+            >
+              {/* Subtle top pill tags */}
               <div style={{
                 position: 'absolute',
-                bottom: '1.25rem',
-                left: '1.25rem',
-                background: 'rgba(15, 23, 42, 0.88)',
+                top: '0.85rem',
+                left: '0.85rem',
+                background: 'rgba(15, 23, 42, 0.85)',
                 backdropFilter: 'blur(10px)',
-                color: 'white',
-                padding: '0.55rem 1.1rem',
-                borderRadius: '30px',
-                fontSize: '0.78rem',
+                WebkitBackdropFilter: 'blur(10px)',
+                color: '#FFFFFF',
+                padding: '0.35rem 0.75rem',
+                borderRadius: '20px',
+                fontSize: '0.7rem',
                 fontWeight: 800,
-                letterSpacing: '0.6px',
-                border: '1px solid rgba(255,255,255,0.2)',
-                display: 'flex',
+                letterSpacing: '0.5px',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                display: 'inline-flex',
                 alignItems: 'center',
-                gap: '0.5rem'
+                gap: '0.4rem',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
               }}>
-                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22C55E', boxShadow: '0 0 8px #22C55E' }} />
-                WASH MY CAR ORG • DOORSTEP DETAILING
-              </div>
-            </div>
-
-            {/* Floating Water Efficiency Circular Badge */}
-            <div style={{
-              position: 'absolute',
-              top: '-15px',
-              right: '-10px',
-              width: '100px',
-              height: '100px',
-              borderRadius: '50%',
-              background: 'white',
-              boxShadow: '0 15px 30px rgba(0,0,0,0.3)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              textAlign: 'center',
-              border: '2px dashed #0EA5E9',
-              color: '#0284C7',
-              fontSize: '0.65rem',
-              fontWeight: 900,
-              padding: '0.4rem',
-              transform: 'rotate(10deg)',
-              zIndex: 10
-            }}>
-              <Droplets size={22} color="#0EA5E9" style={{ marginBottom: '2px' }} />
-              <span>{activeSlide.badgeText || cms.heroBadgeText}</span>
-            </div>
-
-            {/* Interactive Floating Phone Mockup (Washcaro style) */}
-            <div style={{
-              position: 'absolute',
-              bottom: '-25px',
-              left: '-20px',
-              width: '200px',
-              background: 'linear-gradient(155deg, #0F172A, #1E293B)',
-              border: '4px solid #334155',
-              borderRadius: '24px',
-              padding: '0.85rem',
-              boxShadow: '0 25px 50px rgba(0,0,0,0.5)',
-              color: 'white',
-              zIndex: 10,
-              transform: 'rotate(-4deg)'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: '#38BDF8', fontWeight: 800 }}>
-                <span>Wash My Car Org</span>
-                <span>4G ●</span>
-              </div>
-              <div style={{ fontSize: '0.6rem', color: '#94A3B8', marginTop: '0.5rem' }}>Good Day! 👋</div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'white', margin: '0.2rem 0 0.5rem' }}>
-                Book Your <span style={{ color: '#38BDF8' }}>Wash</span>
-              </div>
-              
-              <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '10px', padding: '0.4rem', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.25rem', textAlign: 'center', fontSize: '0.55rem' }}>
-                <div>🚿<div style={{ fontSize: '0.5rem', color: '#94A3B8' }}>Wash</div></div>
-                <div>✨<div style={{ fontSize: '0.5rem', color: '#94A3B8' }}>Detail</div></div>
-                <div>🪖<div style={{ fontSize: '0.5rem', color: '#94A3B8' }}>Helmet</div></div>
-                <div>💨<div style={{ fontSize: '0.5rem', color: '#94A3B8' }}>Steam</div></div>
+                <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#22C55E', boxShadow: '0 0 8px #22C55E' }} />
+                <span>DOORSTEP DETAILING</span>
               </div>
 
-              <button 
-                onClick={() => navigate('/login')}
-                style={{ 
-                  marginTop: '0.6rem', 
-                  width: '100%', 
-                  background: '#0EA5E9', 
-                  color: 'white', 
-                  border: 'none', 
-                  borderRadius: '8px', 
-                  padding: '0.35rem', 
-                  fontSize: '0.65rem', 
+              {activeSlide.badgeText && (
+                <div style={{
+                  position: 'absolute',
+                  top: '0.85rem',
+                  right: '0.85rem',
+                  background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.95), rgba(2, 132, 199, 0.95))',
+                  backdropFilter: 'blur(10px)',
+                  color: 'white',
+                  padding: '0.35rem 0.75rem',
+                  borderRadius: '20px',
+                  fontSize: '0.68rem',
                   fontWeight: 800,
-                  cursor: 'pointer' 
-                }}
-              >
-                Instant Book →
-              </button>
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  boxShadow: '0 4px 12px rgba(14,165,233,0.35)'
+                }}>
+                  <Droplets size={12} color="#FFFFFF" />
+                  <span>{activeSlide.badgeText}</span>
+                </div>
+              )}
+            </div>
+
+            {/* 2. Interactive Booking & Details Card (Cleanly BELOW the Image, ZERO Overlapping!) */}
+            <div 
+              className="hero-hud-card" 
+              style={{
+                width: '100%',
+                background: 'rgba(15, 23, 42, 0.94)',
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)',
+                border: '1px solid rgba(255, 255, 255, 0.18)',
+                borderRadius: '20px',
+                padding: '0.9rem 1.15rem',
+                boxShadow: '0 12px 30px rgba(0, 0, 0, 0.45)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.65rem'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ fontSize: '0.95rem', fontWeight: 800, color: 'white' }}>Wash My Car Org</span>
+                    <span style={{ 
+                      background: 'rgba(34,197,94,0.18)', 
+                      color: '#4ADE80', 
+                      fontSize: '0.62rem', 
+                      fontWeight: 700, 
+                      padding: '0.12rem 0.45rem', 
+                      borderRadius: '8px',
+                      border: '1px solid rgba(74,222,128,0.3)'
+                    }}>
+                      ✓ Verified
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.74rem', color: '#94A3B8', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <span style={{ color: '#38BDF8', fontWeight: 700 }}>★ Professional Service</span>
+                    <span>•</span>
+                    <span>Visakhapatnam Doorstep Care</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => navigate('/login')}
+                  style={{
+                    background: 'linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    padding: '0.52rem 1.05rem',
+                    fontSize: '0.78rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    boxShadow: '0 4px 15px rgba(14,165,233,0.4)',
+                    transition: 'all 0.2s ease',
+                    whiteSpace: 'nowrap'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(14,165,233,0.6)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 15px rgba(14,165,233,0.4)';
+                  }}
+                >
+                  <span>Instant Book</span>
+                  <ArrowRight size={14} />
+                </button>
+              </div>
+
+              {/* Quick Service Categories Row */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(4, 1fr)',
+                gap: '0.35rem',
+                background: 'rgba(255, 255, 255, 0.05)',
+                borderRadius: '10px',
+                padding: '0.35rem 0.5rem',
+                border: '1px solid rgba(255, 255, 255, 0.08)'
+              }}>
+                <div style={{ textAlign: 'center' }}>
+                  <span style={{ fontSize: '0.8rem' }}>🚿</span>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#E2E8F0', marginLeft: '3px' }}>Wash</span>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <span style={{ fontSize: '0.8rem' }}>✨</span>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#E2E8F0', marginLeft: '3px' }}>Detail</span>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <span style={{ fontSize: '0.8rem' }}>🪖</span>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#E2E8F0', marginLeft: '3px' }}>Helmet</span>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <span style={{ fontSize: '0.8rem' }}>💨</span>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#E2E8F0', marginLeft: '3px' }}>Steam</span>
+                </div>
+              </div>
             </div>
 
           </div>
@@ -1079,6 +1419,21 @@ const Home = () => {
             <span style={{ color: '#38BDF8' }}>0{currentSlideIndex + 1}</span>
             <span style={{ color: 'rgba(255,255,255,0.3)' }}>/</span>
             <span style={{ color: '#94A3B8' }}>0{slides.length}</span>
+          </div>
+
+          {/* Subtle Swipe Guide */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            color: 'rgba(255,255,255,0.5)',
+            fontSize: '0.74rem',
+            fontWeight: 700,
+            letterSpacing: '0.5px'
+          }}>
+            <span>‹</span>
+            <span>Swipe to explore</span>
+            <span>›</span>
           </div>
 
           {/* Clickable Indicator Pills */}
@@ -1666,6 +2021,7 @@ const Home = () => {
               : null;
 
             const isMostPopular = washTypes.length >= 2 && idx === 1;
+            const parsedDetails = parsePackageHighlights(wt.description, wt.quickByte, wt.name);
 
             return (
               <div
@@ -1736,27 +2092,32 @@ const Home = () => {
 
                 {/* Package Body */}
                 <div style={{ padding: '1.75rem 2rem', textAlign: 'left', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                  <p style={{ color: '#64748B', fontSize: '0.92rem', lineHeight: 1.6, marginBottom: '1.5rem' }}>
-                    {wt.description || 'Professional doorstep vehicle spa delivered directly to your home with spot-free purified water and high-pressure steam.'}
-                  </p>
+                  {parsedDetails.summary && 
+                   parsedDetails.summary.toLowerCase() !== wt.name?.toLowerCase() && 
+                   parsedDetails.summary.toLowerCase() !== `${wt.name?.toLowerCase()} plan` && (
+                    <p style={{ color: '#64748B', fontSize: '0.92rem', lineHeight: 1.6, marginBottom: '1.25rem' }}>
+                      {parsedDetails.summary}
+                    </p>
+                  )}
 
                   <div style={{ marginBottom: '1.5rem', flex: 1 }}>
                     <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.75rem' }}>
                       Package Highlights:
                     </div>
                     <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                      <li style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.88rem', color: '#334155' }}>
-                        <Check size={16} color="#0EA5E9" style={{ flexShrink: 0 }} /> High-Pressure Exterior Snow Foam
-                      </li>
-                      <li style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.88rem', color: '#334155' }}>
-                        <Check size={16} color="#0EA5E9" style={{ flexShrink: 0 }} /> Spot-Free Water Rinse & Microfiber Dry
-                      </li>
-                      <li style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.88rem', color: '#334155' }}>
-                        <Check size={16} color="#0EA5E9" style={{ flexShrink: 0 }} /> Tyre & Rim Dressing & UV Protectant
-                      </li>
-                      <li style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.88rem', color: '#334155' }}>
-                        <Check size={16} color="#0EA5E9" style={{ flexShrink: 0 }} /> Dashboard & Glass Crystal Polish
-                      </li>
+                      {parsedDetails.points.length > 0 ? (
+                        parsedDetails.points.map((pointText, pIdx) => (
+                          <li key={pIdx} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', fontSize: '0.88rem', color: '#334155', lineHeight: 1.4 }}>
+                            <Check size={16} color="#0EA5E9" style={{ flexShrink: 0, marginTop: '2px' }} />
+                            <span>{pointText}</span>
+                          </li>
+                        ))
+                      ) : (
+                        <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', fontSize: '0.88rem', color: '#334155', lineHeight: 1.4 }}>
+                          <Check size={16} color="#0EA5E9" style={{ flexShrink: 0, marginTop: '2px' }} />
+                          <span>{parsedDetails.summary || wt.name || 'Doorstep vehicle wash & detailing'}</span>
+                        </li>
+                      )}
                     </ul>
                   </div>
 
@@ -1877,139 +2238,96 @@ const Home = () => {
         </div>
       </section>
 
-      {/* 5.5 REFER & EARN ADVERTISEMENT BANNER (ADMIN CONFIGURED - HIDDEN IF DISABLED) */}
+      {/* 5.5 REFER & EARN ADVERTISEMENT BANNER (SHORT & SWEET, DYNAMIC ADMIN CONFIGURED) */}
       {settings?.referralEnabled !== false && (() => {
-        const isTieredStreak = settings?.referralStreakBonus === 'TIERED';
-        const basePoints = settings?.referralRewardPoints ?? 50;
-        const cashRatio = settings?.pointsToCashRatio || 4.0;
+        const basePoints = Number(settings?.referralRewardPoints) >= 0 ? Number(settings.referralRewardPoints) : 50;
+        const cashRatio = Number(settings?.pointsToCashRatio) > 0 ? Number(settings.pointsToCashRatio) : 1;
         const cashValue = Math.round(basePoints / cashRatio);
+        const hasToken = !!localStorage.getItem('userToken');
 
         return (
-          <section id="refer-earn" style={{ padding: '2rem 6% 4.5rem', maxWidth: '1240px', margin: '3rem auto 0' }}>
+          <section id="refer-earn" style={{ padding: '2rem 6% 3.5rem', maxWidth: '1240px', margin: '2rem auto 0' }}>
             <div style={{
-              background: 'linear-gradient(135deg, #070F26 0%, #111E3D 50%, #07152E 100%)',
-              borderRadius: '28px',
-              border: '1.5px solid rgba(56, 189, 248, 0.35)',
-              padding: '3rem 2.5rem',
-              boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.5), 0 0 35px rgba(14, 165, 233, 0.15)',
+              background: 'linear-gradient(135deg, #070F26 0%, #0F172A 50%, #081B38 100%)',
+              borderRadius: '24px',
+              border: '1.5px solid rgba(56, 189, 248, 0.3)',
+              padding: '2.25rem 2rem',
+              boxShadow: '0 20px 45px -10px rgba(15, 23, 42, 0.45)',
               position: 'relative',
               overflow: 'hidden'
             }}>
-              {/* Ambient background glow */}
+              {/* Subtle ambient glow */}
               <div style={{
                 position: 'absolute',
-                top: '-60px',
-                right: '-60px',
-                width: '280px',
-                height: '280px',
+                top: '-40px',
+                right: '-40px',
+                width: '200px',
+                height: '200px',
                 borderRadius: '50%',
-                background: 'radial-gradient(circle, rgba(14, 165, 233, 0.25) 0%, transparent 70%)',
-                pointerEvents: 'none'
-              }} />
-              <div style={{
-                position: 'absolute',
-                bottom: '-80px',
-                left: '10%',
-                width: '320px',
-                height: '320px',
-                borderRadius: '50%',
-                background: 'radial-gradient(circle, rgba(250, 204, 21, 0.15) 0%, transparent 70%)',
+                background: 'radial-gradient(circle, rgba(14, 165, 233, 0.2) 0%, transparent 70%)',
                 pointerEvents: 'none'
               }} />
 
-              <div className="referral-container-grid" style={{ position: 'relative', zIndex: 1 }}>
-                {/* Left Content */}
+              <div className="referral-container-grid" style={{ position: 'relative', zIndex: 1, alignItems: 'center' }}>
+                {/* Left Content: Concise & High Impact */}
                 <div>
                   <div style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '0.5rem',
+                    gap: '0.4rem',
                     background: 'rgba(250, 204, 21, 0.12)',
-                    border: '1px solid rgba(250, 204, 21, 0.35)',
-                    padding: '0.4rem 1.1rem',
-                    borderRadius: '30px',
+                    border: '1px solid rgba(250, 204, 21, 0.3)',
+                    padding: '0.3rem 0.85rem',
+                    borderRadius: '999px',
                     color: '#FACC15',
-                    fontSize: '0.8rem',
-                    fontWeight: 900,
-                    letterSpacing: '0.6px',
-                    marginBottom: '1.25rem'
+                    fontSize: '0.75rem',
+                    fontWeight: 800,
+                    letterSpacing: '0.5px',
+                    marginBottom: '0.85rem',
+                    textTransform: 'uppercase'
                   }}>
-                    <Sparkles size={15} />
-                    OFFICIAL REFERRAL PROGRAM
+                    <Sparkles size={14} />
+                    Referral Program
                   </div>
 
                   <h2 style={{
-                    fontSize: 'clamp(2rem, 3.8vw, 2.9rem)',
+                    fontSize: 'clamp(1.7rem, 3.2vw, 2.4rem)',
                     fontWeight: 900,
                     color: '#FFFFFF',
-                    margin: '0 0 1rem',
-                    lineHeight: 1.18,
-                    letterSpacing: '-0.5px'
+                    margin: '0 0 0.65rem',
+                    lineHeight: 1.2,
+                    letterSpacing: '-0.02em'
                   }}>
-                    Refer Friends & Get <span style={{ background: 'linear-gradient(135deg, #38BDF8, #FACC15)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{isTieredStreak ? 'Free Doorstep Washes' : `+${basePoints} Reward Points`}</span>
+                    Refer Friends & Earn <span style={{ background: 'linear-gradient(135deg, #38BDF8, #FACC15)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>+₹{cashValue} Off Washes</span>
                   </h2>
 
-                  <p style={{ color: '#94A3B8', fontSize: '1.02rem', lineHeight: 1.65, margin: '0 0 1.5rem', maxWidth: '520px' }}>
-                    {isTieredStreak
-                      ? 'Share your personal invite code with friends & neighbors. When they complete their first doorstep wash, you both unlock reward points redeemable for 100% free car & bike detailing!'
-                      : `Share your invite code with friends & neighbors. For every friend who completes their first doorstep wash, you instantly earn +${basePoints} points (equal to ₹${cashValue} discount) with no tier restrictions!`}
+                  <p style={{ color: '#94A3B8', fontSize: '0.94rem', lineHeight: 1.55, margin: '0 0 1.25rem', maxWidth: '520px' }}>
+                    Share your invite code. When a friend books and completes their first doorstep wash, you instantly get <strong>+{basePoints} points (₹{cashValue} discount)</strong> into your wallet to redeem directly at checkout ({cashRatio} pt{cashRatio > 1 ? 's' : ''} = ₹1.00)!
                   </p>
 
-                  {/* Feature highlights checklist */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', marginBottom: '2rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#E2E8F0', fontSize: '0.88rem' }}>
-                      <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(56, 189, 248, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Check size={13} color="#38BDF8" />
-                      </div>
-                      <span>Zero cash needed — redeem points directly at checkout (4 pts = ₹1)</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#E2E8F0', fontSize: '0.88rem' }}>
-                      <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(56, 189, 248, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Check size={13} color="#38BDF8" />
-                      </div>
-                      <span>Instant automatic wallet credit upon friend's first completed wash</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#E2E8F0', fontSize: '0.88rem' }}>
-                      <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(56, 189, 248, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Check size={13} color="#38BDF8" />
-                      </div>
-                      <span>
-                        {isTieredStreak
-                          ? 'Bonus streak multipliers unlocked with each active consecutive referral'
-                          : `Same flat reward points: exactly +${basePoints} pts for every successful referral`}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
                     <button
-                      onClick={() => navigate('/login')}
+                      onClick={() => navigate(hasToken ? '/rewards' : '/login')}
                       style={{
                         background: 'linear-gradient(135deg, #0EA5E9, #0284C7)',
                         color: 'white',
                         border: 'none',
-                        padding: '0.85rem 1.8rem',
-                        borderRadius: '16px',
+                        padding: '0.75rem 1.4rem',
+                        borderRadius: '12px',
                         fontWeight: 800,
-                        fontSize: '0.95rem',
+                        fontSize: '0.9rem',
                         cursor: 'pointer',
-                        boxShadow: '0 10px 25px rgba(14, 165, 233, 0.4)',
+                        boxShadow: '0 8px 20px rgba(14, 165, 233, 0.35)',
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '0.5rem',
+                        gap: '0.45rem',
                         transition: 'transform 0.2s, box-shadow 0.2s'
                       }}
-                      onMouseEnter={e => {
-                        e.currentTarget.style.transform = 'translateY(-2px)';
-                        e.currentTarget.style.boxShadow = '0 14px 28px rgba(14, 165, 233, 0.5)';
-                      }}
-                      onMouseLeave={e => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 10px 25px rgba(14, 165, 233, 0.4)';
-                      }}
+                      onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+                      onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
                     >
-                      <span>Start Earning Rewards</span>
-                      <ArrowRight size={17} />
+                      <span>Start Earning</span>
+                      <ArrowRight size={16} />
                     </button>
                     <Link
                       to="/rewards"
@@ -2017,14 +2335,14 @@ const Home = () => {
                         color: '#38BDF8',
                         textDecoration: 'none',
                         fontWeight: 700,
-                        fontSize: '0.92rem',
-                        padding: '0.8rem 1.25rem',
-                        borderRadius: '14px',
+                        fontSize: '0.88rem',
+                        padding: '0.7rem 1.1rem',
+                        borderRadius: '12px',
                         background: 'rgba(56, 189, 248, 0.08)',
                         border: '1px solid rgba(56, 189, 248, 0.25)',
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '0.4rem',
+                        gap: '0.35rem',
                         transition: 'all 0.2s'
                       }}
                       onMouseEnter={e => {
@@ -2036,23 +2354,32 @@ const Home = () => {
                         e.currentTarget.style.borderColor = 'rgba(56, 189, 248, 0.25)';
                       }}
                     >
-                      <span>{isTieredStreak ? 'View Rewards & Tiers' : 'View Rewards & Wallet'}</span>
-                      <ArrowRight size={15} />
+                      <span>View Rewards & Rules</span>
+                      <ArrowRight size={14} />
                     </Link>
                   </div>
                 </div>
 
-                {/* Right: Modern Aesthetic Metrics Grid */}
-                <div className="referral-stats-grid">
-                  {/* Stat 1: Referral Base Points */}
-                  <div className="referral-stat-card">
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                {/* Right: Short & Sweet Single Hero Metric Card */}
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  borderRadius: '20px',
+                  padding: '1.4rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.9rem',
+                  backdropFilter: 'blur(12px)',
+                  boxShadow: '0 10px 30px rgba(0,0,0,0.25)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                       <div style={{
                         width: '38px',
                         height: '38px',
-                        borderRadius: '12px',
-                        background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(14, 165, 233, 0.1))',
-                        border: '1px solid rgba(56, 189, 248, 0.3)',
+                        borderRadius: '10px',
+                        background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(14, 165, 233, 0.1))',
+                        border: '1px solid rgba(56, 189, 248, 0.35)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -2060,125 +2387,51 @@ const Home = () => {
                       }}>
                         <Gift size={20} />
                       </div>
-                      <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#38BDF8', background: 'rgba(56, 189, 248, 0.12)', padding: '0.2rem 0.55rem', borderRadius: '20px' }}>
-                        {isTieredStreak ? 'BASE PERK' : 'PER REFERRAL'}
-                      </span>
+                      <div>
+                        <div style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.04em' }}>Per Friend's 1st Wash</div>
+                        <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#FFFFFF' }}>Instant Reward</div>
+                      </div>
                     </div>
-                    <div style={{ fontSize: '2.4rem', fontWeight: 900, color: '#38BDF8', lineHeight: 1, letterSpacing: '-0.5px' }}>
-                      +{basePoints}
+                    <span style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      color: '#10B981',
+                      background: 'rgba(16, 185, 129, 0.15)',
+                      padding: '0.25rem 0.65rem',
+                      borderRadius: '999px',
+                      border: '1px solid rgba(16, 185, 129, 0.3)'
+                    }}>
+                      DIRECT DISCOUNT
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem', padding: '0.2rem 0' }}>
+                    <div style={{ fontSize: '2.5rem', fontWeight: 900, color: '#38BDF8', lineHeight: 1 }}>
+                      +{basePoints} <span style={{ fontSize: '1rem', fontWeight: 700, color: '#94A3B8' }}>pts</span>
                     </div>
-                    <div style={{ color: '#F8FAFC', fontWeight: 800, fontSize: '0.95rem', marginTop: '0.5rem' }}>
-                      Points Per Referral
-                    </div>
-                    <div style={{ color: '#94A3B8', fontSize: '0.78rem', marginTop: '0.25rem', lineHeight: 1.4 }}>
-                      Credited on friend's 1st completed doorstep wash
+                    <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#FACC15', lineHeight: 1 }}>
+                      = ₹{cashValue} Off
                     </div>
                   </div>
 
-                  {/* Stat 2: Streak Bonus Multiplier OR Flat Value */}
-                  {isTieredStreak ? (
-                    <div className="referral-stat-card">
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                        <div style={{
-                          width: '38px',
-                          height: '38px',
-                          borderRadius: '12px',
-                          background: 'linear-gradient(135deg, rgba(250, 204, 21, 0.2), rgba(234, 179, 8, 0.1))',
-                          border: '1px solid rgba(250, 204, 21, 0.3)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#FACC15'
-                        }}>
-                          <Zap size={20} />
-                        </div>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#FACC15', background: 'rgba(250, 204, 21, 0.12)', padding: '0.2rem 0.55rem', borderRadius: '20px' }}>
-                          MULTIPLIER
-                        </span>
-                      </div>
-                      <div style={{ fontSize: '2.4rem', fontWeight: 900, color: '#FACC15', lineHeight: 1, letterSpacing: '-0.5px' }}>
-                        +{Number(settings?.referralStreakBonus) > 0 ? Number(settings.referralStreakBonus) : 25}
-                      </div>
-                      <div style={{ color: '#F8FAFC', fontWeight: 800, fontSize: '0.95rem', marginTop: '0.5rem' }}>
-                        Streak Bonus Points
-                      </div>
-                      <div style={{ color: '#94A3B8', fontSize: '0.78rem', marginTop: '0.25rem', lineHeight: 1.4 }}>
-                        Bonus multiplier for active consecutive invites
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: '0.65rem',
+                    paddingTop: '0.75rem',
+                    borderTop: '1px solid rgba(255,255,255,0.08)'
+                  }}>
+                    <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '10px', padding: '0.6rem 0.75rem' }}>
+                      <div style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 600 }}>CHECKOUT VALUE</div>
+                      <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#FFFFFF', marginTop: '2px' }}>
+                        {cashRatio} pt{cashRatio > 1 ? 's' : ''} = ₹1.00
                       </div>
                     </div>
-                  ) : (
-                    <div className="referral-stat-card">
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                        <div style={{
-                          width: '38px',
-                          height: '38px',
-                          borderRadius: '12px',
-                          background: 'linear-gradient(135deg, rgba(250, 204, 21, 0.2), rgba(234, 179, 8, 0.1))',
-                          border: '1px solid rgba(250, 204, 21, 0.3)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#FACC15'
-                        }}>
-                          <Check size={20} />
-                        </div>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#FACC15', background: 'rgba(250, 204, 21, 0.12)', padding: '0.2rem 0.55rem', borderRadius: '20px' }}>
-                          FLAT REWARD
-                        </span>
+                    <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '10px', padding: '0.6rem 0.75rem' }}>
+                      <div style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 600 }}>INVITE LIMIT</div>
+                      <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#38BDF8', marginTop: '2px' }}>
+                        {settings?.referralMaxLimit > 0 ? `Max ${settings.referralMaxLimit}` : 'Unlimited'}
                       </div>
-                      <div style={{ fontSize: '2.4rem', fontWeight: 900, color: '#FACC15', lineHeight: 1, letterSpacing: '-0.5px' }}>
-                        ₹{cashValue}
-                      </div>
-                      <div style={{ color: '#F8FAFC', fontWeight: 800, fontSize: '0.95rem', marginTop: '0.5rem' }}>
-                        Cash Value Per Invite
-                      </div>
-                      <div style={{ color: '#94A3B8', fontSize: '0.78rem', marginTop: '0.25rem', lineHeight: 1.4 }}>
-                        Flat points for every single referral with zero tiers
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Stat 3: Full Width Milestone Card */}
-                  <div className="referral-stat-card referral-full-card">
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-                        <div style={{
-                          width: '42px',
-                          height: '42px',
-                          borderRadius: '12px',
-                          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(5, 150, 105, 0.15))',
-                          border: '1px solid rgba(52, 211, 153, 0.35)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#34D399',
-                          flexShrink: 0
-                        }}>
-                          <Award size={22} />
-                        </div>
-                        <div>
-                          <div style={{ fontSize: '0.96rem', fontWeight: 800, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                            <span>100% Cashless Doorstep Detailing</span>
-                            <span style={{ fontSize: '0.75rem', color: '#38BDF8', fontWeight: 700 }}>
-                              • {settings?.referralMaxLimit ? `Max ${settings.referralMaxLimit} Referrals/Month` : 'Unlimited Referrals'}
-                            </span>
-                          </div>
-                          <p style={{ color: '#94A3B8', fontSize: '0.8rem', margin: '0.2rem 0 0', lineHeight: 1.4 }}>
-                            Redeem earned wallet points at checkout for free exterior foam wash, deep steam & bike care.
-                          </p>
-                        </div>
-                      </div>
-                      <span style={{
-                        background: 'linear-gradient(135deg, #059669, #10B981)',
-                        color: 'white',
-                        fontWeight: 800,
-                        fontSize: '0.76rem',
-                        padding: '0.35rem 0.85rem',
-                        borderRadius: '20px',
-                        letterSpacing: '0.5px'
-                      }}>
-                        4 POINTS = ₹1 CASH
-                      </span>
                     </div>
                   </div>
                 </div>
@@ -2190,18 +2443,18 @@ const Home = () => {
       })()}
 
       {/* 6. THE WASH MY CAR ORG DIFFERENCE (WHY CHOOSE US) */}
-      <section id="why-us" style={{ padding: '6rem 6%', background: '#F8FAFC' }}>
+      <section id="why-us" className="why-us-section" style={{ padding: '3.5rem 6%', background: '#F8FAFC' }}>
         <div style={{ maxWidth: '1240px', margin: '0 auto' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '3rem', alignItems: 'center', marginBottom: '4rem' }}>
+          <div className="why-us-header" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem', alignItems: 'center', marginBottom: '2rem' }}>
             <div>
-              <span style={{ color: '#0284C7', fontWeight: 800, fontSize: '0.85rem', letterSpacing: '1.5px', textTransform: 'uppercase' }}>
+              <span style={{ color: '#0284C7', fontWeight: 800, fontSize: '0.78rem', letterSpacing: '1.2px', textTransform: 'uppercase' }}>
                 THE DIFFERENCE
               </span>
-              <h2 style={{ fontSize: 'clamp(2.2rem, 4.5vw, 3.2rem)', fontWeight: 900, color: '#0F172A', margin: '0.5rem 0 1rem', letterSpacing: '-0.8px' }}>
+              <h2 style={{ fontSize: 'clamp(1.75rem, 3.2vw, 2.5rem)', fontWeight: 900, color: '#0F172A', margin: '0.35rem 0 0.4rem', letterSpacing: '-0.5px', lineHeight: 1.15 }}>
                 {cms.whyTitle}
               </h2>
             </div>
-            <p style={{ color: '#64748B', fontSize: '1.1rem', lineHeight: 1.7, margin: 0 }}>
+            <p style={{ color: '#64748B', fontSize: '0.98rem', lineHeight: 1.6, margin: 0 }}>
               {cms.whySubtitle}
             </p>
           </div>
@@ -2210,44 +2463,44 @@ const Home = () => {
           <div className="why-cards-grid">
             
             {/* Card 01 - Featured Mobile-Ready Hero Card */}
-            <div style={{
-              borderRadius: '24px',
-              padding: '2.25rem 2rem',
+            <div className="why-card why-card-featured" style={{
+              borderRadius: '20px',
+              padding: '1.5rem 1.35rem',
               background: 'linear-gradient(145deg, #0B132B 0%, #0F172A 60%, #0369A1 100%)',
               color: 'white',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
-              minHeight: '280px',
+              minHeight: '210px',
               border: '1.5px solid rgba(56, 189, 248, 0.35)',
-              boxShadow: '0 15px 35px -5px rgba(15, 23, 42, 0.35)',
+              boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.25)',
               position: 'relative',
               overflow: 'hidden'
             }}>
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
                   <span style={{ 
-                    fontSize: '0.75rem', 
+                    fontSize: '0.72rem', 
                     fontWeight: 800, 
                     color: '#38BDF8', 
-                    letterSpacing: '1px', 
+                    letterSpacing: '0.8px', 
                     textTransform: 'uppercase',
                     background: 'rgba(56, 189, 248, 0.15)',
-                    padding: '0.35rem 0.75rem',
+                    padding: '0.25rem 0.65rem',
                     borderRadius: '20px',
                     border: '1px solid rgba(56, 189, 248, 0.3)'
                   }}>
                     01 • CONVENIENCE
                   </span>
-                  <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'rgba(56, 189, 248, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38BDF8' }}>
-                    <Car size={22} />
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(56, 189, 248, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38BDF8' }}>
+                    <Car size={18} />
                   </div>
                 </div>
 
                 <h3 style={{ 
-                  fontSize: '1.45rem', 
+                  fontSize: '1.25rem', 
                   fontWeight: 900, 
-                  margin: '0 0 0.85rem', 
+                  margin: '0 0 0.5rem', 
                   lineHeight: 1.25, 
                   color: '#FFFFFF' 
                 }}>
@@ -2255,154 +2508,154 @@ const Home = () => {
                 </h3>
               </div>
 
-              <p style={{ color: '#E2E8F0', fontSize: '0.92rem', lineHeight: 1.6, margin: 0 }}>
+              <p style={{ color: '#CBD5E1', fontSize: '0.88rem', lineHeight: 1.55, margin: 0 }}>
                 {cms.whyCard1Text}
               </p>
             </div>
 
             {/* Card 02 */}
-            <div style={{
-              borderRadius: '24px',
-              padding: '2.25rem 2rem',
+            <div className="why-card" style={{
+              borderRadius: '20px',
+              padding: '1.5rem 1.35rem',
               background: 'white',
               border: '1px solid #E2E8F0',
-              boxShadow: '0 8px 25px rgba(0,0,0,0.04)',
+              boxShadow: '0 4px 15px rgba(0,0,0,0.03)',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
-              minHeight: '280px',
+              minHeight: '210px',
               transition: 'transform 0.2s, box-shadow 0.2s'
             }}>
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
                   <span style={{ 
-                    fontSize: '0.75rem', 
+                    fontSize: '0.72rem', 
                     fontWeight: 800, 
                     color: '#0284C7', 
-                    letterSpacing: '1px', 
+                    letterSpacing: '0.8px', 
                     textTransform: 'uppercase',
                     background: '#EFF6FF',
-                    padding: '0.35rem 0.75rem',
+                    padding: '0.25rem 0.65rem',
                     borderRadius: '20px',
                     border: '1px solid #BAE6FD'
                   }}>
                     02 • SPEED
                   </span>
-                  <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#F0F9FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284C7' }}>
-                    <Clock size={22} />
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#F0F9FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284C7' }}>
+                    <Clock size={18} />
                   </div>
                 </div>
 
                 <h3 style={{ 
-                  fontSize: '1.35rem', 
+                  fontSize: '1.2rem', 
                   fontWeight: 800, 
                   color: '#0F172A', 
-                  margin: '0 0 0.85rem', 
-                  lineHeight: 1.3 
+                  margin: '0 0 0.5rem', 
+                  lineHeight: 1.25 
                 }}>
                   {cms.whyCard2Title}
                 </h3>
               </div>
 
-              <p style={{ color: '#64748B', fontSize: '0.92rem', lineHeight: 1.6, margin: 0 }}>
+              <p style={{ color: '#64748B', fontSize: '0.88rem', lineHeight: 1.55, margin: 0 }}>
                 {cms.whyCard2Text}
               </p>
             </div>
 
             {/* Card 03 */}
-            <div style={{
-              borderRadius: '24px',
-              padding: '2.25rem 2rem',
+            <div className="why-card" style={{
+              borderRadius: '20px',
+              padding: '1.5rem 1.35rem',
               background: 'white',
               border: '1px solid #E2E8F0',
-              boxShadow: '0 8px 25px rgba(0,0,0,0.04)',
+              boxShadow: '0 4px 15px rgba(0,0,0,0.03)',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
-              minHeight: '280px',
+              minHeight: '210px',
               transition: 'transform 0.2s, box-shadow 0.2s'
             }}>
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
                   <span style={{ 
-                    fontSize: '0.75rem', 
+                    fontSize: '0.72rem', 
                     fontWeight: 800, 
                     color: '#0284C7', 
-                    letterSpacing: '1px', 
+                    letterSpacing: '0.8px', 
                     textTransform: 'uppercase',
                     background: '#EFF6FF',
-                    padding: '0.35rem 0.75rem',
+                    padding: '0.25rem 0.65rem',
                     borderRadius: '20px',
                     border: '1px solid #BAE6FD'
                   }}>
                     03 • SPECIALISTS
                   </span>
-                  <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#F0F9FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284C7' }}>
-                    <Award size={22} />
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#F0F9FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284C7' }}>
+                    <Award size={18} />
                   </div>
                 </div>
 
                 <h3 style={{ 
-                  fontSize: '1.35rem', 
+                  fontSize: '1.2rem', 
                   fontWeight: 800, 
                   color: '#0F172A', 
-                  margin: '0 0 0.85rem', 
-                  lineHeight: 1.3 
+                  margin: '0 0 0.5rem', 
+                  lineHeight: 1.25 
                 }}>
                   {cms.whyCard3Title}
                 </h3>
               </div>
 
-              <p style={{ color: '#64748B', fontSize: '0.92rem', lineHeight: 1.6, margin: 0 }}>
+              <p style={{ color: '#64748B', fontSize: '0.88rem', lineHeight: 1.55, margin: 0 }}>
                 {cms.whyCard3Text}
               </p>
             </div>
 
             {/* Card 04 */}
-            <div style={{
-              borderRadius: '24px',
-              padding: '2.25rem 2rem',
+            <div className="why-card" style={{
+              borderRadius: '20px',
+              padding: '1.5rem 1.35rem',
               background: 'white',
               border: '1px solid #E2E8F0',
-              boxShadow: '0 8px 25px rgba(0,0,0,0.04)',
+              boxShadow: '0 4px 15px rgba(0,0,0,0.03)',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
-              minHeight: '280px',
+              minHeight: '210px',
               transition: 'transform 0.2s, box-shadow 0.2s'
             }}>
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
                   <span style={{ 
-                    fontSize: '0.75rem', 
+                    fontSize: '0.72rem', 
                     fontWeight: 800, 
                     color: '#0284C7', 
-                    letterSpacing: '1px', 
+                    letterSpacing: '0.8px', 
                     textTransform: 'uppercase',
                     background: '#EFF6FF',
-                    padding: '0.35rem 0.75rem',
+                    padding: '0.25rem 0.65rem',
                     borderRadius: '20px',
                     border: '1px solid #BAE6FD'
                   }}>
                     04 • ECO-CONSCIOUS
                   </span>
-                  <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#F0F9FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284C7' }}>
-                    <Droplets size={22} />
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#F0F9FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284C7' }}>
+                    <Droplets size={18} />
                   </div>
                 </div>
 
                 <h3 style={{ 
-                  fontSize: '1.35rem', 
+                  fontSize: '1.2rem', 
                   fontWeight: 800, 
                   color: '#0F172A', 
-                  margin: '0 0 0.85rem', 
-                  lineHeight: 1.3 
+                  margin: '0 0 0.5rem', 
+                  lineHeight: 1.25 
                 }}>
                   {cms.whyCard4Title}
                 </h3>
               </div>
 
-              <p style={{ color: '#64748B', fontSize: '0.92rem', lineHeight: 1.6, margin: 0 }}>
+              <p style={{ color: '#64748B', fontSize: '0.88rem', lineHeight: 1.55, margin: 0 }}>
                 {cms.whyCard4Text}
               </p>
             </div>
@@ -2410,6 +2663,7 @@ const Home = () => {
           </div>
         </div>
       </section>
+
 
       {/* 7. METRICS & IMPACT STATS */}
       <section style={{
@@ -2722,7 +2976,7 @@ const Home = () => {
                   <MapPin size={15} color="#0EA5E9" /> Active Doorstep Service Zones:
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  {['Sujatha Nagar', 'MVP Colony', 'Gajuwaka', 'Madhurawada', 'Siripuram', 'Rushikonda', 'Pendurthi', 'NAD Junction', 'Akkayyapalem'].map((zone, zi) => (
+                  {(areas.length > 0 ? areas.map(a => a.name) : ['Nad Junction', 'Old Gajuwaka', 'Pendurthi', 'Maddilapalem', 'Madhurawada']).map((zone, zi) => (
                     <span 
                       key={zi}
                       style={{
@@ -3131,36 +3385,180 @@ const Home = () => {
 
       {/* 11. PREMIUM FOOTER */}
       <footer style={{
-        padding: '3.5rem 6% 2rem', 
+        padding: '3.5rem 6% 2.5rem', 
         borderTop: '1px solid rgba(255,255,255,0.08)', 
         background: '#0A0F1D',
         color: '#94A3B8'
       }}>
-        <div style={{ maxWidth: '1240px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '2rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{ background: 'white', padding: '0.2rem', borderRadius: '8px', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <img src={logo} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+        <div style={{ maxWidth: '1240px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
+          
+          {/* Top Footer Row: Large Logo Badge & Follow Us On Links */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '2rem' }}>
+            
+            {/* Enlarged Logo in White Box & Brand Identity */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+              <div style={{ 
+                background: '#FFFFFF', 
+                width: '58px',
+                height: '58px', 
+                borderRadius: '14px', 
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.45), 0 0 16px rgba(56, 189, 248, 0.25)', 
+                display: 'inline-flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                border: '1.5px solid rgba(255,255,255,0.4)',
+                overflow: 'hidden',
+                padding: '4px',
+                flexShrink: 0
+              }}>
+                <img 
+                  src={logo} 
+                  alt="Wash My Car Org Logo" 
+                  style={{ 
+                    width: '100%', 
+                    height: '100%', 
+                    objectFit: 'contain', 
+                    transform: 'scale(1.42)', 
+                    transformOrigin: 'center' 
+                  }} 
+                />
+              </div>
+
+              <div>
+                <div style={{ fontWeight: 900, fontSize: '1.3rem', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+                  <span style={{ color: '#FFFFFF' }}>WASH </span>
+                  <span style={{ color: '#38BDF8' }}>MY </span>
+                  <span style={{ color: '#FFFFFF' }}>CAR </span>
+                  <span style={{ color: '#38BDF8' }}>ORG</span>
+                </div>
+                <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginTop: '4px', fontWeight: 500 }}>
+                  Doorstep Vehicle Detailing & Steam Spa • Visakhapatnam
+                </div>
+              </div>
             </div>
-            <span style={{ fontWeight: 900, fontSize: '1.1rem' }}>
-              <span style={{ color: '#FFFFFF' }}>WASH </span>
-              <span style={{ color: '#38BDF8' }}>MY </span>
-              <span style={{ color: '#FFFFFF' }}>CAR </span>
-              <span style={{ color: '#38BDF8' }}>ORG</span>
-            </span>
+
+            {/* "Follow Us On" Dynamic Social Media Links (Configured by Admin in Settings) */}
+            {socialLinks.filter(s => s.enabled && s.url).length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  color: '#38BDF8',
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase'
+                }}>
+                  <span>Follow Us On</span>
+                  <span style={{ width: '24px', height: '2px', background: 'linear-gradient(90deg, #38BDF8, transparent)', borderRadius: '2px' }} />
+                </div>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.55rem', alignItems: 'center' }}>
+                  {socialLinks.filter(s => s.enabled && s.url).map((s, idx) => (
+                    <a
+                      key={s.id || idx}
+                      href={s.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={`Visit our ${s.platform}: ${s.name || s.platform}`}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        borderRadius: '24px',
+                        padding: '0.45rem 0.95rem',
+                        color: '#F1F5F9',
+                        textDecoration: 'none',
+                        fontSize: '0.82rem',
+                        fontWeight: 700,
+                        transition: 'all 0.25s ease',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.background = 'rgba(14, 165, 233, 0.2)';
+                        e.currentTarget.style.borderColor = '#38BDF8';
+                        e.currentTarget.style.color = '#38BDF8';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 6px 16px rgba(14,165,233,0.3)';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)';
+                        e.currentTarget.style.color = '#F1F5F9';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
+                      }}
+                    >
+                      <span style={{ display: 'flex', alignItems: 'center' }}>
+                        {s.id === 'instagram' && (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#E1306C' }}>
+                            <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+                            <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+                            <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
+                          </svg>
+                        )}
+                        {s.id === 'facebook' && (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ color: '#1877F2' }}>
+                            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                          </svg>
+                        )}
+                        {s.id === 'whatsapp' && (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#22C55E' }}>
+                            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+                          </svg>
+                        )}
+                        {s.id === 'linkedin' && (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#0EA5E9' }}>
+                            <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/>
+                            <rect x="2" y="9" width="4" height="12"/>
+                            <circle cx="4" cy="4" r="2"/>
+                          </svg>
+                        )}
+                        {s.id === 'twitter' && (
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" style={{ color: '#FFFFFF' }}>
+                            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                          </svg>
+                        )}
+                      </span>
+                      <span>{s.name || s.platform}</span>
+                      <ExternalLink size={12} style={{ opacity: 0.6 }} />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
-          <div style={{ display: 'flex', gap: '1.5rem', fontWeight: 600, fontSize: '0.85rem' }}>
-            <a href="#packages" style={{ color: '#CBD5E1' }}>Services</a>
-            <a href="#why-us" style={{ color: '#CBD5E1' }}>Why Wash My Car Org</a>
-            <a href="#partners" style={{ color: '#CBD5E1' }}>Franchise</a>
-            <a href="#faq" style={{ color: '#CBD5E1' }}>FAQ</a>
+          {/* Bottom Divider Row: Navigation Links & Copyright */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '1.25rem',
+            paddingTop: '1.5rem',
+            borderTop: '1px solid rgba(255, 255, 255, 0.08)'
+          }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', fontWeight: 600, fontSize: '0.85rem' }}>
+              <a href="#packages" style={{ color: '#CBD5E1', textDecoration: 'none' }}>Services</a>
+              <a href="#why-us" style={{ color: '#CBD5E1', textDecoration: 'none' }}>Why Wash My Car Org</a>
+              <a href="#partners" style={{ color: '#CBD5E1', textDecoration: 'none' }}>Franchise</a>
+              <a href="#faq" style={{ color: '#CBD5E1', textDecoration: 'none' }}>FAQ</a>
+              <Link to="/terms" style={{ color: '#38BDF8', textDecoration: 'none' }}>Terms & Conditions</Link>
+              <Link to="/privacy" style={{ color: '#38BDF8', textDecoration: 'none' }}>Privacy Policy</Link>
+            </div>
+
+            <div style={{ fontSize: '0.82rem', color: '#64748B' }}>
+              © 2026 Wash My Car Org Doorstep Care. All rights reserved.
+            </div>
           </div>
 
-          <div style={{ fontSize: '0.82rem' }}>
-            © 2026 Wash My Car Org Doorstep Care. All rights reserved.
-          </div>
         </div>
       </footer>
+
 
     </div>
   );

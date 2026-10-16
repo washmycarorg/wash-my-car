@@ -214,7 +214,7 @@ const Services = () => {
   return (
     <div className="animate-fade-in">
       {/* Navigation tabs */}
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '2px solid #E2E8F0', paddingBottom: '0.5rem', flexWrap: 'wrap' }}>
+      <div className="tabs-scrollable">
         <button 
           onClick={() => setActiveTab('matrix')}
           style={{
@@ -294,13 +294,14 @@ const Services = () => {
 
       {/* Tab Contents */}
       {activeTab === 'matrix' && (
-        <div className="card" style={{ padding: '1.5rem', overflowX: 'auto' }}>
+        <div className="card p-0" style={{ padding: '1rem' }}>
           <h3 style={{ marginBottom: '1.25rem', color: 'var(--primary-navy)' }}>Service Pricing & Commission Matrix</h3>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
             Click on any cell to edit the service price and configure the employee payout (percentage or fixed amount) for that specific vehicle and plan.
           </p>
 
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '700px' }}>
+          <div className="table-responsive">
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '700px' }}>
             <thead>
               <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #E2E8F0' }}>
                 <th style={{ padding: '1rem', color: 'var(--primary-navy)', fontWeight: 700 }}>Car / Vehicle Type</th>
@@ -486,6 +487,7 @@ const Services = () => {
               ) : null}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

@@ -19,7 +19,7 @@ const DashboardLayout = ({ children }) => {
       <Header toggleSidebar={() => setIsSidebarOpen(true)} profile={profile} />
       <Sidebar isOpen={isSidebarOpen} closeSidebar={() => setIsSidebarOpen(false)} />
       
-      <main style={{flex: 1, padding: '1.5rem 1rem 6.5rem 1rem', overflowX: 'hidden'}}>
+      <main className="user-main-content">
         {children}
       </main>
 

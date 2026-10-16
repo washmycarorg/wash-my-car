@@ -25,6 +25,48 @@ const SettingsPage = () => {
     { count: 5, points: 150 }
   ]);
   const [adImageTab, setAdImageTab] = useState('upload'); // 'upload' | 'url'
+  const [policyTab, setPolicyTab] = useState('terms'); // 'terms' | 'privacy'
+
+  const DEFAULT_TERMS = `1. DOORSTEP ACCESS & SERVICE REQUIREMENTS
+- Customer Water & Power Access: The customer agrees to provide accessible domestic water tap connection and a standard 220V/16A electric plug point within a reasonable distance (20-25 meters) for our technician to operate high-pressure washing machines, vacuum cleaners, and steam detailing equipment safely.
+- Vehicle Parking Clearance: The vehicle must be parked in a safe, legal, and adequately illuminated space with at least 2 to 3 feet of clearance on all sides to allow complete exterior and interior detailing without obstruction.
+- Personal Belongings & Valuables: Customers are strictly requested to remove all personal belongings, cash, jewelry, electronic items, and important documents from inside the car before service starts. Wash My Car Org and its technicians are not responsible for unattended personal valuables.
+
+2. CANCELLATION, RESCHEDULE & REFUND POLICY
+- Easy Slot Rescheduling: Customers can reschedule any upcoming service slot free of charge up to 2 hours before the scheduled appointment time.
+- Cancellation Before Dispatch: If a booking is cancelled before the service vehicle and technician are dispatched, a 100% refund will be processed immediately to the original payment method or credited to your Wash My Car Org wallet.
+- Failed Doorstep Access / On-Site Trip Fee: If our technician arrives at your doorstep but service cannot be performed due to lack of water/electricity access, gated community denial, or customer unavailability after 20 minutes of waiting, a nominal trip & fuel charge of ₹99 will be deducted and the remaining balance refunded.
+- Bad Weather Policy: In case of sudden torrential monsoon rain or hazardous weather, washes will be placed on hold and rescheduled to the earliest convenient dry time slot with customer consent.
+
+3. PRICING, PROMOTIONS & VIP PASSES
+- All prices displayed are inclusive of professional detailing labor and premium pH-neutral cleaning chemicals.
+- Promotional coupon codes and referral wallet discounts are applicable as per individual offer rules.
+- VIP monthly subscription passes are non-transferable and tied to the registered vehicle plate number.`;
+
+  const DEFAULT_PRIVACY = `1. INFORMATION WE COLLECT & PURPOSE
+- Mobile Number & SMS OTP: Collected exclusively for secure account registration, login verification, passwordless SMS authentication via Twilio, and instant transactional booking updates (booking confirmation, technician arrival alert, and digital invoice).
+- Vehicle Registration Plate Number & Model: Collected strictly to instruct the assigned service technician on exactly which vehicle to wash and detail at your doorstep, guaranteeing service authenticity and preventing wrong-car washing.
+- Service Address & Location: Used solely for navigation and smart dispatch routing of our doorstep mobile detailing van to your home or office parking.
+
+2. BEFORE & AFTER WASH VERIFICATION PHOTOS
+- Purpose of Vehicle Photos: Our field technicians take high-resolution before-and-after photographs of the vehicle exterior, tyres, and cabin. These photos are taken solely for service completion verification, job quality audit, and internal technician authenticity evaluation.
+- Absolute Confidentiality: Vehicle photos are strictly private and stored securely. They will NEVER be sold, shared, published, or distributed to any third party or public social media without your prior explicit consent.
+
+3. COMMUNICATIONS & PROMOTIONAL NOTIFICATIONS
+- Service Communications: We send essential transactional SMS, WhatsApp updates, and call reminders regarding your active wash appointment and arrival timings.
+- Promotional Messages: We may occasionally notify you about exclusive seasonal discounts, monsoon specials, or loyalty point bonuses. You can opt out of promotional messages anytime by contacting support.
+
+4. STRICT ZERO THIRD-PARTY DATA SHARING GUARANTEE
+- We respect your privacy. Wash My Car Org has a strict zero-tolerance data monetisation policy: we NEVER sell, rent, lease, trade, or share your personal information, phone numbers, or vehicle details with third-party advertisers or external marketing brokers.`;
+
+  const DEFAULT_SOCIAL_LINKS = [
+    { id: 'instagram', platform: 'Instagram', enabled: true, name: '@washmycarorg', url: 'https://instagram.com/washmycarorg' },
+    { id: 'facebook', platform: 'Facebook', enabled: true, name: 'Wash My Car Org', url: 'https://facebook.com/washmycarorg' },
+    { id: 'whatsapp', platform: 'WhatsApp', enabled: true, name: '+91 98765 43210', url: 'https://wa.me/919876543210' },
+    { id: 'linkedin', platform: 'LinkedIn', enabled: false, name: 'Wash My Car Org', url: 'https://linkedin.com/' },
+    { id: 'twitter', platform: 'Twitter (X)', enabled: false, name: '@washmycarorg', url: 'https://x.com/washmycarorg' }
+  ];
+  const [socialLinks, setSocialLinks] = useState(DEFAULT_SOCIAL_LINKS);
   const [settings, setSettings] = useState({
     bookingsEnabled: true,
     subscriptionsEnabled: true,
@@ -50,8 +92,11 @@ const SettingsPage = () => {
     dashboardAdBadge: "PROMOTIONAL OFFER • LIMITED SLOTS",
     subscriptionBannerTitle: "Exclusive VIP Car Care Membership",
     subscriptionBannerSubtitle: "Save up to 40% with monthly doorstep passes, complimentary add-ons & priority scheduling.",
-    subscriptionBannerImage: "https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=1600&q=85"
+    subscriptionBannerImage: "https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=1600&q=85",
+    termsAndConditionsText: DEFAULT_TERMS,
+    privacyPolicyText: DEFAULT_PRIVACY
   });
+
 
   const handleInstantToggle = async (field, newValue) => {
     setSettings(prev => ({ ...prev, [field]: newValue }));
@@ -135,8 +180,23 @@ const SettingsPage = () => {
           dashboardAdBadge: res.dashboardAdBadge || "PROMOTIONAL OFFER • LIMITED SLOTS",
           subscriptionBannerTitle: res.subscriptionBannerTitle || "Exclusive VIP Car Care Membership",
           subscriptionBannerSubtitle: res.subscriptionBannerSubtitle || "Save up to 40% with monthly doorstep passes, complimentary add-ons & priority scheduling.",
-          subscriptionBannerImage: res.subscriptionBannerImage || "https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=1600&q=85"
+          subscriptionBannerImage: res.subscriptionBannerImage || "https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=1600&q=85",
+          termsAndConditionsText: res.termsAndConditionsText || DEFAULT_TERMS,
+          privacyPolicyText: res.privacyPolicyText || DEFAULT_PRIVACY
         });
+
+
+        if (res.socialLinks) {
+          try {
+            const parsedSocial = typeof res.socialLinks === 'string' ? JSON.parse(res.socialLinks) : res.socialLinks;
+            if (Array.isArray(parsedSocial) && parsedSocial.length > 0) {
+              setSocialLinks(parsedSocial);
+            }
+          } catch (e) {
+            console.warn('Could not parse social links:', e);
+          }
+        }
+
         setLoading(false);
       })
       .catch(err => {
@@ -240,6 +300,14 @@ const SettingsPage = () => {
     setSettings(prev => ({ ...prev, dashboardAdImage: '' }));
   };
 
+  const handleUpdateSocial = (index, field, value) => {
+    setSocialLinks(prev => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -265,7 +333,10 @@ const SettingsPage = () => {
         dashboardAdBadge: settings.dashboardAdBadge,
         subscriptionBannerTitle: settings.subscriptionBannerTitle,
         subscriptionBannerSubtitle: settings.subscriptionBannerSubtitle,
-        subscriptionBannerImage: settings.subscriptionBannerImage
+        subscriptionBannerImage: settings.subscriptionBannerImage,
+        socialLinks: JSON.stringify(socialLinks),
+        termsAndConditionsText: settings.termsAndConditionsText,
+        privacyPolicyText: settings.privacyPolicyText
       });
       setSettings(prev => ({
         ...prev,
@@ -288,8 +359,11 @@ const SettingsPage = () => {
         dashboardAdBadge: res.dashboardAdBadge ?? prev.dashboardAdBadge,
         subscriptionBannerTitle: res.subscriptionBannerTitle ?? prev.subscriptionBannerTitle,
         subscriptionBannerSubtitle: res.subscriptionBannerSubtitle ?? prev.subscriptionBannerSubtitle,
-        subscriptionBannerImage: res.subscriptionBannerImage ?? prev.subscriptionBannerImage
+        subscriptionBannerImage: res.subscriptionBannerImage ?? prev.subscriptionBannerImage,
+        termsAndConditionsText: res.termsAndConditionsText ?? prev.termsAndConditionsText,
+        privacyPolicyText: res.privacyPolicyText ?? prev.privacyPolicyText
       }));
+
       alert('System settings updated successfully!');
     } catch (err) {
       console.error(err);
@@ -327,7 +401,7 @@ const SettingsPage = () => {
         </div>
       )}
 
-      <div className="card animate-fade-in" style={{ padding: '2.5rem' }}>
+      <div className="card animate-fade-in" style={{ padding: '1.75rem' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
           <div>
             <h3 style={{ marginBottom: '0.35rem', color: 'var(--primary-navy)' }}>System Operations & Rules</h3>
@@ -1431,7 +1505,328 @@ const SettingsPage = () => {
               </div>
             </div>
 
+            {/* ========================================================
+                SOCIAL MEDIA & "FOLLOW US ON" FOOTER LINKS
+            ======================================================== */}
+            <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '1.3rem' }}>🌐</span>
+                <div>
+                  <h4 style={{ margin: 0, color: 'var(--primary-navy)', fontSize: '1.05rem', fontWeight: 700 }}>
+                    Social Media & "Follow Us On" Footer Links
+                  </h4>
+                  <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                    Control which social channels appear in the website footer. Customize each platform's display name or handle, and set the target redirect link.
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                {socialLinks.map((item, idx) => (
+                  <div 
+                    key={item.id || idx}
+                    style={{
+                      background: item.enabled ? '#FFFFFF' : '#F8FAFC',
+                      border: item.enabled ? '1.5px solid #0284C7' : '1px solid #E2E8F0',
+                      borderRadius: '12px',
+                      padding: '1rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.75rem',
+                      boxShadow: item.enabled ? '0 4px 12px rgba(2, 132, 199, 0.08)' : 'none',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                        <div style={{
+                          width: '36px',
+                          height: '36px',
+                          borderRadius: '10px',
+                          background: item.id === 'instagram' 
+                            ? 'linear-gradient(45deg, #F58529, #DD2A7B, #8134AF)' 
+                            : item.id === 'facebook' 
+                            ? '#1877F2' 
+                            : item.id === 'whatsapp' 
+                            ? '#25D366' 
+                            : item.id === 'linkedin' 
+                            ? '#0A66C2' 
+                            : '#0F172A',
+                          color: 'white',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}>
+                          {item.id === 'instagram' && (
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+                              <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+                              <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
+                            </svg>
+                          )}
+                          {item.id === 'facebook' && (
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>
+                            </svg>
+                          )}
+                          {item.id === 'whatsapp' && (
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+                            </svg>
+                          )}
+                          {item.id === 'linkedin' && (
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/>
+                              <rect x="2" y="9" width="4" height="12"/>
+                              <circle cx="4" cy="4" r="2"/>
+                            </svg>
+                          )}
+                          {item.id === 'twitter' && (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                            </svg>
+                          )}
+                        </div>
+
+                        <div>
+                          <span style={{ fontWeight: 800, fontSize: '0.92rem', color: 'var(--primary-navy)' }}>
+                            {item.platform}
+                          </span>
+                          <span style={{
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            marginLeft: '0.5rem',
+                            padding: '2px 8px',
+                            borderRadius: '10px',
+                            background: item.enabled ? '#DCFCE7' : '#F1F5F9',
+                            color: item.enabled ? '#15803D' : '#64748B'
+                          }}>
+                            {item.enabled ? 'ACTIVE IN FOOTER' : 'HIDDEN'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Toggle Switch */}
+                      <label style={{ position: 'relative', display: 'inline-block', width: '48px', height: '26px', cursor: 'pointer', flexShrink: 0 }}>
+                        <input
+                          type="checkbox"
+                          checked={!!item.enabled}
+                          onChange={e => handleUpdateSocial(idx, 'enabled', e.target.checked)}
+                          style={{ opacity: 0, width: 0, height: 0 }}
+                        />
+                        <span style={{
+                          position: 'absolute',
+                          inset: 0,
+                          backgroundColor: item.enabled ? '#0284C7' : '#CBD5E1',
+                          borderRadius: '26px',
+                          transition: '0.3s'
+                        }}>
+                          <span style={{
+                            position: 'absolute',
+                            height: '20px',
+                            width: '20px',
+                            left: item.enabled ? '24px' : '4px',
+                            bottom: '3px',
+                            backgroundColor: 'white',
+                            borderRadius: '50%',
+                            transition: '0.3s',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                          }} />
+                        </span>
+                      </label>
+                    </div>
+
+                    {/* Inputs */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '0.75rem', opacity: item.enabled ? 1 : 0.6 }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '3px' }}>
+                          Display Name / ID (Shown in Footer)
+                        </label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={item.name || ''}
+                          onChange={e => handleUpdateSocial(idx, 'name', e.target.value)}
+                          placeholder="e.g. @washmycarorg"
+                          style={{ fontSize: '0.85rem', padding: '0.45rem 0.65rem' }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '3px' }}>
+                          Target Redirect Link / Web URL
+                        </label>
+                        <input
+                          type="url"
+                          className="form-input"
+                          value={item.url || ''}
+                          onChange={e => handleUpdateSocial(idx, 'url', e.target.value)}
+                          placeholder={`https://${item.id === 'whatsapp' ? 'wa.me/91...' : item.id + '.com/...'}`}
+                          style={{ fontSize: '0.85rem', padding: '0.45rem 0.65rem' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Live Footer Preview */}
+              <div style={{ background: '#0F172A', borderRadius: '12px', padding: '1.25rem', color: 'white', marginTop: '0.5rem' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#38BDF8', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '0.75rem' }}>
+                  Live Footer "Follow Us On" Preview:
+                </div>
+                <div style={{ display: 'flex', gap: '0.85rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  {socialLinks.filter(s => s.enabled).map((s, i) => (
+                    <div 
+                      key={i} 
+                      style={{ 
+                        background: 'rgba(255,255,255,0.08)', 
+                        border: '1px solid rgba(255,255,255,0.15)', 
+                        borderRadius: '25px', 
+                        padding: '0.35rem 0.85rem', 
+                        display: 'inline-flex', 
+                        alignItems: 'center', 
+                        gap: '0.5rem',
+                        fontSize: '0.78rem',
+                        color: '#F8FAFC'
+                      }}
+                    >
+                      <span style={{ display: 'flex', alignItems: 'center' }}>
+                        {s.id === 'instagram' && '📸'}
+                        {s.id === 'facebook' && '📘'}
+                        {s.id === 'whatsapp' && '💬'}
+                        {s.id === 'linkedin' && '💼'}
+                        {s.id === 'twitter' && '𝕏'}
+                      </span>
+                      <strong style={{ color: 'white' }}>{s.name || s.platform}</strong>
+                    </div>
+                  ))}
+                  {socialLinks.filter(s => s.enabled).length === 0 && (
+                    <span style={{ fontSize: '0.8rem', color: '#94A3B8' }}>No social channels enabled. Toggle switches above to display.</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* ========================================================
+                TERMS & CONDITIONS & PRIVACY POLICY EDITOR
+            ======================================================== */}
+            <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '1.3rem' }}>📜</span>
+                  <div>
+                    <h4 style={{ margin: 0, color: 'var(--primary-navy)', fontSize: '1.05rem', fontWeight: 700 }}>
+                      Terms of Service & Privacy Policy Editor
+                    </h4>
+                    <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                      Super Admin can alter customer policies anytime. Dynamically served on public /terms and /privacy pages.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Sub Tab Switcher */}
+                <div style={{ display: 'flex', gap: '0.35rem', background: '#F1F5F9', padding: '3px', borderRadius: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setPolicyTab('terms')}
+                    style={{
+                      padding: '0.35rem 0.75rem',
+                      fontSize: '0.76rem',
+                      fontWeight: 700,
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: policyTab === 'terms' ? '#0284C7' : 'transparent',
+                      color: policyTab === 'terms' ? 'white' : '#64748B',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Terms & Conditions
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPolicyTab('privacy')}
+                    style={{
+                      padding: '0.35rem 0.75rem',
+                      fontSize: '0.76rem',
+                      fontWeight: 700,
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: policyTab === 'privacy' ? '#0284C7' : 'transparent',
+                      color: policyTab === 'privacy' ? 'white' : '#64748B',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Privacy Policy
+                  </button>
+                </div>
+              </div>
+
+              {/* Terms of Service Editor */}
+              {policyTab === 'terms' && (
+                <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A' }}>
+                      Customer Doorstep Terms & Operating Conditions
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setSettings(s => ({ ...s, termsAndConditionsText: DEFAULT_TERMS }))}
+                      style={{ fontSize: '0.72rem', color: '#0284C7', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
+                    >
+                      Reset to Standard Template
+                    </button>
+                  </div>
+
+                  <textarea
+                    rows={12}
+                    className="form-input"
+                    value={settings.termsAndConditionsText || ''}
+                    onChange={e => setSettings({ ...settings, termsAndConditionsText: e.target.value })}
+                    placeholder="Enter Terms & Conditions..."
+                    style={{ fontSize: '0.84rem', lineHeight: 1.6, fontFamily: 'monospace' }}
+                  />
+
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                    💡 <strong>Includes:</strong> Domestic water tap & 16A power requirement, vehicle clearance, valuables disclaimer, 100% pre-dispatch refunds, and ₹99 on-site access trip fee.
+                  </div>
+                </div>
+              )}
+
+              {/* Privacy Policy Editor */}
+              {policyTab === 'privacy' && (
+                <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A' }}>
+                      Customer Privacy, Vehicle Data & Photo Audit Policy
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setSettings(s => ({ ...s, privacyPolicyText: DEFAULT_PRIVACY }))}
+                      style={{ fontSize: '0.72rem', color: '#0284C7', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
+                    >
+                      Reset to Standard Template
+                    </button>
+                  </div>
+
+                  <textarea
+                    rows={12}
+                    className="form-input"
+                    value={settings.privacyPolicyText || ''}
+                    onChange={e => setSettings({ ...settings, privacyPolicyText: e.target.value })}
+                    placeholder="Enter Privacy Policy..."
+                    style={{ fontSize: '0.84rem', lineHeight: 1.6, fontFamily: 'monospace' }}
+                  />
+
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                    💡 <strong>Includes:</strong> Phone/OTP for login, vehicle plate taken strictly to wash right car, vehicle before/after photos strictly for employee quality audit & never shared with 3rd parties, zero data monetisation.
+                  </div>
+                </div>
+              )}
+            </div>
+
           </div>
+
 
           <button
             type="submit"

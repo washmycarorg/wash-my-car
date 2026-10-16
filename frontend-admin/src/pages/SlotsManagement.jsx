@@ -323,7 +323,7 @@ const SlotsManagement = () => {
       )}
 
       {/* Grid: 1. Fleet & Distance Engine, 2. Default Daily Slots */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '1.5rem' }}>
         
         {/* Card 1: Field Worker Capacity & Transit Limit */}
         <div className="card" style={{ padding: '1.75rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -635,7 +635,7 @@ const SlotsManagement = () => {
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '1.5rem', alignItems: 'start' }}>
           
           {/* TAB 1: Entire Month Configuration Form */}
           {overrideMode === 'MONTH' ? (
@@ -1028,7 +1028,7 @@ const SlotsManagement = () => {
             )}
 
             {/* Dynamic Service Area Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
               {displayAreas.map((area, idx) => {
                 const isCenterHub = idx === 0 || area.name.toLowerCase().includes('nad');
                 const distFromHub = idx === 0 ? 0 : (distanceMatrix[displayAreas[0]?.name]?.[area.name] ?? calcGpsDistanceKm(displayAreas[0]?.latitude, displayAreas[0]?.longitude, area.latitude, area.longitude));
@@ -1113,7 +1113,7 @@ const SlotsManagement = () => {
                 </div>
               </div>
 
-              <div style={{ overflowX: 'auto' }}>
+              <div className="table-responsive">
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center', minWidth: '650px' }}>
                   <thead style={{ background: '#0F172A', color: 'white' }}>
                     <tr>

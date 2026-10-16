@@ -21,131 +21,109 @@ import logo from './assets/wash my car.png';
 const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
   const location = useLocation();
   const isActive = (path) => location.pathname === path ? 'active' : '';
+  const closeSidebar = () => setIsMobileOpen(false);
 
   return (
     <>
       {/* Mobile overlay */}
       {isMobileOpen && (
         <div 
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 40 }}
-          onClick={() => setIsMobileOpen(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 999, backdropFilter: 'blur(2px)' }}
+          onClick={closeSidebar}
         />
       )}
       
-      <aside className={`sidebar ${isMobileOpen ? 'mobile-open' : ''}`} style={{zIndex: 50}}>
-        <div className="flex items-center justify-between" style={{marginBottom: '2rem'}}>
-          <Link to="/" className="nav-brand flex items-center gap-3">
-            <div style={{background: 'white', padding: '0.2rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '45px', height: '45px'}}>
-              <img src={logo} alt="Logo" style={{width: '100%', height: '100%', objectFit: 'contain', transform: 'scale(1.2)'}} />
+      <aside className={`sidebar ${isMobileOpen ? 'mobile-open' : ''}`}>
+        <div className="flex items-center justify-between" style={{marginBottom: '1.75rem'}}>
+          <Link to="/" onClick={closeSidebar} className="nav-brand flex items-center gap-3">
+            <div style={{background: 'white', padding: '0.2rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '42px', height: '42px'}}>
+              <img src={logo} alt="Logo" style={{width: '100%', height: '100%', objectFit: 'contain', transform: 'scale(1.15)'}} />
             </div>
             <div>
-              <div style={{color: 'white', fontWeight: 'bold', fontSize: '1.25rem', lineHeight: 1.2}}>ADMIN</div>
-              <div style={{color: 'var(--accent-teal)', fontSize: '0.75rem', fontWeight: 600}}>WASH MY CAR ORG</div>
+              <div style={{color: 'white', fontWeight: 'bold', fontSize: '1.2rem', lineHeight: 1.2}}>ADMIN</div>
+              <div style={{color: 'var(--accent-teal)', fontSize: '0.72rem', fontWeight: 600, whiteSpace: 'nowrap'}}>WASH MY CAR ORG</div>
             </div>
           </Link>
-          <button className="md-hidden text-white btn-close" onClick={() => setIsMobileOpen(false)}>
+          <button className="md-hidden text-white btn-close" onClick={closeSidebar} style={{background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.25rem'}}>
             <X size={24} />
           </button>
         </div>
         
-        <nav className="flex-col flex gap-2">
-          <Link to="/dashboard" className={`sidebar-link ${isActive('/dashboard')}`}>
-            <LayoutDashboard size={20} /> Dashboard
+        <nav className="flex-col flex gap-1">
+          <Link to="/dashboard" onClick={closeSidebar} className={`sidebar-link ${isActive('/dashboard')}`}>
+            <LayoutDashboard size={19} /> Dashboard
           </Link>
-          <Link to="/employees" className={`sidebar-link ${isActive('/employees')}`}>
-            <Briefcase size={20} /> Employees
+          <Link to="/employees" onClick={closeSidebar} className={`sidebar-link ${isActive('/employees')}`}>
+            <Briefcase size={19} /> Employees
           </Link>
-          <Link to="/users" className={`sidebar-link ${isActive('/users')}`}>
-            <Users size={20} /> Users Directory
+          <Link to="/users" onClick={closeSidebar} className={`sidebar-link ${isActive('/users')}`}>
+            <Users size={19} /> Users Directory
           </Link>
-          <Link to="/bookings" className={`sidebar-link ${isActive('/bookings')}`}>
-            <Calendar size={20} /> Bookings & Slots
+          <Link to="/bookings" onClick={closeSidebar} className={`sidebar-link ${isActive('/bookings')}`}>
+            <Calendar size={19} /> Bookings & Slots
           </Link>
-          <Link to="/slots-management" className={`sidebar-link ${isActive('/slots-management')}`}>
-            <Compass size={20} /> Slot Dispatch & Zones
+          <Link to="/slots-management" onClick={closeSidebar} className={`sidebar-link ${isActive('/slots-management')}`}>
+            <Compass size={19} /> Slot Dispatch & Zones
           </Link>
-          <Link to="/inquiries" className={`sidebar-link ${isActive('/inquiries')}`}>
-            <MessageSquare size={20} /> Enquiries & Complaints
+          <Link to="/inquiries" onClick={closeSidebar} className={`sidebar-link ${isActive('/inquiries')}`}>
+            <MessageSquare size={19} /> Enquiries & Complaints
           </Link>
-          <Link to="/earnings" className={`sidebar-link ${isActive('/earnings')}`}>
-            <DollarSign size={20} /> Financials
+          <Link to="/earnings" onClick={closeSidebar} className={`sidebar-link ${isActive('/earnings')}`}>
+            <DollarSign size={19} /> Financials
           </Link>
-          <Link to="/leaves" className={`sidebar-link ${isActive('/leaves')}`}>
-            <FileText size={20} /> Leave Approvals
+          <Link to="/leaves" onClick={closeSidebar} className={`sidebar-link ${isActive('/leaves')}`}>
+            <FileText size={19} /> Leave Approvals
           </Link>
-          <Link to="/services" className={`sidebar-link ${isActive('/services')}`}>
-            <Briefcase size={20} /> Packages & Plans
+          <Link to="/services" onClick={closeSidebar} className={`sidebar-link ${isActive('/services')}`}>
+            <Briefcase size={19} /> Packages & Plans
           </Link>
-          <Link to="/subscriptions" className={`sidebar-link ${isActive('/subscriptions')}`}>
-            <Crown size={20} /> VIP Subscriptions
+          <Link to="/subscriptions" onClick={closeSidebar} className={`sidebar-link ${isActive('/subscriptions')}`}>
+            <Crown size={19} /> VIP Subscriptions
           </Link>
-          <Link to="/inventory" className={`sidebar-link ${isActive('/inventory')}`}>
-            <Package size={20} /> Inventory Management
+          <Link to="/inventory" onClick={closeSidebar} className={`sidebar-link ${isActive('/inventory')}`}>
+            <Package size={19} /> Inventory Management
           </Link>
-          <Link to="/offers" className={`sidebar-link ${isActive('/offers')}`}>
-            <Tag size={20} /> Offers
+          <Link to="/offers" onClick={closeSidebar} className={`sidebar-link ${isActive('/offers')}`}>
+            <Tag size={19} /> Offers
           </Link>
-          <Link to="/areas" className={`sidebar-link ${isActive('/areas')}`}>
-            <MapPin size={20} /> Service Areas
+          <Link to="/areas" onClick={closeSidebar} className={`sidebar-link ${isActive('/areas')}`}>
+            <MapPin size={19} /> Service Areas
           </Link>
-          <Link to="/cms" className={`sidebar-link ${isActive('/cms')}`}>
-            <Globe size={20} /> Homepage CMS
+          <Link to="/cms" onClick={closeSidebar} className={`sidebar-link ${isActive('/cms')}`}>
+            <Globe size={19} /> Homepage CMS
           </Link>
-          <Link to="/settings" className={`sidebar-link ${isActive('/settings')}`}>
-            <Settings size={20} /> Settings
+          <Link to="/settings" onClick={closeSidebar} className={`sidebar-link ${isActive('/settings')}`}>
+            <Settings size={19} /> Settings
           </Link>
           
-          <div style={{marginTop: 'auto', paddingTop: '2rem'}}>
-            <button className="btn btn-outline btn-block" style={{borderColor: 'rgba(255,255,255,0.2)', color: 'white'}} onClick={() => { localStorage.removeItem('adminToken'); localStorage.removeItem('adminInfo'); window.location.href='/'; }}>
+          <div style={{marginTop: 'auto', paddingTop: '1.5rem', paddingBottom: '1rem'}}>
+            <button className="btn btn-outline btn-block" style={{borderColor: 'rgba(255,255,255,0.25)', color: 'white', width: '100%'}} onClick={() => { closeSidebar(); localStorage.removeItem('adminToken'); localStorage.removeItem('adminInfo'); window.location.href='/'; }}>
               Log Out
             </button>
           </div>
         </nav>
       </aside>
-      
-      {/* Required CSS to make sidebar work on mobile */}
-      <style>{`
-        .sidebar.mobile-open {
-          display: flex;
-          position: fixed;
-          left: 0;
-          top: 0;
-          bottom: 0;
-        }
-        @media (max-width: 768px) {
-          .md-hidden { display: block; background: transparent; border: none; cursor: pointer; }
-        }
-        @media (min-width: 769px) {
-          .md-hidden { display: none; }
-        }
-      `}</style>
     </>
   );
 };
 
 const Header = ({ title, setIsMobileOpen }) => (
-  <header style={{background: 'var(--bg-white)', borderBottom: '1px solid #e2e8f0', padding: '1rem 2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 10, position: 'sticky', top: 0}}>
-    <div className="flex items-center gap-4">
-      <button className="md-hidden" style={{background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.5rem'}} onClick={() => setIsMobileOpen(true)}>
-        <Menu size={24} color="var(--text-dark)" />
+  <header className="admin-header">
+    <div className="flex items-center gap-3" style={{ minWidth: 0 }}>
+      <button className="md-hidden" style={{background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.4rem', display: 'flex', alignItems: 'center'}} onClick={() => setIsMobileOpen(true)} aria-label="Toggle navigation menu">
+        <Menu size={24} color="var(--primary-navy)" />
       </button>
-      <h2 style={{margin: 0, fontSize: '1.5rem'}}>{title}</h2>
+      <h2 className="admin-header-title" style={{margin: 0, fontWeight: 800, color: 'var(--primary-navy)'}}>{title}</h2>
     </div>
     
-    <div className="flex items-center gap-4">
-      <div style={{position: 'relative'}} className="hidden md-block">
-        <Search size={20} style={{position: 'absolute', left: 10, top: 10, color: 'var(--text-muted)'}} />
-        <input type="text" className="form-input" placeholder="Search..." style={{paddingLeft: '2.5rem', width: '250px', marginBottom: 0}} />
+    <div className="flex items-center gap-3" style={{ flexShrink: 0 }}>
+      <div style={{position: 'relative'}} className="admin-header-search">
+        <Search size={18} style={{position: 'absolute', left: 10, top: 11, color: 'var(--text-muted)'}} />
+        <input type="text" className="form-input" placeholder="Search..." style={{paddingLeft: '2.4rem', width: '220px', marginBottom: 0}} />
       </div>
-      <Bell size={24} color="var(--text-muted)" style={{cursor: 'pointer'}} />
-      <div style={{width: 40, height: 40, borderRadius: '50%', background: 'var(--primary-blue)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold'}}>A</div>
+      <Bell size={22} color="var(--text-muted)" style={{cursor: 'pointer'}} />
+      <div style={{width: 36, height: 36, borderRadius: '50%', background: 'var(--primary-blue)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '0.9rem'}}>A</div>
     </div>
-    
-    <style>{`
-      @media (max-width: 768px) {
-        .hidden\\.md-block { display: none; }
-      }
-    `}</style>
   </header>
 );
 
@@ -155,9 +133,9 @@ const AdminLayout = ({ children, title }) => {
   return (
     <div className="dashboard-layout animate-fade-in">
       <Sidebar isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} />
-      <div className="main-content flex-col" style={{padding: 0, height: '100vh', overflowY: 'auto'}}>
+      <div className="main-content flex-col">
         <Header title={title} setIsMobileOpen={setIsMobileOpen} />
-        <main style={{padding: '2rem', flex: 1}}>
+        <main className="admin-main">
           {children}
         </main>
       </div>
@@ -393,86 +371,88 @@ const EmployeeManagement = () => {
 
   return (
     <AdminLayout title="Employee Details & Stats">
-      <div className="card" style={{padding: 0, overflowX: 'auto'}}>
+      <div className="card p-0" style={{padding: 0}}>
         <div className="flex justify-between items-center p-6 border-b border-gray-200">
           <h3 style={{margin: 0}}>All Employees</h3>
         </div>
-        <table style={{width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '600px'}}>
-          <thead style={{background: '#F8FAFC'}}>
-            <tr>
-              <th style={{padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem', textTransform: 'uppercase'}}>Name</th>
-              <th style={{padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem', textTransform: 'uppercase'}}>Contact</th>
-              <th style={{padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem', textTransform: 'uppercase'}}>Earnings</th>
-              <th style={{padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem', textTransform: 'uppercase'}}>Status</th>
-              <th style={{padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem', textTransform: 'uppercase'}}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {employees.map((emp) => (
-              <tr key={emp.id} style={{borderBottom: '1px solid #F1F5F9', transition: 'background 0.2s'}} className="hover:bg-gray-50">
-                <td style={{padding: '1rem 1.5rem'}}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    {emp.photo ? (
-                      <img src={emp.photo} alt="Avatar" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', border: '1px solid #E2E8F0' }} />
-                    ) : (
-                      <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--accent-teal-light)', color: 'var(--primary-navy)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
-                        {(emp.name[0] || 'E').toUpperCase()}
-                      </div>
-                    )}
-                    <div>
-                      <div style={{fontWeight: 600, color: 'var(--primary-navy)'}}>{emp.name}</div>
-                      <div style={{fontSize: '0.8rem'}} className={emp.onDuty ? 'text-success' : 'text-muted'}>{emp.onDuty ? '● On Duty' : '○ Off Duty'}</div>
-                    </div>
-                  </div>
-                </td>
-                <td style={{padding: '1rem 1.5rem'}}>
-                  <div style={{color: 'var(--text-main)', fontSize: '0.9rem'}}>{emp.phone}</div>
-                  <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.25rem'}}>{emp.email}</div>
-                  <div style={{fontSize: '0.75rem', color: 'var(--primary-blue)', fontWeight: 600}}>
-                    Area: {emp.serviceAreas && emp.serviceAreas.length > 0 ? emp.serviceAreas[0]?.name : 'None'}
-                  </div>
-                </td>
-                <td style={{padding: '1rem 1.5rem'}}>
-                  <div style={{fontWeight: 700, color: 'var(--primary-navy)'}}>₹{emp.earnings || 0}</div>
-                  <div style={{fontSize: '0.75rem', marginTop: '0.2rem'}}>
-                    {emp.payType === 'FIXED_SALARY' ? (
-                      <span style={{ background: '#E0F2FE', color: '#0369A1', padding: '0.2rem 0.5rem', borderRadius: '6px', fontWeight: 700 }}>
-                        Fixed (₹{emp.salary || emp.baseSalary || 0}/mo)
-                      </span>
-                    ) : emp.payType === 'HYBRID' ? (
-                      <span style={{ background: '#EDE9FE', color: '#6D28D9', padding: '0.2rem 0.5rem', borderRadius: '6px', fontWeight: 700 }}>
-                        Hybrid (₹{emp.baseSalary || 0} + Comm)
-                      </span>
-                    ) : (
-                      <span style={{ background: '#DCFCE7', color: '#166534', padding: '0.2rem 0.5rem', borderRadius: '6px', fontWeight: 700 }}>
-                        Commission Only
-                      </span>
-                    )}
-                  </div>
-                </td>
-                <td style={{padding: '1rem 1.5rem'}}>
-                  <span className={`badge ${emp.status === 'ACTIVE' ? 'badge-success' : emp.status === 'PENDING' ? 'badge-warning' : 'badge-danger'}`}>
-                    {emp.status}
-                  </span>
-                </td>
-                <td style={{padding: '1rem 1.5rem'}} className="flex gap-2">
-                  <button onClick={() => setSelectedEmployee(emp)} className="btn btn-outline" style={{padding: '0.4rem 0.8rem', fontSize: '0.85rem'}}>Details & Edit</button>
-                  {emp.status === 'ACTIVE' ? 
-                    <button onClick={() => handleToggle(emp.id, emp.status)} className="btn btn-outline" style={{padding: '0.4rem 0.8rem', fontSize: '0.85rem', borderColor: 'var(--danger)', color: 'var(--danger)'}}>Suspend</button> :
-                    <button onClick={() => handleToggle(emp.id, emp.status)} className="btn btn-teal" style={{padding: '0.4rem 0.8rem', fontSize: '0.85rem'}}>Approve</button>
-                  }
-                </td>
-              </tr>
-            ))}
-            {employees.length === 0 && (
+        <div className="table-responsive">
+          <table style={{width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '600px'}}>
+            <thead style={{background: '#F8FAFC'}}>
               <tr>
-                <td colSpan="5" style={{padding: '3rem', textAlign: 'center', color: 'var(--text-muted)'}}>
-                  No employees found.
-                </td>
+                <th style={{padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem', textTransform: 'uppercase'}}>Name</th>
+                <th style={{padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem', textTransform: 'uppercase'}}>Contact</th>
+                <th style={{padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem', textTransform: 'uppercase'}}>Earnings</th>
+                <th style={{padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem', textTransform: 'uppercase'}}>Status</th>
+                <th style={{padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem', textTransform: 'uppercase'}}>Actions</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {employees.map((emp) => (
+                <tr key={emp.id} style={{borderBottom: '1px solid #F1F5F9', transition: 'background 0.2s'}} className="hover:bg-gray-50">
+                  <td style={{padding: '1rem 1.5rem'}}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      {emp.photo ? (
+                        <img src={emp.photo} alt="Avatar" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', border: '1px solid #E2E8F0' }} />
+                      ) : (
+                        <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--accent-teal-light)', color: 'var(--primary-navy)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                          {(emp.name[0] || 'E').toUpperCase()}
+                        </div>
+                      )}
+                      <div>
+                        <div style={{fontWeight: 600, color: 'var(--primary-navy)'}}>{emp.name}</div>
+                        <div style={{fontSize: '0.8rem'}} className={emp.onDuty ? 'text-success' : 'text-muted'}>{emp.onDuty ? '● On Duty' : '○ Off Duty'}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td style={{padding: '1rem 1.5rem'}}>
+                    <div style={{color: 'var(--text-main)', fontSize: '0.9rem'}}>{emp.phone}</div>
+                    <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.25rem'}}>{emp.email}</div>
+                    <div style={{fontSize: '0.75rem', color: 'var(--primary-blue)', fontWeight: 600}}>
+                      Area: {emp.serviceAreas && emp.serviceAreas.length > 0 ? emp.serviceAreas[0]?.name : 'None'}
+                    </div>
+                  </td>
+                  <td style={{padding: '1rem 1.5rem'}}>
+                    <div style={{fontWeight: 700, color: 'var(--primary-navy)'}}>₹{emp.earnings || 0}</div>
+                    <div style={{fontSize: '0.75rem', marginTop: '0.2rem'}}>
+                      {emp.payType === 'FIXED_SALARY' ? (
+                        <span style={{ background: '#E0F2FE', color: '#0369A1', padding: '0.2rem 0.5rem', borderRadius: '6px', fontWeight: 700 }}>
+                          Fixed (₹{emp.salary || emp.baseSalary || 0}/mo)
+                        </span>
+                      ) : emp.payType === 'HYBRID' ? (
+                        <span style={{ background: '#EDE9FE', color: '#6D28D9', padding: '0.2rem 0.5rem', borderRadius: '6px', fontWeight: 700 }}>
+                          Hybrid (₹{emp.baseSalary || 0} + Comm)
+                        </span>
+                      ) : (
+                        <span style={{ background: '#DCFCE7', color: '#166534', padding: '0.2rem 0.5rem', borderRadius: '6px', fontWeight: 700 }}>
+                          Commission Only
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td style={{padding: '1rem 1.5rem'}}>
+                    <span className={`badge ${emp.status === 'ACTIVE' ? 'badge-success' : emp.status === 'PENDING' ? 'badge-warning' : 'badge-danger'}`}>
+                      {emp.status}
+                    </span>
+                  </td>
+                  <td style={{padding: '1rem 1.5rem'}} className="flex gap-2">
+                    <button onClick={() => setSelectedEmployee(emp)} className="btn btn-outline" style={{padding: '0.4rem 0.8rem', fontSize: '0.85rem'}}>Details & Edit</button>
+                    {emp.status === 'ACTIVE' ? 
+                      <button onClick={() => handleToggle(emp.id, emp.status)} className="btn btn-outline" style={{padding: '0.4rem 0.8rem', fontSize: '0.85rem', borderColor: 'var(--danger)', color: 'var(--danger)'}}>Suspend</button> :
+                      <button onClick={() => handleToggle(emp.id, emp.status)} className="btn btn-teal" style={{padding: '0.4rem 0.8rem', fontSize: '0.85rem'}}>Approve</button>
+                    }
+                  </td>
+                </tr>
+              ))}
+              {employees.length === 0 && (
+                <tr>
+                  <td colSpan="5" style={{padding: '3rem', textAlign: 'center', color: 'var(--text-muted)'}}>
+                    No employees found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Details Modal */}
@@ -488,7 +468,7 @@ const EmployeeManagement = () => {
           zIndex: 1000,
           padding: '1rem'
         }}>
-          <div className="card animate-fade-in" style={{ width: '100%', maxWidth: '500px', background: 'white', padding: '2.5rem', borderRadius: 'var(--radius-lg)', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div className="card animate-fade-in admin-modal-content" style={{ width: '100%', maxWidth: '520px', background: 'white', padding: '2rem', borderRadius: 'var(--radius-lg)', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid #F1F5F9', paddingBottom: '0.75rem' }}>
               <h3 style={{ margin: 0, color: 'var(--primary-navy)' }}>Employee Application & Settings</h3>
               <button onClick={() => setSelectedEmployee(null)} className="btn btn-outline" style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem' }}>Close</button>
@@ -497,11 +477,11 @@ const EmployeeManagement = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               
               {/* Photo & Basic info */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
                 {selectedEmployee.photo ? (
-                  <img src={selectedEmployee.photo} alt="Avatar" style={{ width: '70px', height: '70px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary-blue)' }} />
+                  <img src={selectedEmployee.photo} alt="Avatar" style={{ width: '65px', height: '65px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary-blue)' }} />
                 ) : (
-                  <div style={{ width: '70px', height: '70px', borderRadius: '50%', background: 'var(--accent-teal-light)', color: 'var(--primary-navy)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '1.5rem' }}>
+                  <div style={{ width: '65px', height: '65px', borderRadius: '50%', background: 'var(--accent-teal-light)', color: 'var(--primary-navy)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '1.5rem' }}>
                     {(selectedEmployee.name[0] || 'E').toUpperCase()}
                   </div>
                 )}
@@ -514,7 +494,7 @@ const EmployeeManagement = () => {
               </div>
 
               {/* Grid details */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.9rem', color: 'var(--text-main)' }}>
+              <div className="admin-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.9rem', color: 'var(--text-main)' }}>
                 <div><strong>Phone:</strong> {selectedEmployee.phone}</div>
                 <div><strong>Email:</strong> {selectedEmployee.email}</div>
                 <div><strong>Aadhaar Number:</strong> {selectedEmployee.aadhaarNumber || 'Not provided'}</div>

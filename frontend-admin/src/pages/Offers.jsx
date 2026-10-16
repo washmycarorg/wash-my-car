@@ -603,10 +603,11 @@ const Offers = () => {
       
       {/* Offers Table List */}
       <div className="lg:col-span-2">
-        <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
+        <div className="card p-0" style={{ padding: 0 }}>
           <div className="p-6 border-b border-gray-200">
             <h3 style={{ margin: 0, color: 'var(--primary-navy)' }}>Active & Scheduled Offers</h3>
           </div>
+          <div className="table-responsive">
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '600px' }}>
             <thead style={{ background: '#F8FAFC' }}>
               <tr>
@@ -733,6 +734,7 @@ const Offers = () => {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
     </div>

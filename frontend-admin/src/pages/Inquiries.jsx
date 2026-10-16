@@ -105,7 +105,7 @@ const Inquiries = () => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       
       {/* Top Stat Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '1.25rem' }}>
         <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1.5rem' }}>
           <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(14, 165, 233, 0.1)', color: 'var(--primary-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <MessageSquare size={24} />
@@ -206,7 +206,7 @@ const Inquiries = () => {
         </div>
 
         {/* Inquiries Table */}
-        <div style={{ overflowX: 'auto' }}>
+        <div className="table-responsive">
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '950px' }}>
             <thead style={{ background: '#F8FAFC', borderBottom: '1.5px solid #E2E8F0' }}>
               <tr>
@@ -390,7 +390,7 @@ const Inquiries = () => {
           zIndex: 1000,
           padding: '1rem'
         }}>
-          <div className="card animate-fade-in" style={{ width: '100%', maxWidth: '540px', background: 'white', padding: '2rem', borderRadius: '20px', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div className="card animate-fade-in admin-modal-content" style={{ width: '100%', maxWidth: '540px', background: 'white', padding: '2rem', borderRadius: '20px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E2E8F0', paddingBottom: '0.75rem', marginBottom: '1.25rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <MessageSquare size={20} color="var(--primary-blue)" />

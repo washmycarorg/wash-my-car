@@ -1037,9 +1037,41 @@ export const deleteAllocation = async (req, res) => {
 };
 
 // System Settings CRUD
+export const DEFAULT_TERMS_AND_CONDITIONS = `1. DOORSTEP ACCESS & SERVICE REQUIREMENTS
+- Customer Water & Power Access: The customer agrees to provide accessible domestic water tap connection and a standard 220V/16A electric plug point within a reasonable distance (20-25 meters) for our technician to operate high-pressure washing machines, vacuum cleaners, and steam detailing equipment safely.
+- Vehicle Parking Clearance: The vehicle must be parked in a safe, legal, and adequately illuminated space with at least 2 to 3 feet of clearance on all sides to allow complete exterior and interior detailing without obstruction.
+- Personal Belongings & Valuables: Customers are strictly requested to remove all personal belongings, cash, jewelry, electronic items, and important documents from inside the car before service starts. Wash My Car Org and its technicians are not responsible for unattended personal valuables.
+
+2. CANCELLATION, RESCHEDULE & REFUND POLICY
+- Easy Slot Rescheduling: Customers can reschedule any upcoming service slot free of charge up to 2 hours before the scheduled appointment time.
+- Cancellation Before Dispatch: If a booking is cancelled before the service vehicle and technician are dispatched, a 100% refund will be processed immediately to the original payment method or credited to your Wash My Car Org wallet.
+- Failed Doorstep Access / On-Site Trip Fee: If our technician arrives at your doorstep but service cannot be performed due to lack of water/electricity access, gated community denial, or customer unavailability after 20 minutes of waiting, a nominal trip & fuel charge of ₹99 will be deducted and the remaining balance refunded.
+- Bad Weather Policy: In case of sudden torrential monsoon rain or hazardous weather, washes will be placed on hold and rescheduled to the earliest convenient dry time slot with customer consent.
+
+3. PRICING, PROMOTIONS & VIP PASSES
+- All prices displayed are inclusive of professional detailing labor and premium pH-neutral cleaning chemicals.
+- Promotional coupon codes and referral wallet discounts are applicable as per individual offer rules.
+- VIP monthly subscription passes are non-transferable and tied to the registered vehicle plate number.`;
+
+export const DEFAULT_PRIVACY_POLICY = `1. INFORMATION WE COLLECT & PURPOSE
+- Mobile Number & SMS OTP: Collected exclusively for secure account registration, login verification, passwordless SMS authentication via Twilio, and instant transactional booking updates (booking confirmation, technician arrival alert, and digital invoice).
+- Vehicle Registration Plate Number & Model: Collected strictly to instruct the assigned service technician on exactly which vehicle to wash and detail at your doorstep, guaranteeing service authenticity and preventing wrong-car washing.
+- Service Address & Location: Used solely for navigation and smart dispatch routing of our doorstep mobile detailing van to your home or office parking.
+
+2. BEFORE & AFTER WASH VERIFICATION PHOTOS
+- Purpose of Vehicle Photos: Our field technicians take high-resolution before-and-after photographs of the vehicle exterior, tyres, and cabin. These photos are taken solely for service completion verification, job quality audit, and internal technician authenticity evaluation.
+- Absolute Confidentiality: Vehicle photos are strictly private and stored securely. They will NEVER be sold, shared, published, or distributed to any third party or public social media without your prior explicit consent.
+
+3. COMMUNICATIONS & PROMOTIONAL NOTIFICATIONS
+- Service Communications: We send essential transactional SMS, WhatsApp updates, and call reminders regarding your active wash appointment and arrival timings.
+- Promotional Messages: We may occasionally notify you about exclusive seasonal discounts, monsoon specials, or loyalty point bonuses. You can opt out of promotional messages anytime by contacting support.
+
+4. STRICT ZERO THIRD-PARTY DATA SHARING GUARANTEE
+- We respect your privacy. Wash My Car Org has a strict zero-tolerance data monetisation policy: we NEVER sell, rent, lease, trade, or share your personal information, phone numbers, or vehicle details with third-party advertisers or external marketing brokers.`;
+
 export const getSystemSettings = async (req, res) => {
   try {
-    let settings = await prisma.systemSettings.findUnique({
+    let settings = await prisma.systemSettings.findFirst({
       where: { id: 1 }
     });
     if (!settings) {
@@ -1065,11 +1097,21 @@ export const getSystemSettings = async (req, res) => {
           bookingTermsText: "1. Access Requirements: Customer agrees to provide adequate water tap access and a standard electric plug point for the technician to perform the doorstep car wash service safely.\n2. Vehicle Parking: The vehicle must be parked in a well-lit area with sufficient clearance around all sides.\n3. Valuable Items: Please remove all personal belongings and valuables from inside the car prior to service commencement.\n4. Timings: Service slots are subject to local traffic and weather conditions.",
           subscriptionBannerTitle: "Exclusive VIP Car Care Membership",
           subscriptionBannerSubtitle: "Save up to 40% with monthly doorstep passes, complimentary add-ons & priority scheduling.",
-          subscriptionBannerImage: "https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=1600&q=85"
+          subscriptionBannerImage: "https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=1600&q=85",
+          termsAndConditionsText: DEFAULT_TERMS_AND_CONDITIONS,
+          privacyPolicyText: DEFAULT_PRIVACY_POLICY
         }
       });
     }
-    res.json(settings);
+
+    // Attach defaults if currently empty in DB
+    const finalSettings = {
+      ...settings,
+      termsAndConditionsText: settings.termsAndConditionsText || DEFAULT_TERMS_AND_CONDITIONS,
+      privacyPolicyText: settings.privacyPolicyText || DEFAULT_PRIVACY_POLICY
+    };
+
+    res.json(finalSettings);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -1098,7 +1140,10 @@ export const updateSystemSettings = async (req, res) => {
       subscriptionBannerTitle,
       subscriptionBannerSubtitle,
       subscriptionBannerImage,
-      subscriptionTermsText
+      subscriptionTermsText,
+      socialLinks,
+      termsAndConditionsText,
+      privacyPolicyText
     } = req.body;
     
     const settings = await prisma.systemSettings.upsert({
@@ -1124,7 +1169,10 @@ export const updateSystemSettings = async (req, res) => {
         ...(dashboardAdBadge !== undefined && { dashboardAdBadge: String(dashboardAdBadge) }),
         ...(subscriptionBannerTitle !== undefined && { subscriptionBannerTitle: String(subscriptionBannerTitle) }),
         ...(subscriptionBannerSubtitle !== undefined && { subscriptionBannerSubtitle: String(subscriptionBannerSubtitle) }),
-        ...(subscriptionBannerImage !== undefined && { subscriptionBannerImage: String(subscriptionBannerImage) })
+        ...(subscriptionBannerImage !== undefined && { subscriptionBannerImage: String(subscriptionBannerImage) }),
+        ...(socialLinks !== undefined && { socialLinks: typeof socialLinks === 'object' ? JSON.stringify(socialLinks) : String(socialLinks) }),
+        ...(termsAndConditionsText !== undefined && { termsAndConditionsText: String(termsAndConditionsText) }),
+        ...(privacyPolicyText !== undefined && { privacyPolicyText: String(privacyPolicyText) })
       },
       create: {
         id: 1,
@@ -1152,7 +1200,10 @@ export const updateSystemSettings = async (req, res) => {
         dashboardAdBadge: dashboardAdBadge || "PROMOTIONAL OFFER • LIMITED SLOTS",
         subscriptionBannerTitle: subscriptionBannerTitle || "Exclusive VIP Car Care Membership",
         subscriptionBannerSubtitle: subscriptionBannerSubtitle || "Save up to 40% with monthly doorstep passes, complimentary add-ons & priority scheduling.",
-        subscriptionBannerImage: subscriptionBannerImage || "https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=1600&q=85"
+        subscriptionBannerImage: subscriptionBannerImage || "https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=1600&q=85",
+        socialLinks: socialLinks ? (typeof socialLinks === 'object' ? JSON.stringify(socialLinks) : String(socialLinks)) : undefined,
+        termsAndConditionsText: termsAndConditionsText || DEFAULT_TERMS_AND_CONDITIONS,
+        privacyPolicyText: privacyPolicyText || DEFAULT_PRIVACY_POLICY
       }
     });
     res.json(settings);
@@ -1160,6 +1211,7 @@ export const updateSystemSettings = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
 
 // ========================
 // SUBSCRIPTION PLANS ADMIN

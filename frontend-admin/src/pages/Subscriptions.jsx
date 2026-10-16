@@ -347,7 +347,7 @@ const Subscriptions = () => {
   });
 
   return (
-    <div style={{ padding: '1.5rem', maxWidth: '1300px', margin: '0 auto' }}>
+    <div style={{ padding: '0 0 2rem 0', maxWidth: '1300px', margin: '0 auto' }}>
       {/* Page Header */}
       <div style={{
         display: 'flex',
@@ -432,7 +432,7 @@ const Subscriptions = () => {
       )}
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid #E2E8F0', marginBottom: '1.5rem' }}>
+      <div className="tabs-scrollable">
         <button
           onClick={() => setActiveTab('plans')}
           style={{
@@ -554,7 +554,7 @@ const Subscriptions = () => {
               </button>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '1.25rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))', gap: '1.25rem' }}>
               {filteredPlans.map(plan => {
                 let parsedFeatures = [];
                 try {
@@ -822,7 +822,7 @@ const Subscriptions = () => {
               <p style={{ margin: 0 }}>No active subscribers yet.</p>
             </div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
+            <div className="table-responsive">
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
                 <thead>
                   <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase' }}>
@@ -1025,7 +1025,7 @@ const Subscriptions = () => {
           zIndex: 1000,
           padding: '1rem'
         }}>
-          <div style={{
+          <div className="admin-modal-content" style={{
             background: '#FFFFFF',
             borderRadius: '20px',
             width: '100%',
@@ -1094,7 +1094,7 @@ const Subscriptions = () => {
               </div>
 
               {/* Row 1: Car Type & Duration */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="admin-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
                     Vehicle Type *
@@ -1137,7 +1137,7 @@ const Subscriptions = () => {
               </div>
 
               {/* Row 2: Price & Strike Price */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="admin-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
                     Offer Price (₹) *
@@ -1199,7 +1199,7 @@ const Subscriptions = () => {
                   </span>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.65rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '0.65rem' }}>
                   {washTypes.map(wt => {
                     const entry = (formData.includedWashes || []).find(w => Number(w.washTypeId) === Number(wt.id));
                     const count = Number(entry?.count) || 0;
@@ -1330,7 +1330,7 @@ const Subscriptions = () => {
                   </span>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.65rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '0.65rem' }}>
                   {addonsList.map(addon => {
                     const entry = (formData.includedAddons || []).find(a => Number(a.addonId) === Number(addon.id));
                     const count = Number(entry?.count) || 0;

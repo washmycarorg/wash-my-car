@@ -334,7 +334,15 @@ model SystemSettings {
   configuredSlots      String  @default("[\"08:00 AM\",\"10:00 AM\",\"12:00 PM\",\"02:00 PM\",\"04:00 PM\",\"06:00 PM\"]") // Up to 6 slots
   monthlySlotOverrides String? @default("{}")   // Date-specific overrides e.g. {"2026-10-15": ["08:00 AM", ...]}
   zoneDistanceMatrix   String?                 // Custom distance matrix between zones
+
+  // Social Media Links (Instagram, Facebook, WhatsApp, LinkedIn, Twitter/X)
+  socialLinks          String? @default("[{\"id\":\"instagram\",\"platform\":\"Instagram\",\"enabled\":true,\"name\":\"@washmycarorg\",\"url\":\"https://instagram.com/\"},{\"id\":\"facebook\",\"platform\":\"Facebook\",\"enabled\":true,\"name\":\"Wash My Car Org\",\"url\":\"https://facebook.com/\"},{\"id\":\"whatsapp\",\"platform\":\"WhatsApp\",\"enabled\":true,\"name\":\"+91 98765 43210\",\"url\":\"https://wa.me/919876543210\"},{\"id\":\"linkedin\",\"platform\":\"LinkedIn\",\"enabled\":false,\"name\":\"Wash My Car Org\",\"url\":\"https://linkedin.com/\"},{\"id\":\"twitter\",\"platform\":\"Twitter (X)\",\"enabled\":false,\"name\":\"@washmycarorg\",\"url\":\"https://x.com/\"}]")
+
+  // Legal Policies & Terms
+  termsAndConditionsText String?
+  privacyPolicyText      String?
 }
+
 
 model Inquiry {
   id        Int      @id @default(autoincrement())

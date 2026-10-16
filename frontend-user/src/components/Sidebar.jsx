@@ -36,27 +36,81 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
       <aside style={{
         position: 'fixed',
         top: 0, left: 0, bottom: 0,
-        width: '280px',
+        width: '300px',
+        maxWidth: '85vw',
         background: '#025EBA', // Exact blue from screenshot
         color: 'white',
         zIndex: 50,
         transform: isOpen ? 'translateX(0)' : 'translateX(-100%)',
         transition: 'transform 0.3s ease-in-out',
         display: 'flex', flexDirection: 'column',
-        boxShadow: isOpen ? '4px 0 10px rgba(0,0,0,0.1)' : 'none'
+        boxShadow: isOpen ? '4px 0 16px rgba(0,0,0,0.2)' : 'none'
       }}>
-        <div style={{padding: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.1)'}}>
-           <div className="flex items-center gap-3">
-             <div style={{background: 'white', padding: '3px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '52px', height: '52px', flexShrink: 0, boxShadow: '0 4px 12px rgba(0,0,0,0.15)'}}>
+        <div style={{
+          padding: '1.25rem 1rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderBottom: '1px solid rgba(255,255,255,0.12)'
+        }}>
+           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', minWidth: 0 }}>
+             <div style={{
+               background: 'white',
+               padding: '2px',
+               borderRadius: '10px',
+               display: 'flex',
+               alignItems: 'center',
+               justifyContent: 'center',
+               width: '44px',
+               height: '44px',
+               flexShrink: 0,
+               boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+             }}>
                <img src={logo} alt="Wash My Car Logo" style={{width: '100%', height: '100%', objectFit: 'contain', transform: 'scale(1.15)'}} />
              </div>
-             <div>
-               <h2 style={{color: 'white', fontSize: '1.1rem', margin: 0, fontWeight: 700, letterSpacing: '1px'}}>WASH <span style={{color: 'var(--accent-teal)'}}>MY</span> CAR <span style={{color: 'var(--accent-teal)'}}>ORG</span></h2>
-               <p style={{fontSize: '0.65rem', margin: 0, opacity: 0.8}}>Your Car, Cleaned At Your Door.</p>
+             <div style={{ minWidth: 0 }}>
+               <h2 style={{
+                 color: 'white',
+                 fontSize: '0.98rem',
+                 margin: 0,
+                 fontWeight: 800,
+                 letterSpacing: '0.5px',
+                 whiteSpace: 'nowrap',
+                 lineHeight: 1.15,
+                 display: 'flex',
+                 alignItems: 'baseline',
+                 gap: '0.3rem'
+               }}>
+                 <span>WASH <span style={{color: 'var(--accent-teal)'}}>MY</span> CAR</span>
+                 <span style={{color: 'var(--accent-teal)'}}>ORG</span>
+               </h2>
+               <p style={{
+                 fontSize: '0.62rem',
+                 margin: '2px 0 0 0',
+                 opacity: 0.85,
+                 whiteSpace: 'nowrap'
+               }}>
+                 Your Car, Cleaned At Your Door.
+               </p>
              </div>
            </div>
-           <button onClick={closeSidebar} style={{background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', padding: '0.25rem'}}>
-             <X size={24} />
+           <button 
+             onClick={closeSidebar} 
+             aria-label="Close menu"
+             style={{
+               background: 'transparent',
+               border: 'none',
+               color: 'white',
+               cursor: 'pointer',
+               padding: '0.35rem',
+               display: 'flex',
+               alignItems: 'center',
+               justifyContent: 'center',
+               flexShrink: 0,
+               marginLeft: '0.35rem'
+             }}
+           >
+             <X size={22} />
            </button>
         </div>
 

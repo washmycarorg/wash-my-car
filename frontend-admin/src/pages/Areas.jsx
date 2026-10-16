@@ -336,7 +336,7 @@ const Areas = () => {
       )}
 
       {/* Main Grid: Map & Form on Left, Configured Areas on Right */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '1.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '1.5rem' }}>
         
         {/* Left side Map & Form */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>

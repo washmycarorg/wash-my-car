@@ -409,7 +409,7 @@ const CmsSettings = () => {
           </div>
 
           {/* Section Selector Pills */}
-          <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', marginBottom: '1.75rem' }}>
+          <div className="tabs-scrollable" style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', marginBottom: '1.75rem' }}>
             {[
               { id: 'slides', label: `Front Slides (${currentSlides.length})`, icon: Layers, isSpecial: true },
               { id: 'quickbar', label: 'Announcement Bar', icon: Tag },
