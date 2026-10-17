@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Phone, Lock, ArrowLeft, Send, RefreshCw, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { Phone, Lock, ArrowLeft, Send, RefreshCw, CheckCircle2, ShieldCheck, Gift, Sparkles } from 'lucide-react';
 import { loginUser, sendUserOtp } from '../api';
 import logo from '../assets/wash my car.png';
 
@@ -14,6 +14,15 @@ const Login = ({ setAuth }) => {
   const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  // SEO Page Title and Meta Description for Google Sitelinks
+  useEffect(() => {
+    document.title = "Customer Login | Wash My Car Org - Doorstep Car Wash Vizag";
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) {
+      metaDesc.setAttribute('content', 'Sign in to your Wash My Car Org account with SMS OTP. Track active doorstep car wash slots, vehicle spa technicians, and redeem loyalty coins in Vizag.');
+    }
+  }, []);
 
   // Resend OTP countdown timer
   useEffect(() => {
@@ -226,8 +235,65 @@ const Login = ({ setAuth }) => {
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.72rem', fontWeight: 800, color: '#0284C7', background: '#F0F9FF', padding: '0.2rem 0.6rem', borderRadius: '12px', border: '1px solid #BAE6FD', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
               <ShieldCheck size={13} /> SMS OTP Verification
             </div>
-            <h2 style={{ margin: 0, fontWeight: 900, fontSize: '1.6rem', color: 'var(--primary-navy)', letterSpacing: '-0.02em' }}>Welcome Back!</h2>
+            <h1 style={{ margin: 0, fontWeight: 900, fontSize: '1.6rem', color: 'var(--primary-navy)', letterSpacing: '-0.02em' }}>Customer Login</h1>
             <p style={{ margin: '0.35rem 0 0', color: 'var(--text-muted)', fontSize: '0.88rem' }}>Enter your 10-digit mobile number to access your doorstep car care account.</p>
+          </div>
+
+          {/* Sitelink-Aligned Claim Welcome Offer Banner */}
+          <div style={{
+            background: 'linear-gradient(135deg, #F0FDF4 0%, #EFF6FF 100%)',
+            border: '1.5px dashed #0EA5E9',
+            borderRadius: '14px',
+            padding: '0.85rem 1rem',
+            marginBottom: '1.25rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '0.75rem',
+            boxShadow: '0 2px 8px rgba(14, 165, 233, 0.08)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+              <div style={{
+                background: 'linear-gradient(135deg, #0284C7, #0369A1)',
+                color: 'white',
+                width: '36px',
+                height: '36px',
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                boxShadow: '0 3px 8px rgba(2, 132, 199, 0.35)'
+              }}>
+                <Gift size={20} />
+              </div>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: '0.84rem', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <span>Claim Welcome Offer</span>
+                  <span style={{ background: '#22C55E', color: 'white', fontSize: '0.62rem', padding: '1px 6px', borderRadius: '10px', fontWeight: 800 }}>NEW</span>
+                </div>
+                <div style={{ fontSize: '0.74rem', color: '#475569', marginTop: '2px', lineHeight: 1.3 }}>
+                  Sign up now to get ₹100 discount + 100 reward coins on your 1st wash!
+                </div>
+              </div>
+            </div>
+            <Link 
+              to="/register?offer=welcome"
+              style={{
+                background: 'linear-gradient(135deg, #0284C7, #0369A1)',
+                color: 'white',
+                textDecoration: 'none',
+                padding: '0.45rem 0.85rem',
+                borderRadius: '8px',
+                fontSize: '0.76rem',
+                fontWeight: 700,
+                whiteSpace: 'nowrap',
+                boxShadow: '0 2px 6px rgba(2, 132, 199, 0.3)',
+                flexShrink: 0
+              }}
+            >
+              Claim Offer →
+            </Link>
           </div>
           
           {error && (
@@ -409,9 +475,12 @@ const Login = ({ setAuth }) => {
             <span><strong>100% Privacy Protected:</strong> We never share your phone number with 3rd parties or send unsolicited spam.</span>
           </div>
 
-          <p className="text-center mt-6" style={{fontSize: '0.95rem'}}>
-            Don't have an account? <Link to="/register" className="text-blue" style={{fontWeight: 700}}>Create Account</Link>
-          </p>
+          <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.92rem', color: '#475569' }}>
+            <span>Don't have an account? </span>
+            <Link to="/register?offer=welcome" className="text-blue" style={{ fontWeight: 800 }}>
+              Claim Welcome Offer & Register →
+            </Link>
+          </div>
         </div>
       </div>
     </div>

@@ -967,6 +967,91 @@ const Home = () => {
   return (
     <div style={{ fontFamily: 'Outfit, sans-serif', color: '#0F172A', background: '#F8FAFC', scrollBehavior: 'smooth', overflowX: 'hidden' }}>
       
+      {/* 0. GOOGLE SITELINK PROMOTION: TOP ANNOUNCEMENT BAR */}
+      <div style={{
+        background: 'linear-gradient(90deg, #0A0F1D 0%, #0369A1 50%, #0A0F1D 100%)',
+        color: '#FFFFFF',
+        padding: '0.45rem 6%',
+        fontSize: '0.8rem',
+        fontWeight: 600,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '0.5rem',
+        borderBottom: '1px solid rgba(56, 189, 248, 0.25)',
+        zIndex: 101,
+        position: 'relative'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <span style={{ 
+            background: 'linear-gradient(135deg, #10B981, #059669)', 
+            color: 'white', 
+            fontSize: '0.65rem', 
+            fontWeight: 800, 
+            padding: '2px 8px', 
+            borderRadius: '10px',
+            boxShadow: '0 0 8px rgba(16, 185, 129, 0.5)'
+          }}>
+            WELCOME OFFER
+          </span>
+          <span style={{ color: '#F0F9FF' }}>
+            New to Wash My Car? Get Flat <strong>₹100 / 20% OFF</strong> + <strong>100 Free Reward Coins</strong> on your 1st wash in Vizag!
+          </span>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <button 
+            onClick={() => navigate('/register?offer=welcome')}
+            style={{
+              background: '#FCD34D',
+              color: '#0F172A',
+              border: 'none',
+              padding: '0.22rem 0.65rem',
+              borderRadius: '6px',
+              fontSize: '0.74rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.25rem',
+              boxShadow: '0 2px 6px rgba(252, 211, 77, 0.4)'
+            }}
+          >
+            Claim Welcome Offer 🎁
+          </button>
+          <span style={{ color: 'rgba(255,255,255,0.3)' }}>|</span>
+          <button 
+            onClick={() => navigate('/login')}
+            style={{
+              background: 'transparent',
+              color: '#E0F2FE',
+              border: 'none',
+              fontSize: '0.74rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              padding: '0.2rem 0.35rem'
+            }}
+          >
+            Customer Login
+          </button>
+          <button 
+            onClick={() => navigate('/register')}
+            style={{
+              background: 'transparent',
+              color: '#38BDF8',
+              border: 'none',
+              fontSize: '0.74rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              padding: '0.2rem 0.35rem'
+            }}
+          >
+            Register
+          </button>
+        </div>
+      </div>
+
       {/* 1. ULTRA MODERN GLASS NAVBAR */}
       <nav style={{
         display: 'flex', 
@@ -1018,19 +1103,21 @@ const Home = () => {
         </div>
         
         {/* Desktop Links */}
-        <div className="hidden lg:flex" style={{ gap: '1.75rem', fontWeight: 600, fontSize: '0.9rem', alignItems: 'center' }}>
+        <div className="hidden lg:flex" style={{ gap: '1.5rem', fontWeight: 600, fontSize: '0.88rem', alignItems: 'center' }}>
           <a href="#" style={{ color: '#F8FAFC' }}>Home</a>
+          <a href="#welcome-offer" style={{ color: '#FCD34D', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+            <Gift size={14} /> Welcome Offer
+          </a>
           <a href="#packages" style={{ color: '#94A3B8', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = '#38BDF8'} onMouseLeave={e => e.target.style.color = '#94A3B8'}>Wash Packages</a>
           <a href="#service-areas" style={{ color: '#94A3B8', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = '#38BDF8'} onMouseLeave={e => e.target.style.color = '#94A3B8'}>Vizag Localities</a>
           <a href="#addons-strip" style={{ color: '#94A3B8', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = '#38BDF8'} onMouseLeave={e => e.target.style.color = '#94A3B8'}>Add-ons</a>
-          <a href="#why-us" style={{ color: '#94A3B8', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = '#38BDF8'} onMouseLeave={e => e.target.style.color = '#94A3B8'}>Why Choose Us</a>
-          <a href="#partners" style={{ color: '#94A3B8', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = '#38BDF8'} onMouseLeave={e => e.target.style.color = '#94A3B8'}>Franchise</a>
+          <a href="#why-us" style={{ color: '#94A3B8', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = '#38BDF8'} onMouseLeave={e => e.target.style.color = '#94A3B8'}>Why Us</a>
           <a href="#faq" style={{ color: '#94A3B8', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = '#38BDF8'} onMouseLeave={e => e.target.style.color = '#94A3B8'}>FAQ</a>
           <a href="#contact" style={{ color: '#94A3B8', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = '#38BDF8'} onMouseLeave={e => e.target.style.color = '#94A3B8'}>Contact</a>
         </div>
         
         {/* CTA Buttons */}
-        <div className="hidden md:flex" style={{ gap: '0.85rem', alignItems: 'center' }}>
+        <div className="hidden md:flex" style={{ gap: '0.65rem', alignItems: 'center' }}>
           <a 
             href={`https://wa.me/${cleanWhatsappNumber}?text=Hi%20Wash%20My%20Car%20Org%2C%20I%20want%20to%20book%20a%20doorstep%20wash.`}
             target="_blank" 
@@ -1041,15 +1128,57 @@ const Home = () => {
               gap: '0.4rem', 
               background: '#22C55E', 
               color: 'white', 
-              padding: '0.45rem 1rem', 
+              padding: '0.42rem 0.85rem', 
               borderRadius: '25px', 
               fontWeight: 700, 
-              fontSize: '0.82rem',
+              fontSize: '0.8rem',
               boxShadow: '0 4px 10px rgba(34, 197, 94, 0.3)'
             }}
           >
-            <MessageCircle size={15} /> WhatsApp
+            <MessageCircle size={14} /> WhatsApp
           </a>
+
+          <button
+            onClick={() => navigate('/login')}
+            style={{
+              background: 'rgba(255, 255, 255, 0.08)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              color: '#FFFFFF',
+              padding: '0.45rem 0.95rem',
+              borderRadius: '25px',
+              fontWeight: 700,
+              fontSize: '0.82rem',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; }}
+          >
+            Customer Login
+          </button>
+
+          <button
+            onClick={() => navigate('/register?offer=welcome')}
+            style={{
+              background: 'linear-gradient(135deg, #10B981, #059669)',
+              border: 'none',
+              color: '#FFFFFF',
+              padding: '0.45rem 1rem',
+              borderRadius: '25px',
+              fontWeight: 700,
+              fontSize: '0.82rem',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              boxShadow: '0 4px 10px rgba(16, 185, 129, 0.35)',
+              transition: 'transform 0.2s, box-shadow 0.2s'
+            }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; }}
+          >
+            <Gift size={14} /> Claim Offer
+          </button>
 
           <button 
             onClick={() => navigate('/login')} 
@@ -1057,10 +1186,10 @@ const Home = () => {
               background: 'linear-gradient(135deg, #0EA5E9, #0284C7)', 
               color: 'white', 
               border: 'none', 
-              padding: '0.55rem 1.4rem', 
+              padding: '0.45rem 1.15rem', 
               borderRadius: '25px', 
               fontWeight: 700, 
-              fontSize: '0.88rem', 
+              fontSize: '0.82rem', 
               cursor: 'pointer',
               boxShadow: '0 4px 14px rgba(14, 165, 233, 0.4)',
               transition: 'transform 0.2s, box-shadow 0.2s'
@@ -1073,8 +1202,14 @@ const Home = () => {
         </div>
 
         {/* Mobile menu toggle */}
-        <div className="lg:hidden" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          <button onClick={() => navigate('/login')} className="btn btn-teal" style={{ padding: '0.4rem 0.9rem', fontSize: '0.8rem', borderRadius: '15px' }}>Book</button>
+        <div className="lg:hidden" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <button 
+            onClick={() => navigate('/register?offer=welcome')} 
+            className="btn btn-teal" 
+            style={{ padding: '0.35rem 0.75rem', fontSize: '0.74rem', borderRadius: '15px', background: '#10B981', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+          >
+            <Gift size={12} /> Claim Offer
+          </button>
           <button onClick={() => setMenuOpen(!menuOpen)} style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer' }}>
             {menuOpen ? <X size={26} /> : <Menu size={26} />}
           </button>
@@ -1082,18 +1217,49 @@ const Home = () => {
 
         {/* Mobile Dropdown */}
         {menuOpen && (
-          <div style={{ position: 'absolute', top: '100%', left: 0, width: '100%', background: '#0F172A', padding: '1.5rem 6%', display: 'flex', flexDirection: 'column', gap: '1rem', zIndex: 99, borderTop: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 10px 20px rgba(0,0,0,0.3)' }}>
-            <a href="#" onClick={() => setMenuOpen(false)} style={{ color: '#F8FAFC', fontSize: '1rem', fontWeight: 600 }}>Home</a>
-            <a href="#packages" onClick={() => setMenuOpen(false)} style={{ color: '#94A3B8', fontSize: '1rem', fontWeight: 500 }}>Wash Packages</a>
-            <a href="#service-areas" onClick={() => setMenuOpen(false)} style={{ color: '#94A3B8', fontSize: '1rem', fontWeight: 500 }}>Vizag Localities</a>
-            <a href="#addons-strip" onClick={() => setMenuOpen(false)} style={{ color: '#94A3B8', fontSize: '1rem', fontWeight: 500 }}>Add-on Services</a>
-            <a href="#why-us" onClick={() => setMenuOpen(false)} style={{ color: '#94A3B8', fontSize: '1rem', fontWeight: 500 }}>Why Choose Us</a>
-            <a href="#partners" onClick={() => setMenuOpen(false)} style={{ color: '#94A3B8', fontSize: '1rem', fontWeight: 500 }}>Franchise Partnership</a>
-            <a href="#faq" onClick={() => setMenuOpen(false)} style={{ color: '#94A3B8', fontSize: '1rem', fontWeight: 500 }}>FAQ</a>
-            <a href="#contact" onClick={() => setMenuOpen(false)} style={{ color: '#94A3B8', fontSize: '1rem', fontWeight: 500 }}>Contact</a>
-            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
-              <button onClick={() => navigate('/login')} className="btn" style={{ flex: 1, background: 'transparent', color: 'white', border: '1px solid rgba(255,255,255,0.2)', padding: '0.5rem', borderRadius: '15px' }}>Login</button>
-              <button onClick={() => navigate('/register')} className="btn btn-teal" style={{ flex: 1, padding: '0.5rem', borderRadius: '15px' }}>Register</button>
+          <div style={{ position: 'absolute', top: '100%', left: 0, width: '100%', background: '#0F172A', padding: '1.25rem 6%', display: 'flex', flexDirection: 'column', gap: '0.85rem', zIndex: 99, borderTop: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 10px 20px rgba(0,0,0,0.3)' }}>
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(14, 165, 233, 0.2))',
+              border: '1px solid #10B981',
+              borderRadius: '12px',
+              padding: '0.65rem 0.85rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <div>
+                <strong style={{ color: '#34D399', fontSize: '0.86rem', display: 'block' }}>🎁 Welcome Offer</strong>
+                <span style={{ color: '#E2E8F0', fontSize: '0.74rem' }}>Save ₹100 + 100 Reward Coins</span>
+              </div>
+              <button 
+                onClick={() => { setMenuOpen(false); navigate('/register?offer=welcome'); }}
+                style={{
+                  background: '#10B981',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0.35rem 0.75rem',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  cursor: 'pointer'
+                }}
+              >
+                Claim Now
+              </button>
+            </div>
+
+            <a href="#" onClick={() => setMenuOpen(false)} style={{ color: '#F8FAFC', fontSize: '0.95rem', fontWeight: 600 }}>Home</a>
+            <a href="#welcome-offer" onClick={() => setMenuOpen(false)} style={{ color: '#FCD34D', fontSize: '0.95rem', fontWeight: 700 }}>🎁 Claim Welcome Offer</a>
+            <a href="#packages" onClick={() => setMenuOpen(false)} style={{ color: '#94A3B8', fontSize: '0.95rem', fontWeight: 500 }}>Wash Packages</a>
+            <a href="#service-areas" onClick={() => setMenuOpen(false)} style={{ color: '#94A3B8', fontSize: '0.95rem', fontWeight: 500 }}>Vizag Localities</a>
+            <a href="#addons-strip" onClick={() => setMenuOpen(false)} style={{ color: '#94A3B8', fontSize: '0.95rem', fontWeight: 500 }}>Add-on Services</a>
+            <a href="#why-us" onClick={() => setMenuOpen(false)} style={{ color: '#94A3B8', fontSize: '0.95rem', fontWeight: 500 }}>Why Choose Us</a>
+            <a href="#faq" onClick={() => setMenuOpen(false)} style={{ color: '#94A3B8', fontSize: '0.95rem', fontWeight: 500 }}>FAQ</a>
+            <a href="#contact" onClick={() => setMenuOpen(false)} style={{ color: '#94A3B8', fontSize: '0.95rem', fontWeight: 500 }}>Contact</a>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem', marginTop: '0.5rem' }}>
+              <button onClick={() => { setMenuOpen(false); navigate('/login'); }} className="btn" style={{ background: 'transparent', color: 'white', border: '1px solid rgba(255,255,255,0.2)', padding: '0.55rem', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 700 }}>Customer Login</button>
+              <button onClick={() => { setMenuOpen(false); navigate('/register?offer=welcome'); }} className="btn btn-teal" style={{ padding: '0.55rem', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 700, background: '#10B981' }}>Register / Sign Up</button>
             </div>
           </div>
         )}
@@ -1890,6 +2056,243 @@ const Home = () => {
         </div>
       </section>
 
+      {/* 3.5 GOOGLE SITELINK LANDING: CLAIM WELCOME OFFER HUB */}
+      <section 
+        id="welcome-offer" 
+        style={{ 
+          padding: '2.5rem 6%', 
+          maxWidth: '1280px', 
+          margin: '1.5rem auto 2.5rem auto',
+          position: 'relative'
+        }}
+      >
+        <div style={{
+          background: 'linear-gradient(135deg, #0A192F 0%, #0F172A 40%, #064E3B 100%)',
+          borderRadius: '28px',
+          padding: 'clamp(2rem, 4vw, 3.25rem)',
+          color: 'white',
+          position: 'relative',
+          overflow: 'hidden',
+          boxShadow: '0 25px 60px -15px rgba(16, 185, 129, 0.25), 0 10px 30px rgba(0,0,0,0.3)',
+          border: '1.5px solid rgba(52, 211, 153, 0.35)'
+        }}>
+          {/* Ambient Glow Orbs */}
+          <div style={{ position: 'absolute', top: '-60px', right: '-60px', width: '220px', height: '220px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(52, 211, 153, 0.35) 0%, transparent 70%)', pointerEvents: 'none' }} />
+          <div style={{ position: 'absolute', bottom: '-40px', left: '10%', width: '180px', height: '180px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(56, 189, 248, 0.25) 0%, transparent 70%)', pointerEvents: 'none' }} />
+
+          {/* Header Row */}
+          <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.6rem', marginBottom: '2rem' }}>
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              background: 'rgba(52, 211, 153, 0.16)',
+              border: '1px solid rgba(52, 211, 153, 0.45)',
+              color: '#34D399',
+              padding: '0.35rem 0.95rem',
+              borderRadius: '20px',
+              fontSize: '0.78rem',
+              fontWeight: 800,
+              letterSpacing: '0.04em'
+            }}>
+              <Gift size={14} />
+              <span>OFFICIAL WELCOME OFFER • VISAKHAPATNAM</span>
+            </div>
+
+            <h2 style={{
+              fontSize: 'clamp(1.75rem, 3.5vw, 2.5rem)',
+              fontWeight: 900,
+              margin: '0.25rem 0 0',
+              letterSpacing: '-0.02em',
+              lineHeight: 1.15
+            }}>
+              Claim Your Welcome Offer – <span style={{ background: 'linear-gradient(135deg, #34D399, #38BDF8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>First Wash Savings</span>
+            </h2>
+
+            <p style={{
+              fontSize: 'clamp(0.92rem, 1.6vw, 1.05rem)',
+              color: '#CBD5E1',
+              maxWidth: '750px',
+              margin: '0.2rem 0 0',
+              lineHeight: 1.5
+            }}>
+              New customer in Vizag? Register your mobile number today and instantly claim flat welcome discounts, bonus reward coins, and hassle-free doorstep car detailing at your home or apartment.
+            </p>
+          </div>
+
+          {/* 3 Value Pillars Cards */}
+          <div style={{
+            position: 'relative',
+            zIndex: 2,
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gap: '1.25rem',
+            marginBottom: '2.25rem'
+          }}>
+            {/* Pillar 1 */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.06)',
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              borderRadius: '18px',
+              padding: '1.4rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.75rem'
+            }}>
+              <div style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, #10B981, #059669)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)'
+              }}>
+                <Tag size={22} />
+              </div>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: '#FFFFFF' }}>Instant Welcome Discount</h3>
+              <p style={{ fontSize: '0.86rem', color: '#CBD5E1', margin: 0, lineHeight: 1.45 }}>
+                Get flat ₹100 or 20% off your initial booking on any exterior foam wash, interior vacuuming, or full spa package.
+              </p>
+            </div>
+
+            {/* Pillar 2 */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.06)',
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              borderRadius: '18px',
+              padding: '1.4rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.75rem'
+            }}>
+              <div style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, #F59E0B, #D97706)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                boxShadow: '0 4px 12px rgba(245, 158, 11, 0.35)'
+              }}>
+                <Sparkles size={22} />
+              </div>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: '#FFFFFF' }}>100 Free Royalty Coins</h3>
+              <p style={{ fontSize: '0.86rem', color: '#CBD5E1', margin: 0, lineHeight: 1.45 }}>
+                100 Reward Coins automatically credited to your user wallet on signup. Redeem for future washes, add-ons, or interior detailing.
+              </p>
+            </div>
+
+            {/* Pillar 3 */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.06)',
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              borderRadius: '18px',
+              padding: '1.4rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.75rem'
+            }}>
+              <div style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, #0284C7, #0369A1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                boxShadow: '0 4px 12px rgba(2, 132, 199, 0.35)'
+              }}>
+                <ShieldCheck size={22} />
+              </div>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: '#FFFFFF' }}>Zero Upfront Fees</h3>
+              <p style={{ fontSize: '0.86rem', color: '#CBD5E1', margin: 0, lineHeight: 1.45 }}>
+                Sign up in 30 seconds with mobile OTP. No credit card required. Certified mobile technician arrives at your preferred time window.
+              </p>
+            </div>
+          </div>
+
+          {/* Action CTAs */}
+          <div style={{
+            position: 'relative',
+            zIndex: 2,
+            display: 'flex',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '1rem',
+            paddingTop: '1.5rem',
+            borderTop: '1px solid rgba(255, 255, 255, 0.1)'
+          }}>
+            <button
+              onClick={() => navigate('/register?offer=welcome')}
+              style={{
+                background: 'linear-gradient(135deg, #10B981, #059669)',
+                color: 'white',
+                border: 'none',
+                padding: '0.85rem 1.85rem',
+                borderRadius: '30px',
+                fontSize: '1rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                boxShadow: '0 6px 20px rgba(16, 185, 129, 0.45)',
+                transition: 'transform 0.2s, box-shadow 0.2s'
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 8px 25px rgba(16, 185, 129, 0.6)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 6px 20px rgba(16, 185, 129, 0.45)';
+              }}
+            >
+              <span>Claim Welcome Offer & Register Now</span>
+              <ArrowRight size={18} />
+            </button>
+
+            <button
+              onClick={() => navigate('/login')}
+              style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(8px)',
+                color: '#FFFFFF',
+                border: '1.5px solid rgba(255, 255, 255, 0.3)',
+                padding: '0.85rem 1.65rem',
+                borderRadius: '30px',
+                fontSize: '0.95rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                transition: 'background 0.2s, border-color 0.2s'
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                e.currentTarget.style.borderColor = '#38BDF8';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+              }}
+            >
+              <User size={16} />
+              <span>Already a Customer? Login Here</span>
+            </button>
+          </div>
+        </div>
+      </section>
 
       {/* VIP SUBSCRIPTION ADVERTISEMENT BANNER SECTION */}
       {settings?.subscriptionsEnabled && (
@@ -4133,6 +4536,9 @@ const Home = () => {
             borderTop: '1px solid rgba(255, 255, 255, 0.08)'
           }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', fontWeight: 600, fontSize: '0.85rem' }}>
+              <a href="#welcome-offer" style={{ color: '#FCD34D', textDecoration: 'none', fontWeight: 700 }}>🎁 Claim Welcome Offer</a>
+              <Link to="/login" style={{ color: '#CBD5E1', textDecoration: 'none' }}>Customer Login</Link>
+              <Link to="/register" style={{ color: '#CBD5E1', textDecoration: 'none' }}>Register / Sign Up</Link>
               <a href="#packages" style={{ color: '#CBD5E1', textDecoration: 'none' }}>Services</a>
               <a href="#service-areas" style={{ color: '#CBD5E1', textDecoration: 'none' }}>Vizag Localities</a>
               <a href="#why-us" style={{ color: '#CBD5E1', textDecoration: 'none' }}>Why Wash My Car Org</a>

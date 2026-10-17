@@ -36,20 +36,20 @@
     <priority>0.85</priority>
   </url>
 
-  <!-- Customer Login -->
+  <!-- Customer Login Sitelink -->
   <url>
     <loc>https://washmycar.org.in/login</loc>
     <lastmod>2026-10-17</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
   </url>
 
-  <!-- Customer Registration / Sign Up -->
+  <!-- Customer Registration & Claim Welcome Offer Sitelink -->
   <url>
     <loc>https://washmycar.org.in/register</loc>
     <lastmod>2026-10-17</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
   </url>
 
   <!-- Terms & Service Conditions -->

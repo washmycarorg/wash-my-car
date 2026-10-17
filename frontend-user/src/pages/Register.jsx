@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { User as UserIcon, Phone, ArrowLeft, Gift, Lock, RefreshCw, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { User as UserIcon, Phone, ArrowLeft, Gift, Lock, RefreshCw, CheckCircle2, ShieldCheck, Sparkles } from 'lucide-react';
 import { registerUser, sendUserOtp, getSettings } from '../api';
 import logo from '../assets/wash my car.png';
 
@@ -17,6 +17,15 @@ const Register = ({ setAuth }) => {
   const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  // SEO Page Title and Meta Description for Google Sitelinks
+  useEffect(() => {
+    document.title = "Register & Claim Welcome Offer | Wash My Car Org Vizag";
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) {
+      metaDesc.setAttribute('content', 'Register your free account with Wash My Car Org to claim your welcome offer: instant discount + 100 free reward coins on doorstep car wash in Vizag.');
+    }
+  }, []);
 
   useEffect(() => {
     getSettings()
@@ -264,8 +273,61 @@ const Register = ({ setAuth }) => {
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.72rem', fontWeight: 800, color: '#0284C7', background: '#F0F9FF', padding: '0.2rem 0.6rem', borderRadius: '12px', border: '1px solid #BAE6FD', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
               <ShieldCheck size={13} /> Quick Verified Registration
             </div>
-            <h2 style={{ margin: 0, fontWeight: 900, fontSize: '1.6rem', color: 'var(--primary-navy)', letterSpacing: '-0.02em' }}>Create Your Account</h2>
+            <h1 style={{ margin: 0, fontWeight: 900, fontSize: '1.6rem', color: 'var(--primary-navy)', letterSpacing: '-0.02em' }}>Register & Claim Welcome Offer</h1>
             <p style={{ margin: '0.35rem 0 0', color: 'var(--text-muted)', fontSize: '0.88rem' }}>Join us with verified mobile number for hassle-free doorstep car care.</p>
+          </div>
+
+          {/* Sitelink-Aligned Welcome Offer Unlocked Card */}
+          <div style={{
+            background: 'linear-gradient(135deg, #ECFDF5 0%, #EFF6FF 100%)',
+            border: '1.5px solid #10B981',
+            borderRadius: '16px',
+            padding: '1rem',
+            marginBottom: '1.25rem',
+            boxShadow: '0 4px 15px rgba(16, 185, 129, 0.12)',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+              <div style={{
+                background: 'linear-gradient(135deg, #10B981, #059669)',
+                color: 'white',
+                width: '40px',
+                height: '40px',
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                boxShadow: '0 4px 10px rgba(16, 185, 129, 0.35)'
+              }}>
+                <Gift size={22} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <span style={{ fontWeight: 900, fontSize: '0.92rem', color: '#065F46' }}>
+                    🎉 Welcome Offer Activated!
+                  </span>
+                  <span style={{ background: '#059669', color: 'white', fontSize: '0.65rem', padding: '2px 8px', borderRadius: '12px', fontWeight: 800 }}>
+                    SAVE ₹100 ON 1ST WASH
+                  </span>
+                </div>
+                <p style={{ margin: '0.25rem 0 0', fontSize: '0.78rem', color: '#047857', lineHeight: 1.4 }}>
+                  Register below and receive an instant welcome discount on your first doorstep vehicle wash + <strong>100 Free Royalty Reward Coins</strong> credited to your account!
+                </p>
+                <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                  <span style={{ background: 'rgba(5, 150, 105, 0.12)', color: '#047857', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: '8px' }}>
+                    ✓ Spot-Free Foam Wash
+                  </span>
+                  <span style={{ background: 'rgba(5, 150, 105, 0.12)', color: '#047857', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: '8px' }}>
+                    ✓ 100 Reward Coins
+                  </span>
+                  <span style={{ background: 'rgba(5, 150, 105, 0.12)', color: '#047857', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: '8px' }}>
+                    ✓ Doorstep Arrival
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
           
           {error && (
@@ -499,9 +561,12 @@ const Register = ({ setAuth }) => {
             <span><strong>100% Privacy Protected:</strong> We never share your phone number with 3rd parties or send unsolicited spam.</span>
           </div>
 
-          <p className="text-center mt-6" style={{fontSize: '0.95rem'}}>
-            Already have an account? <Link to="/login" className="text-blue" style={{fontWeight: 700}}>Login</Link>
-          </p>
+          <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.92rem', color: '#475569' }}>
+            <span>Already have an account? </span>
+            <Link to="/login" className="text-blue" style={{ fontWeight: 800 }}>
+              Customer Login →
+            </Link>
+          </div>
         </div>
       </div>
     </div>

@@ -154,55 +154,74 @@
       "@id": "https://washmycar.org.in/#website",
       "url": "https://washmycar.org.in/",
       "name": "Wash My Car Org",
+      "alternateName": ["Wash My Car", "Wash My Car Vizag", "Wash My Car Org Doorstep Care"],
       "description": "Visakhapatnam's Doorstep Car Detailing & Vehicle Spa Service",
       "publisher": {
         "@id": "https://washmycar.org.in/#autowash"
+      },
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://washmycar.org.in/?q={search_term_string}#packages",
+        "query-input": "required name=search_term_string"
       }
     }
     </script>
 
-    <!-- JSON-LD Structured Data: Site Navigation Sitelinks (Services, VIP Passes, Book, Login, Register) -->
+    <!-- JSON-LD Structured Data: Site Navigation Sitelinks (Claim Welcome Offer, Customer Login, Register, Packages) -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "ItemList",
+      "name": "Quick Sitelinks",
+      "description": "Primary sitelinks for Wash My Car Org customer portal and booking services in Visakhapatnam",
       "itemListElement": [
         {
           "@type": "SiteNavigationElement",
           "position": 1,
-          "name": "Car Wash Packages & Pricing",
-          "description": "Explore transparent doorstep car wash packages for hatchbacks, sedans, SUVs, and luxury vehicles.",
-          "url": "https://washmycar.org.in/services"
+          "name": "Claim Welcome Offer",
+          "description": "Claim exclusive new customer welcome discount & 100 reward coins on your first doorstep car wash in Vizag.",
+          "url": "https://washmycar.org.in/register?offer=welcome"
         },
         {
           "@type": "SiteNavigationElement",
           "position": 2,
-          "name": "VIP Membership Passes",
-          "description": "Save up to 40% with monthly vehicle spa passes, free add-ons, and priority morning dispatch.",
-          "url": "https://washmycar.org.in/subscriptions"
-        },
-        {
-          "@type": "SiteNavigationElement",
-          "position": 3,
-          "name": "Book Doorstep Wash Slot",
-          "description": "Select date, preferred time window, and address for doorstep car wash arrival in Vizag.",
-          "url": "https://washmycar.org.in/book"
-        },
-        {
-          "@type": "SiteNavigationElement",
-          "position": 4,
           "name": "Customer Login",
-          "description": "Access your Wash My Car profile, ongoing bookings, and royalty reward coins.",
+          "description": "Sign in with your mobile OTP to manage active car wash slots, track mobile technicians, and redeem coins.",
           "url": "https://washmycar.org.in/login"
         },
         {
           "@type": "SiteNavigationElement",
-          "position": 5,
-          "name": "Create Account / Sign Up",
-          "description": "Register today to claim new customer welcome discounts and start earning reward coins.",
+          "position": 3,
+          "name": "Register / Create Account",
+          "description": "Create your free account in 30 seconds with mobile number OTP for instant doorstep vehicle care.",
           "url": "https://washmycar.org.in/register"
+        },
+        {
+          "@type": "SiteNavigationElement",
+          "position": 4,
+          "name": "Car Wash Packages & Pricing",
+          "description": "Explore transparent doorstep car wash packages for hatchbacks, sedans, SUVs, and luxury vehicles.",
+          "url": "https://washmycar.org.in/#packages"
         }
       ]
+    }
+    </script>
+
+    <!-- JSON-LD Structured Data: Welcome Offer Promotion -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Offer",
+      "@id": "https://washmycar.org.in/#welcome-offer",
+      "name": "First Doorstep Car Wash Welcome Offer",
+      "description": "Special welcome bonus for new users in Visakhapatnam: Flat ₹100 / 20% discount plus 100 royalty reward coins on registration.",
+      "url": "https://washmycar.org.in/register?offer=welcome",
+      "priceCurrency": "INR",
+      "availability": "https://schema.org/InStock",
+      "validFrom": "2026-01-01",
+      "offeredBy": {
+        "@id": "https://washmycar.org.in/#autowash"
+      }
     }
     </script>
 
