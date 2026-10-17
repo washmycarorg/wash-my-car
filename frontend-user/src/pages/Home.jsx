@@ -6,7 +6,7 @@ import {
   Compass, Shield, Tag, ChevronDown, MessageCircle, ArrowRight,
   Flame, Bike, Feather, Smartphone, ExternalLink, HelpCircle,
   ChevronLeft, Copy, Send, User, Gift, Zap, Image, Upload, Trash2, Crown,
-  RefreshCw, AlertCircle
+  RefreshCw, AlertCircle, Search, Navigation, ShieldCheck
 } from 'lucide-react';
 import { getHomeContent, getServiceAreas, getWashTypes, getAllWashPrices, getCarTypes, getAddons, getActiveCoupons, submitInquiry, getSettings } from '../api';
 
@@ -28,6 +28,108 @@ const FALLBACK_SLIDE = [
     primaryLink: '/login',
     secondaryLink: '#packages'
   }
+];
+
+const FALLBACK_FAQS = [
+  {
+    q: "Where can I find the best doorstep car wash near me in Visakhapatnam (Vizag)?",
+    a: "Wash My Car Org is Visakhapatnam's #1 doorstep vehicle wash and detailing service. Our trained mobile technicians arrive directly at your home, apartment parking, or workplace with high-pressure machines, snow foam wash, interior vacuuming, and dashboard polish anywhere in Vizag."
+  },
+  {
+    q: "Do you provide doorstep car wash in Pendurthi and Sujatha Nagar?",
+    a: "Yes! Pendurthi and Sujatha Nagar are fully covered under our active doorstep service zones. Whether you live in an apartment complex, gated community, or independent house, our mobile technician arrives on time to clean your hatchback, sedan, or SUV right at your doorstep."
+  },
+  {
+    q: "Is doorstep car wash available in NAD Junction, NAD and Gopalapatnam?",
+    a: "Absolutely! We provide fast doorstep car wash across NAD Junction, NAD flyover area, Gopalapatnam, Simhachalam, Marripalem, and Kancharapalem. You can select your preferred morning or evening arrival window when booking online."
+  },
+  {
+    q: "Can I book home car wash in Gajuwaka and Old Gajuwaka?",
+    a: "Yes, Gajuwaka and Old Gajuwaka have dedicated service teams. We serve residential colonies, Steel Plant township, Kurmannapalem, Sheela Nagar, and Auto Nagar with complete exterior spot-free foam cleaning and interior cabin sanitization."
+  },
+  {
+    q: "Do you offer doorstep car wash in Maddilapalem and MVP Colony?",
+    a: "Yes, Maddilapalem, MVP Colony, Seethammadhara, Resapuvanipalem, Isukathota, and Venkojipalem are among our most active service hubs. We offer spot-free water-efficient car wash, tyre dressing, interior steam cleaning, and monthly VIP care passes."
+  },
+  {
+    q: "How to book a doorstep car wash in Madhurawada and PM Palem?",
+    a: "Booking in Madhurawada, PM Palem, Kommadi, Yendada, and Rushikonda takes less than 60 seconds! Just choose your car model, pick your wash package, enter your doorstep address, and confirm your preferred time slot online."
+  },
+  {
+    q: "What facilities do I need to provide for a doorstep car wash at home in Vizag?",
+    a: "All you need to provide is a standard domestic water tap connection and an ordinary electrical socket (within reach of an extension board). Our team brings all the detailing machinery, pressure hoses, foam canons, vacuum cleaners, and microfiber materials."
+  },
+  {
+    q: "Can I get recurring monthly car wash subscriptions in Visakhapatnam?",
+    a: "Yes! Wash My Car Org offers VIP Monthly Passes with up to 40% discount, priority dispatch, and complimentary perks (like free 2-wheeler wash or visor clean). Passes are bound to your car number for guaranteed regular care."
+  }
+];
+
+const VIZAG_LOCALITY_HUBS = [
+  {
+    id: 'pendurthi-sujatha',
+    name: 'Pendurthi & Sujatha Nagar',
+    region: 'west',
+    badge: 'WEST VIZAG HUB',
+    description: 'Doorstep snow foam wash, interior cabin vacuuming & detailing for independent houses, villas & apartments across Pendurthi, Sujatha Nagar & Vepagunta.',
+    keywords: 'car wash pendurthi, car wash sujatha nagar, doorstep car wash pendurthi, home car wash sujatha nagar',
+    popularLocalities: ['Sujatha Nagar Main Road', 'Pendurthi Junction', 'Chinnamushidiwada', 'Vepagunta', 'Sontyam Road']
+  },
+  {
+    id: 'nad-gopalapatnam',
+    name: 'NAD & NAD Junction',
+    region: 'west',
+    badge: 'CENTRAL-WEST HUB',
+    description: 'Fast mobile car wash and vehicle spa arrival near NAD Junction, NAD flyover, Gopalapatnam, Simhachalam, Marripalem & Kancharapalem.',
+    keywords: 'car wash nad, car wash nad junction, card wash nad junction, car wash near nad vizag, car wash gopalapatnam',
+    popularLocalities: ['NAD Kotha Road', 'Gopalapatnam Bus Stand', 'Simhachalam Road', 'Marripalem VUDA Layout', 'Kakani Nagar']
+  },
+  {
+    id: 'gajuwaka-oldgajuwaka',
+    name: 'Gajuwaka & Old Gajuwaka',
+    region: 'south',
+    badge: 'SOUTH VIZAG HUB',
+    description: 'Complete vehicle detailing, heavy dust removal, foam washing & interior sanitization across Gajuwaka, Old Gajuwaka, Kurmannapalem & Steel Plant.',
+    keywords: 'car wash gajuwaka, car wash old gajuwaka, doorstep car wash gajuwaka, car cleaning gajuwaka',
+    popularLocalities: ['Old Gajuwaka Junction', 'New Gajuwaka', 'Kurmannapalem', 'Steel Plant Township', 'Auto Nagar', 'BHPV']
+  },
+  {
+    id: 'maddilapalem-mvp',
+    name: 'Maddilapalem & MVP Colony',
+    region: 'central',
+    badge: 'CENTRAL VIZAG HUB',
+    description: 'Doorstep car cleaning, luxury foam bath, dashboard polish & tyre gloss near Maddilapalem, MVP Colony, Seethammadhara & Andhra University.',
+    keywords: 'car wash maddilapalem, car wash mvp colony, doorstep car wash maddilapalem, car wash seethammadhara',
+    popularLocalities: ['Maddilapalem Bus Depot', 'MVP Sector 1-12', 'Seethammadhara North Ext.', 'Resapuvanipalem', 'Isukathota']
+  },
+  {
+    id: 'madhurawada-pmpalem',
+    name: 'Madhurawada & PM Palem',
+    region: 'north',
+    badge: 'NORTH VIZAG HUB',
+    description: 'Premier doorstep car wash for gated communities, IT SEZ, apartments and villas in Madhurawada, PM Palem, Kommadi, Yendada & Rushikonda.',
+    keywords: 'car wash madhurawada, carsh madhurawada, car wash pm palem, doorstep car wash madhurawada, car wash near me',
+    popularLocalities: ['PM Palem Stadium Road', 'Mithilapuri VUDA Colony', 'Kommadi Junction', 'Car Shed Junction', 'Yendada Gated Villas']
+  },
+  {
+    id: 'dwarakanagar-central',
+    name: 'Dwaraka Nagar & Siripuram',
+    region: 'central',
+    badge: 'HEART OF VIZAG',
+    description: 'Executive doorstep vehicle detailing at your home or corporate parking in Dwaraka Nagar, Siripuram, Asilmetta, Jagadamba & Daba Gardens.',
+    keywords: 'car wash dwaraka nagar, car wash siripuram, home car wash at visakhapatnam, doorstep car wash vizag',
+    popularLocalities: ['Dwaraka Nagar 1st-5th Lane', 'Siripuram Circle', 'Asilmetta Junction', 'Daba Gardens', 'Waltair Uplands']
+  }
+];
+
+const ALL_VIZAG_LOCALITIES = [
+  'Pendurthi', 'Sujatha Nagar', 'NAD Junction', 'NAD', 'Gajuwaka', 'Old Gajuwaka', 
+  'Maddilapalem', 'Madhurawada', 'MVP Colony', 'Seethammadhara', 'Dwaraka Nagar', 
+  'Siripuram', 'Gopalapatnam', 'Simhachalam', 'Rushikonda', 'PM Palem', 'Yendada', 
+  'Kommadi', 'Kurmannapalem', 'Marripalem', 'Kancharapalem', 'Akkayyapalem', 
+  'Sagar Nagar', 'Sheela Nagar', 'Steel Plant', 'Auto Nagar', 'Beach Road', 
+  'Lawson\'s Bay', 'Waltair Uplands', 'Peda Waltair', 'Maharani Peta', 'Vepagunta', 
+  'Resapuvanipalem', 'Isukathota', 'Venkojipalem', 'Hanumanthawaka', 'Arilova', 'Bheemili'
 ];
 
 
@@ -131,6 +233,8 @@ const Home = () => {
   const [carTypes, setCarTypes] = useState([]);
   const [addons, setAddons] = useState([]);
   const [selectedCarType, setSelectedCarType] = useState(null);
+  const [selectedSeoRegion, setSelectedSeoRegion] = useState('all');
+  const [seoAreaSearch, setSeoAreaSearch] = useState('');
   
   const mapContainerRef = useRef(null);
   const googleMapInstance = useRef(null);
@@ -234,7 +338,7 @@ const Home = () => {
         ...cmsRes,
         heroSlides: resolvedSlides,
         franchisePlans: franchiseParsed,
-        faqs: Array.isArray(faqsParsed) && faqsParsed.length > 0 ? faqsParsed : []
+        faqs: Array.isArray(faqsParsed) && faqsParsed.length > 0 ? faqsParsed : FALLBACK_FAQS
       });
 
       setAreas(areasRes || []);
@@ -914,9 +1018,10 @@ const Home = () => {
         </div>
         
         {/* Desktop Links */}
-        <div className="hidden lg:flex" style={{ gap: '2rem', fontWeight: 600, fontSize: '0.9rem', alignItems: 'center' }}>
+        <div className="hidden lg:flex" style={{ gap: '1.75rem', fontWeight: 600, fontSize: '0.9rem', alignItems: 'center' }}>
           <a href="#" style={{ color: '#F8FAFC' }}>Home</a>
           <a href="#packages" style={{ color: '#94A3B8', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = '#38BDF8'} onMouseLeave={e => e.target.style.color = '#94A3B8'}>Wash Packages</a>
+          <a href="#service-areas" style={{ color: '#94A3B8', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = '#38BDF8'} onMouseLeave={e => e.target.style.color = '#94A3B8'}>Vizag Localities</a>
           <a href="#addons-strip" style={{ color: '#94A3B8', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = '#38BDF8'} onMouseLeave={e => e.target.style.color = '#94A3B8'}>Add-ons</a>
           <a href="#why-us" style={{ color: '#94A3B8', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = '#38BDF8'} onMouseLeave={e => e.target.style.color = '#94A3B8'}>Why Choose Us</a>
           <a href="#partners" style={{ color: '#94A3B8', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = '#38BDF8'} onMouseLeave={e => e.target.style.color = '#94A3B8'}>Franchise</a>
@@ -980,6 +1085,7 @@ const Home = () => {
           <div style={{ position: 'absolute', top: '100%', left: 0, width: '100%', background: '#0F172A', padding: '1.5rem 6%', display: 'flex', flexDirection: 'column', gap: '1rem', zIndex: 99, borderTop: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 10px 20px rgba(0,0,0,0.3)' }}>
             <a href="#" onClick={() => setMenuOpen(false)} style={{ color: '#F8FAFC', fontSize: '1rem', fontWeight: 600 }}>Home</a>
             <a href="#packages" onClick={() => setMenuOpen(false)} style={{ color: '#94A3B8', fontSize: '1rem', fontWeight: 500 }}>Wash Packages</a>
+            <a href="#service-areas" onClick={() => setMenuOpen(false)} style={{ color: '#94A3B8', fontSize: '1rem', fontWeight: 500 }}>Vizag Localities</a>
             <a href="#addons-strip" onClick={() => setMenuOpen(false)} style={{ color: '#94A3B8', fontSize: '1rem', fontWeight: 500 }}>Add-on Services</a>
             <a href="#why-us" onClick={() => setMenuOpen(false)} style={{ color: '#94A3B8', fontSize: '1rem', fontWeight: 500 }}>Why Choose Us</a>
             <a href="#partners" onClick={() => setMenuOpen(false)} style={{ color: '#94A3B8', fontSize: '1rem', fontWeight: 500 }}>Franchise Partnership</a>
@@ -2807,7 +2913,491 @@ const Home = () => {
         </div>
       </section>
 
-      {/* 9. INTERACTIVE FAQ ACCORDION */}
+      {/* 9. VISAKHAPATNAM (VIZAG) DOORSTEP SERVICE AREAS & LOCALITY SEO HUB */}
+      <section id="service-areas" style={{ padding: '5.5rem 6%', background: '#FFFFFF', borderTop: '1px solid #E2E8F0', borderBottom: '1px solid #E2E8F0' }}>
+        <div style={{ maxWidth: '1240px', margin: '0 auto' }}>
+          
+          {/* Section Header */}
+          <div style={{ textAlign: 'center', maxWidth: '860px', margin: '0 auto 3rem' }}>
+            <span style={{ 
+              color: '#0284C7', 
+              fontWeight: 800, 
+              fontSize: '0.82rem', 
+              letterSpacing: '1.4px', 
+              textTransform: 'uppercase',
+              background: '#EFF6FF',
+              padding: '0.35rem 0.95rem',
+              borderRadius: '20px',
+              border: '1px solid #BAE6FD',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              marginBottom: '0.75rem'
+            }}>
+              <MapPin size={15} color="#0284C7" /> DOORSTEP COVERAGE ACROSS VISAKHAPATNAM (VIZAG)
+            </span>
+            <h2 style={{ fontSize: 'clamp(2rem, 4.2vw, 3rem)', fontWeight: 900, color: '#0F172A', margin: '0.35rem 0 1rem', lineHeight: 1.15, letterSpacing: '-0.5px' }}>
+              Doorstep Car Wash in Vizag – Every Locality, Directly at Your Home
+            </h2>
+            <p style={{ color: '#64748B', fontSize: '1.02rem', lineHeight: 1.6, margin: 0 }}>
+              Searching for <strong>"car wash near me"</strong> in Vizag? Whether you reside in <strong>Pendurthi</strong>, <strong>Sujatha Nagar</strong>, <strong>NAD Junction</strong>, <strong>Gajuwaka</strong>, <strong>Old Gajuwaka</strong>, <strong>Maddilapalem</strong>, or <strong>Madhurawada</strong>, our certified mobile technicians bring pure spot-free water washing, high-pressure foam, and interior steam vacuuming directly to your doorstep.
+            </p>
+          </div>
+
+          {/* Interactive Locality Search & Availability Checker */}
+          <div style={{
+            background: 'linear-gradient(145deg, #0B132B 0%, #0F172A 70%, #0369A1 100%)',
+            borderRadius: '24px',
+            padding: '2rem 2.25rem',
+            color: 'white',
+            marginBottom: '3rem',
+            boxShadow: '0 15px 35px -5px rgba(15, 23, 42, 0.25)',
+            border: '1.5px solid rgba(56, 189, 248, 0.3)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+              <div>
+                <h3 style={{ fontSize: '1.35rem', fontWeight: 800, margin: 0, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Search size={20} color="#38BDF8" /> Find Doorstep Car Wash Near Me in Vizag
+                </h3>
+                <p style={{ fontSize: '0.85rem', color: '#94A3B8', margin: '0.3rem 0 0' }}>
+                  Check technician arrival availability in your colony, apartment, or street
+                </p>
+              </div>
+
+              {/* Live Status Badge */}
+              <div style={{
+                background: 'rgba(34, 197, 94, 0.15)',
+                border: '1px solid rgba(34, 197, 94, 0.4)',
+                color: '#4ADE80',
+                padding: '0.35rem 0.85rem',
+                borderRadius: '20px',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem'
+              }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22C55E', display: 'inline-block', boxShadow: '0 0 8px #22C55E' }} />
+                <span>Mobile Detailing Units Active in Vizag</span>
+              </div>
+            </div>
+
+            {/* Search Input Bar */}
+            <div style={{ position: 'relative', marginBottom: '1.25rem' }}>
+              <Search size={18} color="#94A3B8" style={{ position: 'absolute', left: '1.1rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+              <input
+                type="text"
+                placeholder="Type your area (e.g. Pendurthi, Sujatha Nagar, NAD, Gajuwaka, Maddilapalem, Madhurawada...)"
+                value={seoAreaSearch}
+                onChange={e => setSeoAreaSearch(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.9rem 3.5rem 0.9rem 2.9rem',
+                  borderRadius: '16px',
+                  border: '1.5px solid rgba(255, 255, 255, 0.2)',
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  color: '#FFFFFF',
+                  fontSize: '0.95rem',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  backdropFilter: 'blur(8px)',
+                  transition: 'border-color 0.2s'
+                }}
+                onFocus={e => e.target.style.borderColor = '#38BDF8'}
+                onBlur={e => e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)'}
+              />
+              {seoAreaSearch && (
+                <button
+                  onClick={() => setSeoAreaSearch('')}
+                  style={{
+                    position: 'absolute',
+                    right: '1rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'rgba(255, 255, 255, 0.15)',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '24px',
+                    height: '24px',
+                    color: '#CBD5E1',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer'
+                  }}
+                  title="Clear search"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            {/* Region Filter Buttons */}
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.78rem', color: '#94A3B8', fontWeight: 700, marginRight: '0.25rem' }}>Filter Zones:</span>
+              {[
+                { id: 'all', label: 'All Vizag Areas (38+)' },
+                { id: 'west', label: 'West Vizag (Pendurthi, NAD, Sujatha Nagar)' },
+                { id: 'south', label: 'South Vizag (Gajuwaka, Steel Plant)' },
+                { id: 'central', label: 'Central Vizag (Maddilapalem, MVP, Dwaraka Nagar)' },
+                { id: 'north', label: 'North Vizag (Madhurawada, PM Palem, Rushikonda)' }
+              ].map(tab => {
+                const isActive = selectedSeoRegion === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => {
+                      setSelectedSeoRegion(tab.id);
+                      setSeoAreaSearch('');
+                    }}
+                    style={{
+                      background: isActive ? '#0284C7' : 'rgba(255, 255, 255, 0.06)',
+                      border: isActive ? '1.5px solid #38BDF8' : '1px solid rgba(255, 255, 255, 0.12)',
+                      color: isActive ? '#FFFFFF' : '#CBD5E1',
+                      padding: '0.4rem 0.85rem',
+                      borderRadius: '20px',
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      transition: 'all 0.18s ease'
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Instant Locality Search Match Confirmation */}
+            {seoAreaSearch.trim() && (() => {
+              const queryLower = seoAreaSearch.toLowerCase().trim();
+              const matchedHubs = VIZAG_LOCALITY_HUBS.filter(h => 
+                h.name.toLowerCase().includes(queryLower) ||
+                h.description.toLowerCase().includes(queryLower) ||
+                h.keywords.toLowerCase().includes(queryLower) ||
+                h.popularLocalities.some(l => l.toLowerCase().includes(queryLower))
+              );
+              const matchedLocalities = ALL_VIZAG_LOCALITIES.filter(l => l.toLowerCase().includes(queryLower));
+              const isFound = matchedHubs.length > 0 || matchedLocalities.length > 0;
+
+              return (
+                <div style={{
+                  marginTop: '1.25rem',
+                  padding: '1rem 1.25rem',
+                  borderRadius: '16px',
+                  background: isFound ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                  border: isFound ? '1.5px solid #22C55E' : '1.5px solid #EF4444',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '0.75rem'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                    <div style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      background: isFound ? '#22C55E' : '#EF4444',
+                      color: 'white',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}>
+                      {isFound ? <Check size={18} strokeWidth={3} /> : <AlertCircle size={18} />}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 800, fontSize: '0.92rem', color: isFound ? '#86EFAC' : '#FCA5A5' }}>
+                        {isFound 
+                          ? `✅ Doorstep Service Active in "${seoAreaSearch.trim()}"!` 
+                          : `Coverage expanding to "${seoAreaSearch.trim()}"`}
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: '#CBD5E1', marginTop: '0.15rem' }}>
+                        {isFound 
+                          ? `Mobile technicians are actively dispatched in this zone. You can schedule an arrival slot right now!` 
+                          : `We serve all adjoining areas across Visakhapatnam. Select an area nearby or contact support.`}
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => navigate('/login')}
+                    style={{
+                      background: isFound ? '#22C55E' : '#0284C7',
+                      color: 'white',
+                      border: 'none',
+                      padding: '0.55rem 1.25rem',
+                      borderRadius: '12px',
+                      fontWeight: 800,
+                      fontSize: '0.85rem',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+                    }}
+                  >
+                    <span>{isFound ? `Book in ${seoAreaSearch.trim()}` : 'Book Doorstep Slot'}</span>
+                    <ArrowRight size={14} />
+                  </button>
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Featured Locality Hub Cards Grid */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+            gap: '1.5rem',
+            marginBottom: '3rem'
+          }}>
+            {VIZAG_LOCALITY_HUBS
+              .filter(hub => {
+                if (selectedSeoRegion !== 'all' && hub.region !== selectedSeoRegion) return false;
+                if (!seoAreaSearch.trim()) return true;
+                const q = seoAreaSearch.toLowerCase().trim();
+                return hub.name.toLowerCase().includes(q) ||
+                  hub.description.toLowerCase().includes(q) ||
+                  hub.keywords.toLowerCase().includes(q) ||
+                  hub.popularLocalities.some(l => l.toLowerCase().includes(q));
+              })
+              .map(hub => (
+                <div
+                  key={hub.id}
+                  style={{
+                    background: '#FFFFFF',
+                    borderRadius: '20px',
+                    border: '1.5px solid #E2E8F0',
+                    padding: '1.65rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    boxShadow: '0 4px 15px rgba(0,0,0,0.04)',
+                    transition: 'all 0.22s ease',
+                    position: 'relative'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.transform = 'translateY(-3px)';
+                    e.currentTarget.style.borderColor = '#38BDF8';
+                    e.currentTarget.style.boxShadow = '0 12px 28px rgba(14, 165, 233, 0.12)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.borderColor = '#E2E8F0';
+                    e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.04)';
+                  }}
+                >
+                  <div>
+                    {/* Header & Badges */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
+                      <span style={{
+                        background: '#EFF6FF',
+                        color: '#0284C7',
+                        border: '1px solid #BAE6FD',
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        padding: '0.2rem 0.65rem',
+                        borderRadius: '20px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px'
+                      }}>
+                        {hub.badge}
+                      </span>
+
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        color: '#059669',
+                        background: '#ECFDF5',
+                        padding: '0.2rem 0.55rem',
+                        borderRadius: '6px'
+                      }}>
+                        <Check size={12} strokeWidth={3} /> Doorstep Ready
+                      </span>
+                    </div>
+
+                    {/* H3 Heading targeting Search Query */}
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0F172A', margin: '0 0 0.5rem', lineHeight: 1.25 }}>
+                      {hub.name}
+                    </h3>
+
+                    {/* Crawlable Description */}
+                    <p style={{ color: '#475569', fontSize: '0.88rem', lineHeight: 1.55, margin: '0 0 1rem' }}>
+                      {hub.description}
+                    </p>
+
+                    {/* Popular Covered Landmarks in this Zone */}
+                    <div style={{ marginBottom: '1.25rem' }}>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.45rem' }}>
+                        Key Localities Served:
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+                        {hub.popularLocalities.map(loc => (
+                          <span
+                            key={loc}
+                            onClick={() => setSeoAreaSearch(loc)}
+                            style={{
+                              background: '#F8FAFC',
+                              border: '1px solid #E2E8F0',
+                              color: '#334155',
+                              padding: '0.2rem 0.55rem',
+                              borderRadius: '6px',
+                              fontSize: '0.73rem',
+                              fontWeight: 600,
+                              cursor: 'pointer'
+                            }}
+                            title={`Search car wash in ${loc}`}
+                          >
+                            📍 {loc}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card Action Button */}
+                  <button
+                    onClick={() => navigate('/login')}
+                    style={{
+                      width: '100%',
+                      background: 'linear-gradient(135deg, #0EA5E9, #0284C7)',
+                      color: 'white',
+                      border: 'none',
+                      padding: '0.75rem 1rem',
+                      borderRadius: '12px',
+                      fontWeight: 800,
+                      fontSize: '0.85rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.4rem',
+                      boxShadow: '0 4px 12px rgba(14, 165, 233, 0.25)',
+                      transition: 'transform 0.15s ease'
+                    }}
+                  >
+                    <span>Book Doorstep Wash in {hub.name.split('&')[0].trim()}</span>
+                    <ArrowRight size={15} />
+                  </button>
+                </div>
+              ))}
+          </div>
+
+          {/* Complete 38+ Neighborhoods Keyword Tag Cloud */}
+          <div style={{
+            background: '#F8FAFC',
+            border: '1px solid #E2E8F0',
+            borderRadius: '24px',
+            padding: '2rem 2.25rem',
+            textAlign: 'center'
+          }}>
+            <h4 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0F172A', margin: '0 0 0.5rem' }}>
+              Full Visakhapatnam Doorstep Coverage Neighborhoods (A to Z)
+            </h4>
+            <p style={{ color: '#64748B', fontSize: '0.85rem', maxWidth: '680px', margin: '0 auto 1.25rem', lineHeight: 1.5 }}>
+              Our mobile car cleaning scooties &amp; detailers travel to all residential colonies, gated apartments, and independent houses across Vizag:
+            </p>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem', justifyContent: 'center' }}>
+              {ALL_VIZAG_LOCALITIES.map(area => (
+                <button
+                  key={area}
+                  onClick={() => {
+                    setSeoAreaSearch(area);
+                    const el = document.getElementById('service-areas');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  style={{
+                    background: '#FFFFFF',
+                    border: '1px solid #CBD5E1',
+                    borderRadius: '20px',
+                    padding: '0.35rem 0.8rem',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    color: '#1E293B',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.3rem',
+                    transition: 'all 0.15s ease'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.borderColor = '#0284C7';
+                    e.currentTarget.style.color = '#0284C7';
+                    e.currentTarget.style.background = '#F0F9FF';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.borderColor = '#CBD5E1';
+                    e.currentTarget.style.color = '#1E293B';
+                    e.currentTarget.style.background = '#FFFFFF';
+                  }}
+                >
+                  <span>✓ Car Wash {area}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Quick 4-Pill Guarantees Banner */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '1rem',
+              marginTop: '1.75rem',
+              paddingTop: '1.5rem',
+              borderTop: '1px solid #E2E8F0',
+              textAlign: 'left'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#E0F2FE', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284C7', flexShrink: 0 }}>
+                  <Clock size={18} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0F172A' }}>Save 2+ Hours</div>
+                  <div style={{ fontSize: '0.74rem', color: '#64748B' }}>No queues or traffic in Vizag</div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#DCFCE7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16A34A', flexShrink: 0 }}>
+                  <Droplets size={18} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0F172A' }}>Pure Spot-Free Foam</div>
+                  <div style={{ fontSize: '0.74rem', color: '#64748B' }}>pH-neutral scratch-free wash</div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#D97706', flexShrink: 0 }}>
+                  <ShieldCheck size={18} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0F172A' }}>Trained Detailers</div>
+                  <div style={{ fontSize: '0.74rem', color: '#64748B' }}>Equipped mobile professionals</div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284C7', flexShrink: 0 }}>
+                  <Calendar size={18} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0F172A' }}>Live Slot Windows</div>
+                  <div style={{ fontSize: '0.74rem', color: '#64748B' }}>Instant online booking confirmation</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      {/* 10. INTERACTIVE FAQ ACCORDION */}
       <section id="faq" style={{ padding: '6rem 6%', background: '#F8FAFC' }}>
         <div style={{ maxWidth: '850px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '3.5rem' }}>
@@ -3544,6 +4134,7 @@ const Home = () => {
           }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', fontWeight: 600, fontSize: '0.85rem' }}>
               <a href="#packages" style={{ color: '#CBD5E1', textDecoration: 'none' }}>Services</a>
+              <a href="#service-areas" style={{ color: '#CBD5E1', textDecoration: 'none' }}>Vizag Localities</a>
               <a href="#why-us" style={{ color: '#CBD5E1', textDecoration: 'none' }}>Why Wash My Car Org</a>
               <a href="#partners" style={{ color: '#CBD5E1', textDecoration: 'none' }}>Franchise</a>
               <a href="#faq" style={{ color: '#CBD5E1', textDecoration: 'none' }}>FAQ</a>

@@ -6,6 +6,8 @@ Allow: /subscriptions
 Allow: /book
 Allow: /login
 Allow: /register
+Allow: /terms
+Allow: /privacy
 Allow: /favicon.png
 Allow: /logo.png
 
