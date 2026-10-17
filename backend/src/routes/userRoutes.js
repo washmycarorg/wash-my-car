@@ -28,7 +28,8 @@ import {
   getUserSubscriptionPlans,
   getMySubscriptions,
   subscribeToPlan,
-  verifySubscriptionPayment
+  verifySubscriptionPayment,
+  resolveMapsUrl
 } from '../controllers/userController.js';
 
 import { submitInquiry } from '../controllers/inquiryController.js';
@@ -48,6 +49,7 @@ router.get('/settings', getPublicSettings);
 router.post('/inquiries', submitInquiry);
 router.get('/available-slots', getAvailableBookingSlots);
 router.get('/subscriptions/plans', getUserSubscriptionPlans);
+router.post('/resolve-maps-url', resolveMapsUrl);
 
 router.use(verifyToken);
 

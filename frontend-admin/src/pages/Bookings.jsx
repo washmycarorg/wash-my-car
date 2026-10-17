@@ -4,6 +4,22 @@ import { Calendar, User, Car, MapPin, Compass, Image, Eye, RefreshCw, CheckCircl
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
+// Strict dd/mm/yyyy date formatter
+const formatDateDMY = (dateInput) => {
+  if (!dateInput) return '';
+  if (typeof dateInput === 'string' && /^\d{4}-\d{2}-\d{2}/.test(dateInput)) {
+    const [year, month, day] = dateInput.substring(0, 10).split('-');
+    return `${day}/${month}/${year}`;
+  }
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return String(dateInput);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
+};
+
+
 // Modern Custom Assignment Dropdown Component
 const AssignEmployeeDropdown = ({ booking, employees, workloads, onAssign, onFetchWorkload }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -324,6 +340,8 @@ const Bookings = () => {
   // Verification Modal State
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [showMap, setShowMap] = useState(false);
+  const [googleMapsReady, setGoogleMapsReady] = useState(!!(window.google && window.google.maps));
+  const [previewPhoto, setPreviewPhoto] = useState(null);
   const mapContainerRef = useRef(null);
 
   const fetchData = async () => {
@@ -401,7 +419,11 @@ const Bookings = () => {
   // Initialize Map inside the Verification Modal
   useEffect(() => {
     if (selectedBooking && showMap && mapContainerRef.current && window.google && window.google.maps) {
-      const userPos = { lat: selectedBooking.latitude, lng: selectedBooking.longitude };
+      const userLat = Number(selectedBooking.latitude);
+      const userLng = Number(selectedBooking.longitude);
+      if (!userLat || !userLng || isNaN(userLat) || isNaN(userLng)) return;
+
+      const userPos = { lat: userLat, lng: userLng };
       
       const map = new window.google.maps.Map(mapContainerRef.current, {
         center: userPos,
@@ -410,47 +432,70 @@ const Bookings = () => {
         zoomControl: true
       });
 
-      // 1. User Booked Destination Pin (Green)
+      const bounds = new window.google.maps.LatLngBounds();
+      bounds.extend(userPos);
+
+      // 1. User Booked Destination Pin (Green) - HTTPS URL
       new window.google.maps.Marker({
         position: userPos,
         map,
         title: "User Destination",
-        icon: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png'
+        icon: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png'
       });
 
       // 2. Employee Start Job Pin (Orange)
       if (selectedBooking.startLatitude && selectedBooking.startLongitude) {
+        const startPos = { lat: Number(selectedBooking.startLatitude), lng: Number(selectedBooking.startLongitude) };
+        bounds.extend(startPos);
         new window.google.maps.Marker({
-          position: { lat: selectedBooking.startLatitude, lng: selectedBooking.startLongitude },
+          position: startPos,
           map,
           title: "Employee Started Job Here",
-          icon: 'http://maps.google.com/mapfiles/ms/icons/orange-dot.png'
+          icon: 'https://maps.google.com/mapfiles/ms/icons/orange-dot.png'
         });
       }
 
       // 3. Employee Complete Job Pin (Purple)
       if (selectedBooking.endLatitude && selectedBooking.endLongitude) {
+        const endPos = { lat: Number(selectedBooking.endLatitude), lng: Number(selectedBooking.endLongitude) };
+        bounds.extend(endPos);
         new window.google.maps.Marker({
-          position: { lat: selectedBooking.endLatitude, lng: selectedBooking.endLongitude },
+          position: endPos,
           map,
           title: "Employee Completed Job Here",
-          icon: 'http://maps.google.com/mapfiles/ms/icons/purple-dot.png'
+          icon: 'https://maps.google.com/mapfiles/ms/icons/purple-dot.png'
         });
       }
+
+      // If technician coordinates exist, auto-fit bounds so all markers are visible on any screen
+      if (selectedBooking.startLatitude || selectedBooking.endLatitude) {
+        try {
+          map.fitBounds(bounds, 40);
+        } catch (e) {
+          console.warn('Map fitBounds error:', e);
+        }
+      }
     }
-  }, [selectedBooking, showMap]);
+  }, [selectedBooking, showMap, googleMapsReady]);
 
   // Load Maps SDK if not already loaded, when user clicks verification map
   const openVerificationModal = (booking) => {
     setSelectedBooking(booking);
     setShowMap(true);
-    if (!window.google || !window.google.maps) {
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}`;
-      script.async = true;
-      script.defer = true;
-      script.onload = () => {};
-      document.head.appendChild(script);
+    if (window.google && window.google.maps) {
+      setGoogleMapsReady(true);
+    } else {
+      let script = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
+      if (!script) {
+        script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}`;
+        script.async = true;
+        script.defer = true;
+        document.head.appendChild(script);
+      }
+      script.addEventListener('load', () => {
+        setGoogleMapsReady(true);
+      });
     }
   };
 
@@ -822,7 +867,7 @@ const Bookings = () => {
                 {/* Schedule */}
                 <td style={{ padding: '1.25rem 1.25rem', whiteSpace: 'nowrap' }}>
                   <div style={{ fontWeight: 600, color: 'var(--primary-navy)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                    <Calendar size={13} color="var(--primary-blue)" /> {new Date(b.date).toLocaleDateString()}
+                    <Calendar size={13} color="var(--primary-blue)" /> {formatDateDMY(b.date)}
                   </div>
                   <div className="text-xs text-muted" style={{ marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                     <Clock size={12} /> {b.timeSlot}
@@ -1113,25 +1158,111 @@ const Bookings = () => {
         </div>
     </div>
 
+    {/* Lightbox Modal for Full Resolution Photo View */}
+    {previewPhoto && (
+      <div 
+        onClick={() => setPreviewPhoto(null)}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.92)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000,
+          padding: '1rem',
+          cursor: 'zoom-out'
+        }}
+      >
+        <div 
+          onClick={e => e.stopPropagation()} 
+          style={{ 
+            maxWidth: '96vw', 
+            maxHeight: '92vh', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center',
+            cursor: 'default'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '0.75rem', color: 'white' }}>
+            <span style={{ fontWeight: 700, fontSize: '1rem' }}>{previewPhoto.title || 'Service Photo'}</span>
+            <button 
+              onClick={() => setPreviewPhoto(null)}
+              style={{ 
+                background: 'rgba(255, 255, 255, 0.15)', 
+                border: 'none', 
+                color: 'white', 
+                borderRadius: '50%', 
+                width: '36px', 
+                height: '36px', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                cursor: 'pointer' 
+              }}
+            >
+              <X size={20} />
+            </button>
+          </div>
+          <img 
+            src={previewPhoto.url} 
+            alt={previewPhoto.title || 'Preview'} 
+            style={{ 
+              maxWidth: '100%', 
+              maxHeight: '78vh', 
+              objectFit: 'contain', 
+              borderRadius: '10px', 
+              boxShadow: '0 20px 50px rgba(0,0,0,0.6)',
+              border: '1px solid rgba(255,255,255,0.1)'
+            }} 
+          />
+          {previewPhoto.time && (
+            <span style={{ color: '#CBD5E1', fontSize: '0.8rem', marginTop: '0.5rem', background: 'rgba(0,0,0,0.4)', padding: '0.2rem 0.6rem', borderRadius: '4px' }}>
+              Uploaded: {previewPhoto.time}
+            </span>
+          )}
+        </div>
+      </div>
+    )}
+
     {/* Verify Service Accuracy Modal */}
       {showMap && selectedBooking && (
         <div style={{
           position: 'fixed',
           inset: 0,
-          background: 'rgba(13, 38, 80, 0.65)',
-          backdropFilter: 'blur(4px)',
+          background: 'rgba(13, 38, 80, 0.7)',
+          backdropFilter: 'blur(5px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1000,
-          padding: '1rem'
+          padding: '0.75rem',
+          overflowY: 'auto'
         }}>
-          <div className="card admin-modal-content" style={{ width: '100%', maxWidth: '750px', background: 'white', padding: '1.5rem', borderRadius: 'var(--radius-lg)', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div className="card admin-modal-content" style={{ width: '100%', maxWidth: '780px', background: 'white', padding: '1.25rem', borderRadius: 'var(--radius-lg)', maxHeight: '92vh', overflowY: 'auto', margin: 'auto' }}>
             
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid #F1F5F9', paddingBottom: '0.75rem' }}>
-              <h3 style={{ margin: 0, color: 'var(--primary-navy)' }}>
-                Verify Service Accuracy (Booking #{selectedBooking.id})
-              </h3>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', borderBottom: '1px solid #F1F5F9', paddingBottom: '0.75rem', gap: '0.5rem' }}>
+              <div>
+                <h3 style={{ margin: 0, color: 'var(--primary-navy)', fontSize: '1.15rem', fontWeight: 800 }}>
+                  Service Verification #{selectedBooking.id}
+                </h3>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem', alignItems: 'center', marginTop: '0.35rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  <span>📅 {formatDateDMY(selectedBooking.date)} ({selectedBooking.timeSlot})</span>
+                  <span>•</span>
+                  <span style={{ fontWeight: 600, color: 'var(--primary-navy)' }}>{selectedBooking.user?.name || selectedBooking.user?.phone || 'Customer'}</span>
+                  <span>•</span>
+                  <span style={{ color: 'var(--primary-blue)', fontWeight: 600 }}>{selectedBooking.car ? `${selectedBooking.car.make} ${selectedBooking.car.model}` : (selectedBooking.carMake || 'Car')}</span>
+                  {(selectedBooking.carNumber || selectedBooking.car?.carNumber) && (
+                    <span style={{ background: '#FEF08A', color: '#713F12', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: 700, fontSize: '0.72rem' }}>
+                      {selectedBooking.carNumber || selectedBooking.car?.carNumber}
+                    </span>
+                  )}
+                </div>
+              </div>
               <button 
                 onClick={() => { setShowMap(false); setSelectedBooking(null); }}
                 style={{
@@ -1144,6 +1275,7 @@ const Bookings = () => {
                   alignItems: 'center',
                   justifyContent: 'center',
                   cursor: 'pointer',
+                  flexShrink: 0,
                   color: 'var(--text-main)',
                   transition: 'background 0.2s, color 0.2s'
                 }}
@@ -1160,137 +1292,296 @@ const Bookings = () => {
               </button>
             </div>
 
-            {/* Photos Comparison */}
-            <div className="admin-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-              <div>
-                <h4 style={{ fontSize: '0.9rem', color: 'var(--primary-navy)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                  <Image size={16} /> Before Servicing
-                </h4>
+            {/* Photos Comparison - Responsive Grid */}
+            <div className="service-pics-grid" style={{ marginBottom: '1.25rem' }}>
+              {/* Before servicing */}
+              <div style={{ background: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '0.75rem', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--primary-navy)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <Image size={15} color="#0EA5E9" /> Before Servicing
+                  </h4>
+                  {selectedBooking.startAt && (
+                    <span style={{ fontSize: '0.72rem', background: '#E0F2FE', color: '#0369A1', padding: '0.15rem 0.45rem', borderRadius: '12px', fontWeight: 600 }}>
+                      {new Date(selectedBooking.startAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
+                </div>
+
                 {selectedBooking.startImage ? (
-                  <img 
-                    src={selectedBooking.startImage} 
-                    alt="Before service" 
-                    style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: 'var(--radius-md)', border: '1px solid #E2E8F0' }} 
-                  />
-                ) : (
-                  <div style={{ height: '200px', borderRadius: 'var(--radius-md)', background: '#F8FAFC', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', border: '1px dashed #CBD5E1' }}>
-                    No start picture uploaded yet.
+                  <div 
+                    onClick={() => setPreviewPhoto({ 
+                      url: selectedBooking.startImage, 
+                      title: 'Before Servicing Photo', 
+                      time: selectedBooking.startAt ? new Date(selectedBooking.startAt).toLocaleString() : '' 
+                    })}
+                    style={{
+                      position: 'relative',
+                      width: '100%',
+                      height: '220px',
+                      background: '#0F172A',
+                      borderRadius: '8px',
+                      overflow: 'hidden',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    title="Click to view full photo"
+                  >
+                    <img 
+                      src={selectedBooking.startImage} 
+                      alt="Before service" 
+                      style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
+                    />
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '8px',
+                      right: '8px',
+                      background: 'rgba(15, 23, 42, 0.75)',
+                      backdropFilter: 'blur(4px)',
+                      color: 'white',
+                      fontSize: '0.72rem',
+                      padding: '0.2rem 0.5rem',
+                      borderRadius: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                      fontWeight: 600
+                    }}>
+                      <Eye size={12} /> Tap to expand
+                    </div>
                   </div>
-                )}
-                {selectedBooking.startAt && (
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem', textAlign: 'center' }}>
-                    Uploaded: {new Date(selectedBooking.startAt).toLocaleTimeString()}
+                ) : (
+                  <div style={{ height: '220px', borderRadius: '8px', background: '#F1F5F9', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', border: '1.5px dashed #CBD5E1', padding: '1rem', textAlign: 'center', gap: '0.35rem' }}>
+                    <Image size={24} style={{ opacity: 0.4 }} />
+                    <span>No start picture uploaded yet</span>
                   </div>
                 )}
               </div>
 
-              <div>
-                <h4 style={{ fontSize: '0.9rem', color: 'var(--primary-navy)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                  <Image size={16} /> After Servicing
-                </h4>
+              {/* After servicing */}
+              <div style={{ background: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '0.75rem', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--primary-navy)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <Image size={15} color="#10B981" /> After Servicing
+                  </h4>
+                  {selectedBooking.endAt && (
+                    <span style={{ fontSize: '0.72rem', background: '#DCFCE7', color: '#166534', padding: '0.15rem 0.45rem', borderRadius: '12px', fontWeight: 600 }}>
+                      {new Date(selectedBooking.endAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
+                </div>
+
                 {selectedBooking.endImage ? (
-                  <img 
-                    src={selectedBooking.endImage} 
-                    alt="After service" 
-                    style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: 'var(--radius-md)', border: '1px solid #E2E8F0' }} 
-                  />
-                ) : (
-                  <div style={{ height: '200px', borderRadius: 'var(--radius-md)', background: '#F8FAFC', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', border: '1px dashed #CBD5E1' }}>
-                    No completion picture uploaded yet.
+                  <div 
+                    onClick={() => setPreviewPhoto({ 
+                      url: selectedBooking.endImage, 
+                      title: 'After Servicing Photo', 
+                      time: selectedBooking.endAt ? new Date(selectedBooking.endAt).toLocaleString() : '' 
+                    })}
+                    style={{
+                      position: 'relative',
+                      width: '100%',
+                      height: '220px',
+                      background: '#0F172A',
+                      borderRadius: '8px',
+                      overflow: 'hidden',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    title="Click to view full photo"
+                  >
+                    <img 
+                      src={selectedBooking.endImage} 
+                      alt="After service" 
+                      style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
+                    />
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '8px',
+                      right: '8px',
+                      background: 'rgba(15, 23, 42, 0.75)',
+                      backdropFilter: 'blur(4px)',
+                      color: 'white',
+                      fontSize: '0.72rem',
+                      padding: '0.2rem 0.5rem',
+                      borderRadius: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                      fontWeight: 600
+                    }}>
+                      <Eye size={12} /> Tap to expand
+                    </div>
                   </div>
-                )}
-                {selectedBooking.endAt && (
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem', textAlign: 'center' }}>
-                    Uploaded: {new Date(selectedBooking.endAt).toLocaleTimeString()}
+                ) : (
+                  <div style={{ height: '220px', borderRadius: '8px', background: '#F8FAFC', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', border: '1.5px dashed #CBD5E1', padding: '1rem', textAlign: 'center', gap: '0.35rem' }}>
+                    <Image size={24} style={{ opacity: 0.4 }} />
+                    <span>No completion picture uploaded yet</span>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* GPS Map Pinpoints */}
-            <h4 style={{ fontSize: '0.9rem', color: 'var(--primary-navy)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-              <Compass size={16} /> Location Accuracy Track (Google Map Pinpoints)
-            </h4>
-            <div 
-              ref={mapContainerRef} 
-              style={{
-                height: '240px',
-                borderRadius: 'var(--radius-md)',
-                background: '#F1F5F9',
-                border: '1px solid #CBD5E1',
-                marginBottom: '1rem'
-              }}
-            >
-              {!GOOGLE_MAPS_API_KEY && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', flexDirection: 'column', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                  <AlertCircle size={24} style={{ marginBottom: '0.25rem' }} />
-                  Google Maps SDK could not be loaded because VITE_GOOGLE_MAPS_API_KEY is missing.
+            {/* GPS Location & Map Pinpoints */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <h4 style={{ fontSize: '0.9rem', color: 'var(--primary-navy)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 700 }}>
+                  <Compass size={16} color="var(--primary-blue)" /> Location Accuracy & GPS Track
+                </h4>
+
+                {/* Quick Open in Google Maps Link */}
+                {selectedBooking.latitude && selectedBooking.longitude && (
+                  <a 
+                    href={`https://www.google.com/maps/search/?api=1&query=${selectedBooking.latitude},${selectedBooking.longitude}`}
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.3rem',
+                      fontSize: '0.76rem',
+                      fontWeight: 700,
+                      color: '#0284C7',
+                      background: '#E0F2FE',
+                      padding: '0.25rem 0.6rem',
+                      borderRadius: '6px',
+                      textDecoration: 'none'
+                    }}
+                  >
+                    <Navigation size={12} /> Open in Google Maps ↗
+                  </a>
+                )}
+              </div>
+
+              {/* Map container */}
+              <div 
+                ref={mapContainerRef} 
+                style={{
+                  height: '240px',
+                  width: '100%',
+                  borderRadius: 'var(--radius-md)',
+                  background: '#F1F5F9',
+                  border: '1px solid #CBD5E1',
+                  marginBottom: '0.6rem',
+                  position: 'relative',
+                  overflow: 'hidden'
+                }}
+              >
+                {!GOOGLE_MAPS_API_KEY && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', flexDirection: 'column', color: 'var(--text-muted)', fontSize: '0.85rem', padding: '1rem', textAlign: 'center' }}>
+                    <AlertCircle size={24} style={{ marginBottom: '0.25rem', color: '#F59E0B' }} />
+                    Google Maps SDK key is not configured.
+                  </div>
+                )}
+                {GOOGLE_MAPS_API_KEY && !googleMapsReady && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                    Loading map pinpoints...
+                  </div>
+                )}
+              </div>
+
+              {/* Map Markers Legend */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.8rem', background: '#F8FAFC', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid #E2E8F0', fontSize: '0.74rem', color: 'var(--text-main)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#22C55E', display: 'inline-block' }} />
+                  <strong>Green:</strong> Customer Destination
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#F97316', display: 'inline-block' }} />
+                  <strong>Orange:</strong> Tech Started Job
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#A855F7', display: 'inline-block' }} />
+                  <strong>Purple:</strong> Tech Completed Job
+                </div>
+              </div>
+            </div>
+
+            {/* Booked Address & Service Details */}
+            <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                <div>
+                  <span style={{ fontWeight: 800, color: 'var(--primary-navy)', fontSize: '0.92rem' }}>
+                    {selectedBooking.washType?.name} ({selectedBooking.carType?.name})
+                  </span>
+                  {selectedBooking.serviceArea?.name && (
+                    <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', background: '#DBEAFE', color: '#1E40AF', padding: '0.15rem 0.45rem', borderRadius: '4px', fontWeight: 600 }}>
+                      {selectedBooking.serviceArea.name}
+                    </span>
+                  )}
+                </div>
+                <span style={{ fontWeight: 800, color: 'var(--primary-blue)', fontSize: '1.05rem' }}>
+                  ₹{selectedBooking.price}
+                </span>
+              </div>
+
+              {/* Address display */}
+              {selectedBooking.address && (
+                <div style={{ fontSize: '0.82rem', color: '#1E3A8A', display: 'flex', alignItems: 'flex-start', gap: '0.35rem', marginTop: '0.3rem', lineHeight: 1.4 }}>
+                  <MapPin size={14} style={{ flexShrink: 0, marginTop: '2px', color: '#2563EB' }} />
+                  <span><strong>Service Address:</strong> {selectedBooking.address}</span>
                 </div>
               )}
-            </div>
 
-            {/* Ordered Services & Add-ons info */}
-            <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', padding: '1rem', borderRadius: 'var(--radius-md)', marginBottom: '1.25rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                <span style={{ fontWeight: 700, color: 'var(--primary-navy)' }}>
-                  {selectedBooking.washType?.name} ({selectedBooking.carType?.name})
-                </span>
-                <span style={{ fontWeight: 800, color: 'var(--primary-blue)', fontSize: '1rem' }}>
-                  Total Paid: ₹{selectedBooking.price}
-                </span>
-              </div>
-              {selectedBooking.addons && selectedBooking.addons.length > 0 ? (
-                <div style={{ marginTop: '0.5rem', borderTop: '1px dashed #93C5FD', paddingTop: '0.5rem' }}>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1E40AF', marginBottom: '0.25rem' }}>
-                    ✨ Attached Add-ons to Perform:
+              {selectedBooking.addons && selectedBooking.addons.length > 0 && (
+                <div style={{ marginTop: '0.5rem', borderTop: '1px dashed #93C5FD', paddingTop: '0.4rem' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1D4ED8', marginBottom: '0.25rem' }}>
+                    ✨ Add-ons:
                   </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
                     {selectedBooking.addons.map((ba, i) => (
-                      <span key={i} style={{ background: 'white', padding: '0.25rem 0.6rem', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 600, color: '#1D4ED8', border: '1px solid #DBEAFE' }}>
+                      <span key={i} style={{ background: 'white', padding: '0.2rem 0.5rem', borderRadius: '12px', fontSize: '0.74rem', fontWeight: 600, color: '#1D4ED8', border: '1px solid #DBEAFE' }}>
                         + {ba.addon?.name || 'Add-on'} (₹{ba.price})
                       </span>
                     ))}
                   </div>
                 </div>
-              ) : (
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No additional add-ons attached.</div>
               )}
             </div>
 
             {/* Accuracy Calculations */}
-            <div style={{ background: '#F8FAFC', padding: '1rem', borderRadius: 'var(--radius-md)', borderLeft: '4px solid var(--primary-blue)', fontSize: '0.85rem', color: 'var(--text-main)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span><strong>User Target Location Coords:</strong></span>
-                <span>{selectedBooking.latitude.toFixed(5)}, {selectedBooking.longitude.toFixed(5)}</span>
+            <div style={{ background: '#F8FAFC', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', borderLeft: '4px solid var(--primary-blue)', fontSize: '0.82rem', color: 'var(--text-main)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.6rem', marginBottom: '0.75rem' }}>
+                <div>
+                  <span style={{ color: '#64748B', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 700 }}>Customer Target GPS</span>
+                  <span style={{ fontWeight: 600, color: 'var(--primary-navy)', fontFamily: 'monospace' }}>
+                    {selectedBooking.latitude != null ? Number(selectedBooking.latitude).toFixed(5) : 'N/A'}, {selectedBooking.longitude != null ? Number(selectedBooking.longitude).toFixed(5) : 'N/A'}
+                  </span>
+                </div>
+                <div>
+                  <span style={{ color: '#64748B', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 700 }}>Tech Start GPS</span>
+                  <span style={{ fontWeight: 600, color: 'var(--primary-navy)', fontFamily: 'monospace' }}>
+                    {selectedBooking.startLatitude != null && selectedBooking.startLongitude != null
+                      ? `${Number(selectedBooking.startLatitude).toFixed(5)}, ${Number(selectedBooking.startLongitude).toFixed(5)}`
+                      : 'Not recorded'}
+                  </span>
+                </div>
+                <div>
+                  <span style={{ color: '#64748B', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 700 }}>Tech Complete GPS</span>
+                  <span style={{ fontWeight: 600, color: 'var(--primary-navy)', fontFamily: 'monospace' }}>
+                    {selectedBooking.endLatitude != null && selectedBooking.endLongitude != null
+                      ? `${Number(selectedBooking.endLatitude).toFixed(5)}, ${Number(selectedBooking.endLongitude).toFixed(5)}`
+                      : 'Not recorded'}
+                  </span>
+                </div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span><strong>Employee Start Location Coords:</strong></span>
-                <span>
-                  {selectedBooking.startLatitude && selectedBooking.startLongitude
-                    ? `${selectedBooking.startLatitude.toFixed(5)}, ${selectedBooking.startLongitude.toFixed(5)}`
-                    : 'N/A'}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                <span><strong>Employee Complete Location Coords:</strong></span>
-                <span>
-                  {selectedBooking.endLatitude && selectedBooking.endLongitude
-                    ? `${selectedBooking.endLatitude.toFixed(5)}, ${selectedBooking.endLongitude.toFixed(5)}`
-                    : 'N/A'}
-                </span>
-              </div>
-              
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #CBD5E1', paddingTop: '0.75rem', fontWeight: 600, color: 'var(--primary-navy)' }}>
-                <span>Start Picture Deviation (Accuracy):</span>
-                <span>
-                  {getDistanceStr(selectedBooking.latitude, selectedBooking.longitude, selectedBooking.startLatitude, selectedBooking.startLongitude)}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.25rem', fontWeight: 600, color: 'var(--primary-navy)' }}>
-                <span>Complete Picture Deviation (Accuracy):</span>
-                <span>
-                  {getDistanceStr(selectedBooking.latitude, selectedBooking.longitude, selectedBooking.endLatitude, selectedBooking.endLongitude)}
-                </span>
+
+              <div style={{ borderTop: '1px dashed #CBD5E1', paddingTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.25rem' }}>
+                  <span style={{ fontWeight: 600, color: 'var(--primary-navy)' }}>Start Picture Deviation (Accuracy):</span>
+                  <span style={{ fontWeight: 700, color: '#0369A1', background: '#E0F2FE', padding: '0.15rem 0.5rem', borderRadius: '6px' }}>
+                    {getDistanceStr(selectedBooking.latitude, selectedBooking.longitude, selectedBooking.startLatitude, selectedBooking.startLongitude)}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.25rem' }}>
+                  <span style={{ fontWeight: 600, color: 'var(--primary-navy)' }}>Complete Picture Deviation (Accuracy):</span>
+                  <span style={{ fontWeight: 700, color: '#7E22CE', background: '#F3E8FF', padding: '0.15rem 0.5rem', borderRadius: '6px' }}>
+                    {getDistanceStr(selectedBooking.latitude, selectedBooking.longitude, selectedBooking.endLatitude, selectedBooking.endLongitude)}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -1333,7 +1624,7 @@ const Bookings = () => {
             </div>
 
             <p style={{ color: '#475569', fontSize: '0.9rem', lineHeight: 1.5, margin: '0 0 1rem' }}>
-              Are you sure you want to cancel this booking for <strong>{adminCancelModal.user?.name || adminCancelModal.user?.phone}</strong> on <strong>{new Date(adminCancelModal.date).toLocaleDateString()} ({adminCancelModal.timeSlot})</strong>?
+              Are you sure you want to cancel this booking for <strong>{adminCancelModal.user?.name || adminCancelModal.user?.phone}</strong> on <strong>{formatDateDMY(adminCancelModal.date)} ({adminCancelModal.timeSlot})</strong>?
             </p>
 
             {adminCancelModal.price > 0 && (
@@ -1403,9 +1694,20 @@ const Bookings = () => {
         </div>
       )}
 
-      {/* Custom hover CSS */}
+      {/* Custom Responsive & Hover CSS */}
       <style>{`
         tr.hover\\:bg-gray-50:hover { background-color: #F8FAFC; }
+        .service-pics-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 1rem;
+        }
+        @media (max-width: 680px) {
+          .service-pics-grid {
+            grid-template-columns: 1fr;
+            gap: 1.25rem;
+          }
+        }
       `}</style>
     </div>
   );

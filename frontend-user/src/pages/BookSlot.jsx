@@ -22,12 +22,100 @@ import {
   getProfile,
   getAddons,
   getAvailableSlots,
-  getMySubscriptions
+  getMySubscriptions,
+  resolveMapsUrl
 } from '../api';
 import SearchableDropdown from '../components/SearchableDropdown';
 import { INDIAN_CAR_BRANDS } from '../data/indianCars';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+
+const isValidCoord = (lat, lng) => {
+  return typeof lat === 'number' && typeof lng === 'number' &&
+    !isNaN(lat) && !isNaN(lng) &&
+    lat >= -90 && lat <= 90 &&
+    lng >= -180 && lng <= 180;
+};
+
+// Robust helper to extract coordinates from direct lat/lng, DMS, or Google Maps URLs
+const extractCoordinatesFromInput = (raw) => {
+  if (!raw || typeof raw !== 'string') return null;
+  const text = raw.trim();
+
+  // 1. Check for standard @lat,lng in Google Maps URLs
+  const atMatch = text.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (atMatch) {
+    const lat = parseFloat(atMatch[1]);
+    const lng = parseFloat(atMatch[2]);
+    if (isValidCoord(lat, lng)) return { lat, lng, source: 'maps_url_at' };
+  }
+
+  // 2. Check for !3dlat!4dlng in Google Maps URLs
+  const dMatch = text.match(/!3d(-?\d+\.\d+).*?!4d(-?\d+\.\d+)/);
+  if (dMatch) {
+    const lat = parseFloat(dMatch[1]);
+    const lng = parseFloat(dMatch[2]);
+    if (isValidCoord(lat, lng)) return { lat, lng, source: 'maps_url_proto' };
+  }
+
+  // 3. Check for query parameters (?q=lat,lng or ?query=lat,lng or &ll=lat,lng or destination=lat,lng)
+  const qParamMatch = text.match(/[?&](?:q|query|ll|destination|daddr|origin|center)=loc:?(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/i) ||
+                      text.match(/[?&](?:q|query|ll|destination|daddr|origin|center)=(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/i);
+  if (qParamMatch) {
+    const lat = parseFloat(qParamMatch[1]);
+    const lng = parseFloat(qParamMatch[2]);
+    if (isValidCoord(lat, lng)) return { lat, lng, source: 'maps_url_query' };
+  }
+
+  // 4. Check for /search/lat,lng or /place/lat,lng in Google Maps URLs
+  const pathCoordMatch = text.match(/\/(?:search|place)\/(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/i);
+  if (pathCoordMatch) {
+    const lat = parseFloat(pathCoordMatch[1]);
+    const lng = parseFloat(pathCoordMatch[2]);
+    if (isValidCoord(lat, lng)) return { lat, lng, source: 'maps_url_path' };
+  }
+
+  // 5. DMS (Degrees, Minutes, Seconds) format: e.g. 17°44'19.0"N 83°19'05.5"E
+  const dmsRegex = /([0-9]{1,3})[°\s]+([0-9]{1,2})['′\s]+([0-9]{1,2}(?:\.[0-9]+)?)[″"]?\s*([NSEWnsew])[,\s]+([0-9]{1,3})[°\s]+([0-9]{1,2})['′\s]+([0-9]{1,2}(?:\.[0-9]+)?)[″"]?\s*([NSEWnsew])/i;
+  const dmsMatch = text.match(dmsRegex);
+  if (dmsMatch) {
+    const latDeg = parseFloat(dmsMatch[1]);
+    const latMin = parseFloat(dmsMatch[2]);
+    const latSec = parseFloat(dmsMatch[3]);
+    const latDir = dmsMatch[4].toUpperCase();
+
+    const lngDeg = parseFloat(dmsMatch[5]);
+    const lngMin = parseFloat(dmsMatch[6]);
+    const lngSec = parseFloat(dmsMatch[7]);
+    const lngDir = dmsMatch[8].toUpperCase();
+
+    let lat = latDeg + (latMin / 60) + (latSec / 3600);
+    if (latDir === 'S') lat = -lat;
+
+    let lng = lngDeg + (lngMin / 60) + (lngSec / 3600);
+    if (lngDir === 'W') lng = -lng;
+
+    if (isValidCoord(lat, lng)) return { lat: Math.round(lat * 1e6) / 1e6, lng: Math.round(lng * 1e6) / 1e6, source: 'dms' };
+  }
+
+  // 6. Direct numeric coordinates: e.g. '17.7386, 83.3182' or '17.7386 83.3182' or '17.7386N, 83.3182E'
+  const directCoordMatch = text.match(/(?:(?:lat|latitude)\s*[:=]\s*)?(-?\d{1,2}\.\d+)\s*([NSEWnsew])?\s*(?:[°\s,]+)\s*(?:(?:lng|lon|longitude)\s*[:=]\s*)?(-?\d{1,3}\.\d+)\s*([NSEWnsew])?/i);
+  if (directCoordMatch) {
+    let lat = parseFloat(directCoordMatch[1]);
+    const latDir = (directCoordMatch[2] || '').toUpperCase();
+    if (latDir === 'S') lat = -lat;
+
+    let lng = parseFloat(directCoordMatch[3]);
+    const lngDir = (directCoordMatch[4] || '').toUpperCase();
+    if (lngDir === 'W') lng = -lng;
+
+    if (isValidCoord(lat, lng)) {
+      return { lat, lng, source: 'direct_numeric' };
+    }
+  }
+
+  return null;
+};
 
 const renderAddonIcon = (iconName, isChecked = false, size = 18) => {
   const color = isChecked ? '#047857' : 'var(--primary-blue)';
@@ -113,6 +201,7 @@ const BookSlot = () => {
   const navigate = useNavigate();
   const mapRef = useRef(null);
   const autocompleteInputRef = useRef(null);
+  const autocompleteRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markerInstanceRef = useRef(null);
   const activeZoneCircleRef = useRef(null);
@@ -122,6 +211,7 @@ const BookSlot = () => {
   const [showCustomCalendar, setShowCustomCalendar] = useState(false);
   const [viewMonth, setViewMonth] = useState(() => new Date());
   const [locating, setLocating] = useState(false);
+  const [searchingLocation, setSearchingLocation] = useState(false);
   const [matchedZoneInfo, setMatchedZoneInfo] = useState(null);
 
   // Close custom calendar dropdown when clicking outside
@@ -783,39 +873,81 @@ const BookSlot = () => {
     );
   };
 
-  // Geocode an address/place search query and update pin, map & zone
-  const handleSearchLocation = (overrideQuery) => {
+  // Centralized coordinate application: pans map, updates pin, reverse-geocodes & auto-matches service area
+  const applyCoordinates = (newLat, newLng, customAddressLabel) => {
+    setLatitude(newLat);
+    setLongitude(newLng);
+
+    if (mapInstanceRef.current && window.google?.maps) {
+      const latLng = new window.google.maps.LatLng(newLat, newLng);
+      mapInstanceRef.current.panTo(latLng);
+      mapInstanceRef.current.setZoom(16);
+      if (markerInstanceRef.current) {
+        markerInstanceRef.current.setPosition(latLng);
+      }
+    }
+
+    autoMatchServiceArea(newLat, newLng);
+
+    if (customAddressLabel) {
+      setAddress(customAddressLabel);
+      if (autocompleteInputRef.current) {
+        autocompleteInputRef.current.value = customAddressLabel;
+      }
+    } else {
+      reverseGeocode(newLat, newLng);
+    }
+  };
+
+  // Geocode an address/place search query, accept Google Maps links and coordinates, and update pin, map & zone
+  const handleSearchLocation = async (overrideQuery) => {
     const rawQuery = typeof overrideQuery === 'string' ? overrideQuery : (autocompleteInputRef.current ? autocompleteInputRef.current.value : '');
     const query = (rawQuery || '').trim();
-    if (!query || !window.google?.maps?.Geocoder) return;
+    if (!query) return;
 
+    // 1. Direct coordinate extraction (decimal coordinates, DMS, or standard Google Maps URL)
+    const localCoords = extractCoordinatesFromInput(query);
+    if (localCoords) {
+      applyCoordinates(localCoords.lat, localCoords.lng);
+      return;
+    }
+
+    // 2. Short link or external share link resolution (maps.app.goo.gl, goo.gl/maps, etc.)
+    if (query.startsWith('http://') || query.startsWith('https://') || query.includes('goo.gl') || query.includes('maps.app') || query.includes('google.com/maps')) {
+      setSearchingLocation(true);
+      try {
+        const resolved = await resolveMapsUrl(query);
+        if (resolved && resolved.lat && resolved.lng) {
+          applyCoordinates(resolved.lat, resolved.lng);
+          setSearchingLocation(false);
+          return;
+        }
+      } catch (err) {
+        console.warn('Backend URL resolution failed:', err);
+      } finally {
+        setSearchingLocation(false);
+      }
+    }
+
+    // 3. Fallback: Geocode text address / landmark / place with Google Maps Geocoder
+    if (!window.google?.maps?.Geocoder) return;
+    setSearchingLocation(true);
     try {
       const geocoder = new window.google.maps.Geocoder();
       geocoder.geocode({ address: query, componentRestrictions: { country: 'in' } }, (results, status) => {
+        setSearchingLocation(false);
         if (status === 'OK' && results && results[0]) {
           const loc = results[0].geometry.location;
           const sLat = loc.lat();
           const sLng = loc.lng();
-          setLatitude(sLat);
-          setLongitude(sLng);
-          if (mapInstanceRef.current) {
-            mapInstanceRef.current.panTo(loc);
-            mapInstanceRef.current.setZoom(16);
-          }
-          if (markerInstanceRef.current) {
-            markerInstanceRef.current.setPosition(loc);
-          }
-          autoMatchServiceArea(sLat, sLng);
           const fullAddr = results[0].formatted_address || query;
-          setAddress(fullAddr);
-          if (autocompleteInputRef.current) {
-            autocompleteInputRef.current.value = fullAddr;
-          }
+          applyCoordinates(sLat, sLng, fullAddr);
         } else {
-          alert('Could not locate that address on map. Please check spelling or select from the search suggestions.');
+          alert('Could not locate that address, link, or coordinates. Please check the spelling or format.');
         }
       });
     } catch (err) {
+      setSearchingLocation(false);
       console.warn('Geocoding search error:', err);
     }
   };
@@ -908,6 +1040,7 @@ const BookSlot = () => {
       zoomControl: true,
       streetViewControl: false,
       mapTypeControl: false,
+      gestureHandling: 'greedy', // Enables single-finger touch dragging/panning on mobile!
     });
     const newMarker = new window.google.maps.Marker({
       position: pos,
@@ -954,22 +1087,18 @@ const BookSlot = () => {
         autocompleteRef.current = autocomplete;
         autocomplete.addListener('place_changed', () => {
           const place = autocomplete.getPlace();
-          if (!place.geometry || !place.geometry.location) return;
+          if (!place.geometry || !place.geometry.location) {
+            // User might have typed/pasted a maps URL or coordinates directly
+            const rawVal = autocompleteInputRef.current?.value || '';
+            if (rawVal) {
+              handleSearchLocation(rawVal);
+            }
+            return;
+          }
           const placeLoc = place.geometry.location;
           const pLat = placeLoc.lat();
           const pLng = placeLoc.lng();
-          setLatitude(pLat);
-          setLongitude(pLng);
-          newMap.panTo(placeLoc);
-          newMap.setZoom(16);
-          newMarker.setPosition(placeLoc);
-          autoMatchServiceArea(pLat, pLng);
-          const placeAddr = place.formatted_address || place.name || '';
-          if (placeAddr) {
-            setAddress(placeAddr);
-          } else {
-            reverseGeocode(pLat, pLng);
-          }
+          applyCoordinates(pLat, pLng, place.formatted_address || place.name || '');
         });
       } catch (e) {
         console.warn('Autocomplete init error:', e);
@@ -3024,28 +3153,45 @@ const BookSlot = () => {
                   <label className="form-label" style={{ fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#1E293B', fontSize: '0.88rem' }}>
                     <Compass size={16} color="var(--primary-blue)" /> Pinpoint Exact Technician Spot
                   </label>
-                  <span style={{ fontSize: '0.73rem', color: '#0369A1', background: '#F0F9FF', border: '1px solid #BAE6FD', padding: '0.2rem 0.55rem', borderRadius: '6px', fontWeight: 600 }}>
-                    Tap map or drag pin to auto-fill address
-                  </span>
+                  <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.72rem', color: '#047857', background: '#ECFDF5', border: '1px solid #A7F3D0', padding: '0.2rem 0.5rem', borderRadius: '6px', fontWeight: 700 }}>
+                      👆 1-Finger Move
+                    </span>
+                    <span style={{ fontSize: '0.72rem', color: '#0369A1', background: '#F0F9FF', border: '1px solid #BAE6FD', padding: '0.2rem 0.5rem', borderRadius: '6px', fontWeight: 600 }}>
+                      Tap map or drag pin
+                    </span>
+                  </div>
                 </div>
 
                 {/* Map Search Bar & Use Current Location Button */}
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <div style={{ position: 'relative', flex: '1 1 240px', minWidth: '220px', display: 'flex' }}>
+                  <div style={{ position: 'relative', flex: '1 1 260px', minWidth: '220px', display: 'flex' }}>
                     <Search size={15} color="#94A3B8" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
                     <input
                       ref={autocompleteInputRef}
                       type="text"
-                      placeholder="Search apartment, street or landmark..."
+                      placeholder="Search address, paste Google Maps link or lat, lng..."
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                           e.preventDefault();
                           handleSearchLocation();
                         }
                       }}
+                      onPaste={(e) => {
+                        const pasted = e.clipboardData?.getData('text') || '';
+                        if (pasted) {
+                          const isUrl = pasted.includes('http') || pasted.includes('goo.gl') || pasted.includes('maps');
+                          const isCoords = extractCoordinatesFromInput(pasted);
+                          if (isUrl || isCoords) {
+                            setTimeout(() => {
+                              handleSearchLocation(pasted);
+                            }, 50);
+                          }
+                        }
+                      }}
                       style={{
                         width: '100%',
-                        padding: '0.55rem 3.4rem 0.55rem 2rem',
+                        padding: '0.55rem 4.6rem 0.55rem 2rem',
                         borderRadius: '8px',
                         border: '1.5px solid #CBD5E1',
                         fontSize: '0.82rem',
@@ -3060,6 +3206,7 @@ const BookSlot = () => {
                     <button
                       type="button"
                       onClick={() => handleSearchLocation()}
+                      disabled={searchingLocation}
                       style={{
                         position: 'absolute',
                         right: '4px',
@@ -3068,20 +3215,30 @@ const BookSlot = () => {
                         background: 'var(--primary-blue)',
                         border: 'none',
                         color: 'white',
-                        padding: '0.3rem 0.6rem',
+                        padding: '0.3rem 0.65rem',
                         borderRadius: '6px',
                         fontSize: '0.72rem',
                         fontWeight: 700,
-                        cursor: 'pointer',
+                        cursor: searchingLocation ? 'not-allowed' : 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '0.25rem',
-                        boxShadow: '0 1px 3px rgba(2, 132, 199, 0.25)'
+                        boxShadow: '0 1px 3px rgba(2, 132, 199, 0.25)',
+                        opacity: searchingLocation ? 0.75 : 1
                       }}
-                      title="Search place & pin location"
+                      title="Search place, Google Maps link, or coordinates"
                     >
-                      <Search size={11} strokeWidth={2.5} />
-                      <span>Find</span>
+                      {searchingLocation ? (
+                        <>
+                          <RefreshCw size={11} className="animate-spin" />
+                          <span>Locating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Search size={11} strokeWidth={2.5} />
+                          <span>Find</span>
+                        </>
+                      )}
                     </button>
                   </div>
 
@@ -3118,7 +3275,7 @@ const BookSlot = () => {
                     ref={mapRef}
                     style={{
                       width: '100%',
-                      height: '220px',
+                      height: '230px',
                       borderRadius: '12px',
                       border: '1.5px solid #CBD5E1',
                       background: '#F1F5F9',
@@ -3129,7 +3286,7 @@ const BookSlot = () => {
                     position: 'absolute',
                     bottom: '8px',
                     left: '8px',
-                    background: 'rgba(255, 255, 255, 0.92)',
+                    background: 'rgba(255, 255, 255, 0.94)',
                     backdropFilter: 'blur(4px)',
                     padding: '0.25rem 0.6rem',
                     borderRadius: '6px',
@@ -3144,10 +3301,29 @@ const BookSlot = () => {
                   }}>
                     <span>📍 Lat: {Number(latitude).toFixed(4)}, Lng: {Number(longitude).toFixed(4)}</span>
                   </div>
+                  <div style={{
+                    position: 'absolute',
+                    top: '8px',
+                    right: '8px',
+                    background: 'rgba(255, 255, 255, 0.94)',
+                    backdropFilter: 'blur(4px)',
+                    padding: '0.2rem 0.55rem',
+                    borderRadius: '6px',
+                    fontSize: '0.7rem',
+                    color: '#047857',
+                    border: '1px solid #A7F3D0',
+                    fontWeight: 700,
+                    pointerEvents: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.25rem'
+                  }}>
+                    <span>👆 1-Finger Touch</span>
+                  </div>
                 </div>
 
-                <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748B', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <span>💡</span> Tap anywhere on the map or drag the pin. The service zone and address will automatically sync based on your location and configured radius!
+                <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748B', display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                  <span>💡</span> <strong>1-Finger Touch:</strong> Move or scroll map with a single finger. In search box, you can paste full/short Google Maps links (e.g. <code>maps.app.goo.gl/...</code>) or coordinates (e.g. <code>17.7386, 83.3182</code>).
                 </p>
               </div>
 

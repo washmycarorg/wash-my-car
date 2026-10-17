@@ -1966,4 +1966,77 @@ export const verifySubscriptionPayment = async (req, res) => {
   }
 };
 
+// Resolve short/redirected Google Maps URL to coordinates
+export const resolveMapsUrl = async (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url) {
+      return res.status(400).json({ error: 'URL is required' });
+    }
+
+    const cleanedUrl = url.trim();
+
+    // Fetch the URL to follow redirects
+    const response = await fetch(cleanedUrl, {
+      method: 'GET',
+      redirect: 'follow',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+
+    const finalUrl = response.url || cleanedUrl;
+    let lat = null;
+    let lng = null;
+
+    // 1. Check for @lat,lng in redirected URL
+    const atMatch = finalUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (atMatch) {
+      lat = parseFloat(atMatch[1]);
+      lng = parseFloat(atMatch[2]);
+    }
+
+    // 2. Check for !3dlat!4dlng in redirected URL
+    if (!lat) {
+      const dMatch = finalUrl.match(/!3d(-?\d+\.\d+).*?!4d(-?\d+\.\d+)/);
+      if (dMatch) {
+        lat = parseFloat(dMatch[1]);
+        lng = parseFloat(dMatch[2]);
+      }
+    }
+
+    // 3. Check for query parameters (?q=lat,lng, etc.)
+    if (!lat) {
+      const qMatch = finalUrl.match(/[?&](?:q|query|ll|destination|daddr|origin|center)=loc:?(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/i) ||
+                     finalUrl.match(/[?&](?:q|query|ll|destination|daddr|origin|center)=(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/i);
+      if (qMatch) {
+        lat = parseFloat(qMatch[1]);
+        lng = parseFloat(qMatch[2]);
+      }
+    }
+
+    // 4. Check HTML content in case of client-side Google Maps initialization state
+    if (!lat) {
+      const html = await response.text().catch(() => '');
+      const htmlMatch = html.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) ||
+                        html.match(/window\.APP_INITIALIZATION_STATE=.*?\[null,null,(-?\d+\.\d+),(-?\d+\.\d+)\]/) ||
+                        html.match(/itemprop="latitude" content="(-?\d+\.\d+)".*?itemprop="longitude" content="(-?\d+\.\d+)"/s);
+      if (htmlMatch) {
+        lat = parseFloat(htmlMatch[1]);
+        lng = parseFloat(htmlMatch[2]);
+      }
+    }
+
+    if (lat !== null && lng !== null && !isNaN(lat) && !isNaN(lng)) {
+      return res.json({ lat, lng, finalUrl });
+    }
+
+    return res.status(404).json({ error: 'Could not extract coordinates from link', finalUrl });
+  } catch (err) {
+    console.error('Error resolving maps URL:', err);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+
 

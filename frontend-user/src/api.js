@@ -367,3 +367,22 @@ export const verifySubscriptionPayment = async (data) => {
   return res.json();
 };
 
+export const resolveMapsUrl = async (url) => {
+  const res = await fetch(`${API_URL}/users/resolve-maps-url`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url })
+  });
+  if (!res.ok) {
+    const errorText = await res.text();
+    try {
+      const parsed = JSON.parse(errorText);
+      throw new Error(parsed.error || parsed.message || errorText);
+    } catch (e) {
+      throw new Error(errorText || 'Failed to resolve map URL');
+    }
+  }
+  return res.json();
+};
+
+
