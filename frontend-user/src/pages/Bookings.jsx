@@ -64,8 +64,8 @@ const canCancelBooking = (bookingDate, timeSlot) => {
     const diffMs = slotStart.getTime() - now.getTime();
     const diffHours = diffMs / (1000 * 60 * 60);
 
-    // Permitted strictly at least 7 hours before slot start time
-    return diffHours >= 7;
+    // Permitted strictly at least 9 hours before slot start time
+    return diffHours >= 9;
   } catch (err) {
     return true;
   }
@@ -94,6 +94,15 @@ const Bookings = () => {
 
   const handleCancelBooking = async () => {
     if (!cancellingBooking) return;
+
+    // Check time limit again to guard against cached/stale data
+    if (!canCancelBooking(cancellingBooking.date, cancellingBooking.timeSlot)) {
+      alert('⚠️ Cancellation Window Closed\n\nPer our cancellation policy, cancellations with 100% full refund are only permitted up to 9 hours before your scheduled slot arrival time.\n\nIf not cancelled before 9 hours or if any doorstep rejection is found, no refund will be initiated.');
+      setCancellingBooking(null);
+      await fetchBookingsList();
+      return;
+    }
+
     setCancelLoading(true);
     try {
       const res = await cancelBooking(cancellingBooking.id, cancelReason || 'Cancelled by customer');
@@ -102,7 +111,9 @@ const Bookings = () => {
       setCancelReason('');
       await fetchBookingsList();
     } catch (err) {
-      alert('Failed to cancel booking: ' + (err.message || 'Unknown error'));
+      alert('⚠️ Cancellation Policy Notice: ' + (err.message || 'Cancellations are only permitted up to 9 hours before your scheduled slot arrival time. If not cancelled before 9 hours or if any doorstep rejection occurs, no refund will be initiated.'));
+      setCancellingBooking(null);
+      await fetchBookingsList();
     } finally {
       setCancelLoading(false);
     }
@@ -419,8 +430,14 @@ const Bookings = () => {
                 {canCancelBooking(booking.date, booking.timeSlot) ? (
                   <button
                     type="button"
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.stopPropagation();
+                      // Real-time check to prevent opening modal if client data was cached and 9-hour limit has now passed
+                      if (!canCancelBooking(booking.date, booking.timeSlot)) {
+                        alert('⚠️ Cancellation Policy Notice\n\nCancellations with 100% full refund are only permitted up to 9 hours before your scheduled slot arrival time.\n\nIf not cancelled before 9 hours or if any doorstep rejection is found, no refund will be initiated per company policy.');
+                        await fetchBookingsList();
+                        return;
+                      }
                       setCancellingBooking(booking);
                       setCancelReason('');
                     }}
@@ -455,7 +472,7 @@ const Bookings = () => {
                     fontWeight: 600
                   }}>
                     <Clock size={13} color="#94A3B8" />
-                    Cancellation closed (Allowed up to 7 hrs before slot arrival)
+                    Cancellation closed (Allowed up to 9 hrs before slot arrival)
                   </div>
                 )}
               </div>
@@ -610,6 +627,22 @@ const Bookings = () => {
             <p style={{ color: '#475569', fontSize: '0.9rem', lineHeight: 1.5, margin: '0 0 1rem' }}>
               Are you sure you want to cancel your scheduled wash on <strong>{new Date(cancellingBooking.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} ({cancellingBooking.timeSlot})</strong>?
             </p>
+
+            <div style={{
+              background: '#F0FDF4',
+              border: '1px solid #BBF7D0',
+              borderRadius: '10px',
+              padding: '0.65rem 0.85rem',
+              marginBottom: '1rem',
+              fontSize: '0.82rem',
+              color: '#166534',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <CheckCircle size={16} color="#16A34A" style={{ flexShrink: 0 }} />
+              <span><strong>9-Hour Full Refund Window Active:</strong> You are cancelling at least 9 hours before your slot time. A 100% full refund will be allocated. (Note: If not cancelled before 9 hours or if any doorstep rejection is found, no refund will be initiated).</span>
+            </div>
 
             {cancellingBooking.price > 0 && (
               <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '12px', padding: '0.85rem 1rem', marginBottom: '1rem', color: '#065F46', fontSize: '0.85rem', lineHeight: 1.5 }}>

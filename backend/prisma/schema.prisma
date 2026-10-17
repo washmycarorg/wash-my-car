@@ -28,6 +28,7 @@ model Employee {
   phone         String        @unique
   email         String        @unique
   name          String
+  password      String?       // Hashed with bcrypt
   status        String        @default("PENDING") // PENDING, ACTIVE, SUSPENDED
   onDuty        Boolean       @default(false)
   salary        Float         @default(0) // Monthly salary or hourly wage
@@ -208,6 +209,11 @@ model Booking {
   refundAmount         Float?
   refundStatus         String?   // PROCESSED, FAILED, NONE
 
+  // Employee reported issue on slot (customer not available, not lifting call, wrong location)
+  reportedIssue        String?   // CUSTOMER_NOT_AVAILABLE, NOT_LIFTING_CALL, WRONG_LOCATION, OTHER
+  reportedIssueNote    String?
+  reportedIssueAt      DateTime?
+
   createdAt   DateTime  @default(now())
 }
 
@@ -314,7 +320,7 @@ model SystemSettings {
   referralStreakConfig String @default("[{\"count\":1,\"points\":50},{\"count\":2,\"points\":75},{\"count\":3,\"points\":100}]")
 
   // Wash Booking Terms / Water & Power Agreement Text
-  bookingTermsText    String? @default("I agree to provide domestic water & standard electrical plug access if required for the mobile detailing equipment, and grant parking permission for our doorstep van.")
+  bookingTermsText    String? @default("I agree to provide domestic water & standard electrical plug access if required for the mobile detailing equipment, and grant parking clearance for our service technician arriving on scooty/bike.")
 
   // Dashboard Advertisement Banner
   dashboardAdImage    String? @default("https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=1600&q=85")

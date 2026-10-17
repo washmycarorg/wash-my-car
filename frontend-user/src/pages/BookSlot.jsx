@@ -5,7 +5,7 @@ import {
   Search, Compass, AlertCircle, Tag, Sparkles, Plus, Check,
   Shield, Bike, Droplets, Feather, Flame, Info, ArrowRight,
   ArrowLeft, ArrowDown, X, Gift, CheckSquare, Square, ChevronRight, ChevronLeft, ChevronDown, HelpCircle,
-  Clock, Users, Navigation, CalendarX, Crown
+  Clock, Users, Navigation, CalendarX, Crown, RefreshCw, ShieldCheck
 } from 'lucide-react';
 import { 
   createBooking,
@@ -2317,7 +2317,7 @@ const BookSlot = () => {
           </div>
 
           {/* Key Requirement Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.85rem', marginBottom: '1.25rem' }}>
             <div style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: '12px', padding: '1rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#0369A1', fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.25rem' }}>
                 <Droplets size={16} /> Water Supply
@@ -2341,8 +2341,57 @@ const BookSlot = () => {
                 <CarIcon size={16} /> Parking Clearance
               </div>
               <p style={{ margin: 0, fontSize: '0.8rem', color: '#14532D', lineHeight: 1.4 }}>
-                Sufficient clearance space around all 4 doors and boot for the technician to detail safely.
+                Sufficient clearance space around all 4 doors and boot for technician detailing.
               </p>
+            </div>
+
+            <div style={{ background: '#ECFDF5', border: '1.5px solid #86EFAC', borderRadius: '12px', padding: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#15803D', fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.25rem' }}>
+                <RefreshCw size={16} /> Fair Refund System
+              </div>
+              <p style={{ margin: 0, fontSize: '0.8rem', color: '#14532D', lineHeight: 1.4 }}>
+                100% full refund up to 9 hours before slot. If not cancelled before 9 hours or if any doorstep rejection is found, no refund will be initiated.
+              </p>
+            </div>
+          </div>
+
+          {/* Dedicated Cancellation & 100% Refund Policy Banner */}
+          <div style={{
+            background: 'linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)',
+            border: '1.5px solid #86EFAC',
+            borderRadius: '14px',
+            padding: '1.1rem 1.25rem',
+            marginBottom: '1.25rem',
+            boxShadow: '0 2px 10px rgba(34, 197, 94, 0.08)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
+              <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#16A34A', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFF' }}>
+                <RefreshCw size={17} />
+              </div>
+              <h4 style={{ margin: 0, color: '#14532D', fontSize: '0.98rem', fontWeight: 800 }}>
+                Transparent Cancellation & Refund Policy
+              </h4>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', fontSize: '0.85rem', color: '#166534', lineHeight: 1.5 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                <span style={{ color: '#16A34A', fontWeight: 800, marginTop: '2px' }}>•</span>
+                <div>
+                  <strong style={{ color: '#14532D' }}>Prior to 9 Hours to Slot:</strong> Full <strong>100% refund</strong> is immediately allocated and initiated back to your original payment method with zero cancellation fees.
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                <span style={{ color: '#DC2626', fontWeight: 800, marginTop: '2px' }}>•</span>
+                <div>
+                  <strong style={{ color: '#991B1B' }}>Within 9 Hours of Slot Time:</strong> If not cancelled at least 9 hours prior, <strong>no refund will be issued</strong> and cancellation is closed, as our service technician equipped on scooty/bike with wash & detailing kit and vehicle care amenities (floor papers, car fresheners, cleaning liquids & detailing supplies) is already committed and reserved for your vehicle.
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                <span style={{ color: '#DC2626', fontWeight: 800, marginTop: '2px' }}>•</span>
+                <div>
+                  <strong style={{ color: '#991B1B' }}>Doorstep Rejection / Access Denial:</strong> If any doorstep rejection is found upon technician arrival (including customer refusal, lack of domestic water/electricity access, gated entry denial, or customer unavailability), <strong>no refund will be initiated</strong> under any circumstances.
+                </div>
+              </div>
             </div>
           </div>
 
@@ -2358,7 +2407,7 @@ const BookSlot = () => {
               Official Service Disclaimer & Terms
             </h4>
             <div style={{ color: '#475569', fontSize: '0.86rem', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
-              {systemSettings?.bookingTermsText || "1. Access Requirements: Customer agrees to provide adequate water tap access and a standard electric plug point for the technician to perform the doorstep car wash service safely.\n2. Vehicle Parking: The vehicle must be parked in a safe area with sufficient clearance around all sides.\n3. Valuable Items: Please remove all personal belongings and valuables from inside the car prior to service commencement."}
+              {systemSettings?.bookingTermsText || "1. Access Requirements: Customer agrees to provide adequate water tap access and a standard electric plug point for the technician to perform the doorstep car wash service safely.\n2. Vehicle Parking: The vehicle must be parked in a safe area with sufficient clearance around all sides.\n3. Valuable Items: Please remove all personal belongings and valuables from inside the car prior to service commencement.\n4. Cancellation & Refund Policy: Full 100% refund is allocated if cancelled up to 9 hours before scheduled slot time. If not cancelled before 9 hours or if any doorstep rejection is found upon arrival, no refund will be initiated."}
             </div>
           </div>
 
@@ -2399,10 +2448,10 @@ const BookSlot = () => {
             </div>
             <div>
               <span style={{ fontWeight: 700, color: 'var(--primary-navy)', fontSize: '0.92rem', display: 'block' }}>
-                I agree and accept the service terms & requirements
+                I agree and accept the service requirements, 9-hour cancellation & doorstep rejection refund policy
               </span>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                I confirm that water tap access, electricity, and parking permissions will be made available.
+                I confirm water/power tap access and understand that 100% full refund applies only if cancelled at least 9 hours prior to slot time. If not cancelled before 9 hours or if any doorstep rejection is found upon arrival, no refund will be initiated.
               </span>
             </div>
           </div>

@@ -1,26 +1,39 @@
 const RAW_URL = import.meta.env.VITE_API_URL || (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'http://localhost:5001/api' : 'https://api.washmycar.org.in/api');
 const API_URL = RAW_URL.endsWith('/api') ? RAW_URL : `${RAW_URL.replace(/\/$/, '')}/api`;
 
-export const registerEmployee = async (name, phone, email, photo, aadhaarNumber, address, idProofFile, serviceAreaIds) => {
+const parseError = async (res) => {
+  try {
+    const data = await res.json();
+    return data.error || data.message || 'Request failed';
+  } catch {
+    return res.statusText || 'Request failed';
+  }
+};
+
+export const registerEmployee = async (name, phone, email, password, confirmPassword, photo, aadhaarNumber, address, idProofFile, serviceAreaIds) => {
   const res = await fetch(`${API_URL}/auth/employee/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, phone, email, photo, aadhaarNumber, address, idProofFile, serviceAreaIds })
+    body: JSON.stringify({ name, phone, email, password, confirmPassword, photo, aadhaarNumber, address, idProofFile, serviceAreaIds })
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await parseError(res));
   return res.json();
 };
 
-export const loginEmployee = async (phone, otp) => {
+export const loginEmployee = async (identifier, password) => {
   const res = await fetch(`${API_URL}/auth/employee/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ phone, otp })
+    body: JSON.stringify({ identifier, password })
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await parseError(res));
   const data = await res.json();
-  localStorage.setItem('employeeToken', data.token);
-  localStorage.setItem('employeeInfo', JSON.stringify(data.employee));
+  if (data.token) {
+    localStorage.setItem('employeeToken', data.token);
+  }
+  if (data.employee) {
+    localStorage.setItem('employeeInfo', JSON.stringify(data.employee));
+  }
   return data;
 };
 
@@ -89,6 +102,16 @@ export const getServiceAreas = async () => {
 
 export const getInventory = async () => {
   const res = await fetch(`${API_URL}/employees/inventory`, { headers: getHeaders() });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+};
+
+export const reportBookingIssue = async (id, issueType, note) => {
+  const res = await fetch(`${API_URL}/employees/bookings/${id}/report-issue`, {
+    method: 'PUT',
+    headers: getHeaders(),
+    body: JSON.stringify({ issueType, note })
+  });
+  if (!res.ok) throw new Error(await parseError(res));
   return res.json();
 };

@@ -471,7 +471,9 @@ const Bookings = () => {
         carModel.includes(q) || 
         bookingId === q || 
         (`#${b.id}`).includes(q) || 
-        razorpayId.includes(q);
+        razorpayId.includes(q) ||
+        (b.reportedIssue || '').toLowerCase().includes(q) ||
+        (b.reportedIssueNote || '').toLowerCase().includes(q);
 
       if (!matches) return false;
     }
@@ -486,7 +488,11 @@ const Bookings = () => {
       if (b.carTypeId?.toString() !== filterCarTypeId) return false;
     }
     if (filterStatus) {
-      if (b.status !== filterStatus) return false;
+      if (filterStatus === 'REPORTED_ISSUE') {
+        if (!b.reportedIssue) return false;
+      } else if (b.status !== filterStatus) {
+        return false;
+      }
     }
     if (filterPaymentStatus) {
       const actualPayStatus = (b.paymentStatus || (b.razorpayPaymentId ? 'PAID' : (b.refundStatus === 'PROCESSED' ? 'REFUNDED' : 'PENDING'))).toUpperCase();
@@ -588,6 +594,7 @@ const Bookings = () => {
               <option value="STARTED">STARTED</option>
               <option value="COMPLETED">COMPLETED</option>
               <option value="CANCELLED">CANCELLED</option>
+              <option value="REPORTED_ISSUE">⚠️ Reported Issue Only</option>
             </select>
           </div>
 
@@ -977,6 +984,39 @@ const Bookings = () => {
                   {b.cancellationReason && (
                     <div style={{ fontSize: '0.72rem', color: '#991B1B', marginTop: '0.25rem', maxWidth: '140px', lineHeight: 1.25 }}>
                       {b.cancellationReason}
+                    </div>
+                  )}
+
+                  {/* Technician Doorstep Issue Alert */}
+                  {b.reportedIssue && (
+                    <div style={{
+                      marginTop: '0.45rem',
+                      background: '#FFF7ED',
+                      border: '1.5px solid #F97316',
+                      borderRadius: '8px',
+                      padding: '0.4rem 0.55rem',
+                      fontSize: '0.74rem',
+                      color: '#9A3412',
+                      maxWidth: '190px',
+                      lineHeight: 1.35,
+                      boxShadow: '0 1px 3px rgba(234, 88, 12, 0.1)'
+                    }}>
+                      <div style={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#EA580C', fontSize: '0.72rem', textTransform: 'uppercase' }}>
+                        <AlertCircle size={13} color="#EA580C" /> Tech Doorstep Issue:
+                      </div>
+                      <div style={{ fontWeight: 800, marginTop: '0.15rem', color: '#9A3412' }}>
+                        {b.reportedIssue}
+                      </div>
+                      {b.reportedIssueNote && (
+                        <div style={{ fontStyle: 'italic', color: '#C2410C', marginTop: '0.15rem', fontSize: '0.72rem' }}>
+                          "{b.reportedIssueNote}"
+                        </div>
+                      )}
+                      {b.reportedIssueAt && (
+                        <div style={{ fontSize: '0.66rem', color: '#9A3412', marginTop: '0.25rem', opacity: 0.85 }}>
+                          Reported: {new Date(b.reportedIssueAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      )}
                     </div>
                   )}
                 </td>

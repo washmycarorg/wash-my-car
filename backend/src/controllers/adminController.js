@@ -1043,9 +1043,10 @@ export const DEFAULT_TERMS_AND_CONDITIONS = `1. DOORSTEP ACCESS & SERVICE REQUIR
 - Personal Belongings & Valuables: Customers are strictly requested to remove all personal belongings, cash, jewelry, electronic items, and important documents from inside the car before service starts. Wash My Car Org and its technicians are not responsible for unattended personal valuables.
 
 2. CANCELLATION, RESCHEDULE & REFUND POLICY
-- Easy Slot Rescheduling: Customers can reschedule any upcoming service slot free of charge up to 2 hours before the scheduled appointment time.
-- Cancellation Before Dispatch: If a booking is cancelled before the service vehicle and technician are dispatched, a 100% refund will be processed immediately to the original payment method or credited to your Wash My Car Org wallet.
-- Failed Doorstep Access / On-Site Trip Fee: If our technician arrives at your doorstep but service cannot be performed due to lack of water/electricity access, gated community denial, or customer unavailability after 20 minutes of waiting, a nominal trip & fuel charge of ₹99 will be deducted and the remaining balance refunded.
+- 9-Hour Full Refund Window: Customers can cancel an upcoming booking up to 9 hours prior to the scheduled slot arrival time on the booking date to receive a 100% full refund. The refund is automatically initiated to your original payment method.
+- Non-Refundable Within 9 Hours: If not cancelled at least 9 hours prior to the scheduled slot time, bookings are strictly non-refundable and no refund will be initiated, as our service technician equipped on scooty/bike with professional wash & detailing kits and complete vehicle care amenities (floor papers, car fresheners, cleaning liquids & detailing supplies) is reserved exclusively for your vehicle.
+- Easy Slot Rescheduling: Customers can reschedule any upcoming service slot free of charge up to 9 hours before the scheduled appointment time.
+- Doorstep Rejection / Non-Refund Policy: If not cancelled at least 9 hours prior to slot time, or if any doorstep rejection is found upon technician arrival (including customer refusal, lack of domestic water/electricity access, gated community denial, or customer unavailability after 20 minutes of waiting), NO refund will be initiated under any circumstances.
 - Bad Weather Policy: In case of sudden torrential monsoon rain or hazardous weather, washes will be placed on hold and rescheduled to the earliest convenient dry time slot with customer consent.
 
 3. PRICING, PROMOTIONS & VIP PASSES
@@ -1056,7 +1057,7 @@ export const DEFAULT_TERMS_AND_CONDITIONS = `1. DOORSTEP ACCESS & SERVICE REQUIR
 export const DEFAULT_PRIVACY_POLICY = `1. INFORMATION WE COLLECT & PURPOSE
 - Mobile Number & SMS OTP: Collected exclusively for secure account registration, login verification, passwordless SMS authentication via Twilio, and instant transactional booking updates (booking confirmation, technician arrival alert, and digital invoice).
 - Vehicle Registration Plate Number & Model: Collected strictly to instruct the assigned service technician on exactly which vehicle to wash and detail at your doorstep, guaranteeing service authenticity and preventing wrong-car washing.
-- Service Address & Location: Used solely for navigation and smart dispatch routing of our doorstep mobile detailing van to your home or office parking.
+- Service Address & Location: Used solely for navigation and smart dispatch routing of our doorstep mobile detailing technician (arriving on scooty/bike equipped with complete wash & detailing kit and vehicle care amenities) to your home or office parking.
 
 2. BEFORE & AFTER WASH VERIFICATION PHOTOS
 - Purpose of Vehicle Photos: Our field technicians take high-resolution before-and-after photographs of the vehicle exterior, tyres, and cabin. These photos are taken solely for service completion verification, job quality audit, and internal technician authenticity evaluation.
@@ -1094,7 +1095,7 @@ export const getSystemSettings = async (req, res) => {
             { count: 3, points: 100 },
             { count: 5, points: 150 }
           ]),
-          bookingTermsText: "1. Access Requirements: Customer agrees to provide adequate water tap access and a standard electric plug point for the technician to perform the doorstep car wash service safely.\n2. Vehicle Parking: The vehicle must be parked in a well-lit area with sufficient clearance around all sides.\n3. Valuable Items: Please remove all personal belongings and valuables from inside the car prior to service commencement.\n4. Timings: Service slots are subject to local traffic and weather conditions.",
+          bookingTermsText: "1. Access Requirements: Customer agrees to provide adequate water tap access and a standard electric plug point for the technician to perform the doorstep car wash service safely.\n2. Vehicle Parking: The vehicle must be parked in a well-lit area with sufficient clearance around all sides.\n3. Valuable Items: Please remove all personal belongings and valuables from inside the car prior to service commencement.\n4. Cancellation & Refund Policy: Full 100% refund is allocated for cancellations made at least 9 hours prior to scheduled slot time. If not cancelled before 9 hours or if any doorstep rejection is found upon technician arrival, no refund will be initiated.",
           subscriptionBannerTitle: "Exclusive VIP Car Care Membership",
           subscriptionBannerSubtitle: "Save up to 40% with monthly doorstep passes, complimentary add-ons & priority scheduling.",
           subscriptionBannerImage: "https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=1600&q=85",
@@ -1102,6 +1103,23 @@ export const getSystemSettings = async (req, res) => {
           privacyPolicyText: DEFAULT_PRIVACY_POLICY
         }
       });
+    } else {
+      // If settings exist but contain older terms lacking the 9-hour policy, old trip fee, or van references, update them
+      const needsTermsUpdate = !settings.termsAndConditionsText || settings.termsAndConditionsText.includes('Cancellation Before Dispatch') || !settings.termsAndConditionsText.includes('9-Hour') || settings.termsAndConditionsText.includes('₹99') || settings.termsAndConditionsText.includes('trip & fuel charge') || settings.termsAndConditionsText.includes('mobile vans') || settings.termsAndConditionsText.includes('van');
+      const needsBookingTermsUpdate = !settings.bookingTermsText || !settings.bookingTermsText.includes('9 hours') || !settings.bookingTermsText.includes('doorstep rejection');
+      const needsPrivacyUpdate = !settings.privacyPolicyText || settings.privacyPolicyText.includes('detailing van');
+
+      if (needsTermsUpdate || needsBookingTermsUpdate || needsPrivacyUpdate) {
+        const updateData = {};
+        if (needsTermsUpdate) updateData.termsAndConditionsText = DEFAULT_TERMS_AND_CONDITIONS;
+        if (needsBookingTermsUpdate) updateData.bookingTermsText = "1. Access Requirements: Customer agrees to provide adequate water tap access and a standard electric plug point for the technician to perform the doorstep car wash service safely.\n2. Vehicle Parking: The vehicle must be parked in a safe area with sufficient clearance around all sides.\n3. Valuable Items: Please remove all personal belongings and valuables from inside the car prior to service commencement.\n4. Cancellation & Refund Policy: Full 100% refund is allocated for cancellations made at least 9 hours prior to scheduled slot time. If not cancelled before 9 hours or if any doorstep rejection is found upon technician arrival, no refund will be initiated.";
+        if (needsPrivacyUpdate) updateData.privacyPolicyText = DEFAULT_PRIVACY_POLICY;
+
+        settings = await prisma.systemSettings.update({
+          where: { id: settings.id },
+          data: updateData
+        });
+      }
     }
 
     // Attach defaults if currently empty in DB

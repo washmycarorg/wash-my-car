@@ -15,6 +15,7 @@ import History from './pages/History';
 import Bookings from './pages/Bookings';
 import Subscriptions from './pages/Subscriptions';
 import TermsAndPrivacy from './pages/TermsAndPrivacy';
+import Support from './pages/Support';
 
 // Guard wrapper: checks token and user info on mount and on storage change
 const ProtectedRoute = ({ children }) => {
@@ -73,6 +74,8 @@ const App = () => {
         <Route path="/subscriptions" element={<ProtectedRoute><DashboardLayout><Subscriptions /></DashboardLayout></ProtectedRoute>} />
         <Route path="/bookings" element={<ProtectedRoute><DashboardLayout><Bookings /></DashboardLayout></ProtectedRoute>} />
         <Route path="/history" element={<ProtectedRoute><DashboardLayout><History /></DashboardLayout></ProtectedRoute>} />
+        <Route path="/support" element={<ProtectedRoute><DashboardLayout><Support /></DashboardLayout></ProtectedRoute>} />
+        <Route path="/contact" element={<Navigate to="/support" replace />} />
         <Route path="/payments" element={<ProtectedRoute><DashboardLayout><div className="card"><h2>Payment Methods (Coming Soon)</h2></div></DashboardLayout></ProtectedRoute>} />
       </Routes>
     </Router>

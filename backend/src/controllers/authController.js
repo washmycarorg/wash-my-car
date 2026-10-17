@@ -252,45 +252,139 @@ export const userLogin = async (req, res) => {
 };
 
 export const employeeLogin = async (req, res) => {
-  const { phone, otp } = req.body;
-  if (otp !== '1234') return res.status(401).json({ error: 'Invalid OTP' });
+  try {
+    const { identifier, phone, email, password, otp } = req.body;
+    const inputId = (identifier || email || phone || '').trim();
 
-  let employee = await prisma.employee.findUnique({ where: { phone } });
-  if (!employee) return res.status(404).json({ error: 'Employee not found' });
+    if (!inputId) {
+      return res.status(400).json({ error: 'Please enter your email or phone number' });
+    }
 
-  if (employee.status === 'PENDING') {
-    return res.status(403).json({ error: 'Your account is pending admin approval. You will receive access once approved.' });
+    if (!password && !otp) {
+      return res.status(400).json({ error: 'Please enter your password' });
+    }
+
+    // Support phone in various formats (+91, without +91, raw digits)
+    const rawDigits = inputId.replace(/^\+91/, '').replace(/\D/g, '');
+    const formattedPhone = rawDigits ? `+91${rawDigits.slice(-10)}` : inputId;
+
+    let employee = await prisma.employee.findFirst({
+      where: {
+        OR: [
+          { email: { equals: inputId, mode: 'insensitive' } },
+          { phone: inputId },
+          { phone: formattedPhone },
+          ...(rawDigits ? [{ phone: rawDigits }] : [])
+        ]
+      }
+    });
+
+    if (!employee) {
+      return res.status(404).json({ error: 'Employee account not found. Please check your credentials or register.' });
+    }
+
+    if (employee.status === 'PENDING') {
+      return res.status(403).json({ error: 'Your account is pending admin approval. You will receive access once approved.' });
+    }
+
+    if (employee.status === 'SUSPENDED') {
+      return res.status(403).json({ error: 'Your account has been suspended. Please contact administration.' });
+    }
+
+    // Verify Password
+    if (password) {
+      if (employee.password) {
+        const isMatch = await bcrypt.compare(password, employee.password);
+        if (!isMatch) {
+          return res.status(401).json({ error: 'Incorrect password. Please try again.' });
+        }
+      } else {
+        // Fallback for legacy employee accounts created before password field existed
+        const legacyMatches = 
+          password === 'password' ||
+          password === employee.phone || 
+          password === rawDigits || 
+          password === '123456' || 
+          password === '1234';
+        
+        if (legacyMatches) {
+          // Auto-hash and save this password for them
+          const hashedPassword = await bcrypt.hash(password, 10);
+          await prisma.employee.update({
+            where: { id: employee.id },
+            data: { password: hashedPassword }
+          });
+        } else {
+          return res.status(401).json({ error: 'Incorrect password. If this is your first time logging in, please contact admin.' });
+        }
+      }
+    } else if (otp) {
+      if (otp !== '1234') {
+        return res.status(401).json({ error: 'Invalid password or OTP' });
+      }
+    }
+
+    const token = generateToken({ id: employee.id, role: 'EMPLOYEE' });
+    
+    // Remove password from returned employee object
+    const { password: _, ...employeeData } = employee;
+    res.json({ message: 'Login successful', token, employee: employeeData });
+  } catch (error) {
+    res.status(500).json({ error: error.message || 'Login error' });
   }
-
-  const token = generateToken({ id: employee.id, role: 'EMPLOYEE' });
-  res.json({ message: 'Login successful', token, employee });
 };
 
 export const employeeRegister = async (req, res) => {
   try {
-    const { name, phone, email, photo, aadhaarNumber, address, idProofFile, serviceAreaIds } = req.body;
+    const { 
+      name, phone, email, password, confirmPassword, 
+      photo, aadhaarNumber, address, idProofFile, serviceAreaIds 
+    } = req.body;
     
+    if (!name || !phone || !email) {
+      return res.status(400).json({ error: 'Name, phone, and email are required' });
+    }
+
+    if (!password) {
+      return res.status(400).json({ error: 'Password is required' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+    }
+
+    if (confirmPassword && password !== confirmPassword) {
+      return res.status(400).json({ error: 'Passwords do not match' });
+    }
+
+    const cleanPhone = String(phone).trim();
+    const cleanEmail = String(email).trim().toLowerCase();
+
     // Check if employee already exists
     let existingEmployee = await prisma.employee.findFirst({
       where: {
         OR: [
-          { phone },
-          { email }
+          { phone: cleanPhone },
+          { email: { equals: cleanEmail, mode: 'insensitive' } }
         ]
       }
     });
 
     if (existingEmployee) {
-      return res.status(400).json({ error: 'Employee with this phone or email already exists' });
+      return res.status(400).json({ error: 'Employee with this phone number or email already exists' });
     }
 
+    // Hash password with bcrypt
+    const hashedPassword = await bcrypt.hash(password, 10);
+
     const data = {
-      name,
-      phone,
-      email,
+      name: name.trim(),
+      phone: cleanPhone,
+      email: cleanEmail,
+      password: hashedPassword,
       photo,
-      aadhaarNumber,
-      address,
+      aadhaarNumber: aadhaarNumber ? aadhaarNumber.trim() : null,
+      address: address ? address.trim() : null,
       idProofFile,
       status: 'PENDING'
     };
@@ -307,9 +401,12 @@ export const employeeRegister = async (req, res) => {
       include: { serviceAreas: true }
     });
 
-    res.json({ message: 'Employee registered successfully', employeeId: newEmployee.id });
+    res.json({ 
+      message: 'Employee registered successfully! Your account is submitted for admin approval.', 
+      employeeId: newEmployee.id 
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message || 'Registration failed' });
   }
 };
 

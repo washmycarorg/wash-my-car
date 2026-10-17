@@ -113,16 +113,34 @@ const Dashboard = ({ profile, setProfile }) => {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-4 mb-6">
-        <div className="card" style={{padding: '1.25rem', border: '1px solid #E2E8F0'}}>
+        <div 
+          onClick={() => navigate('/schedule')}
+          className="card" 
+          style={{
+            padding: '1.25rem', 
+            border: '1.5px solid #BAE6FD', 
+            cursor: 'pointer',
+            transition: 'transform 0.15s, box-shadow 0.15s',
+            background: '#F0F9FF'
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.transform = 'translateY(-2px)';
+            e.currentTarget.style.boxShadow = '0 6px 16px rgba(14, 165, 233, 0.15)';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = 'none';
+          }}
+        >
           <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem'}}>
-            <span style={{color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 700}}>ACTIVE JOBS</span>
+            <span style={{color: '#0369A1', fontSize: '0.8rem', fontWeight: 800}}>ACTIVE JOBS</span>
             <ClipboardList size={20} color="var(--primary-blue)" />
           </div>
           <h2 style={{margin: 0, fontSize: '1.85rem', fontWeight: 800, color: 'var(--primary-navy)'}}>
             {activeJobs.length || stats.pendingJobs || 0}
           </h2>
-          <span style={{ fontSize: '0.72rem', color: '#059669', fontWeight: 600, display: 'block', marginTop: '0.35rem' }}>
-            Ready to service
+          <span style={{ fontSize: '0.74rem', color: 'var(--primary-blue)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.35rem' }}>
+            Go to Assigned Slots <ArrowRight size={12} />
           </span>
         </div>
 
@@ -137,16 +155,34 @@ const Dashboard = ({ profile, setProfile }) => {
           </span>
         </div>
 
-        <div className="card" style={{padding: '1.25rem', border: '1px solid #E2E8F0'}}>
+        <div 
+          onClick={() => navigate('/completed')}
+          className="card" 
+          style={{
+            padding: '1.25rem', 
+            border: '1.5px solid #BBF7D0', 
+            cursor: 'pointer',
+            transition: 'transform 0.15s, box-shadow 0.15s',
+            background: '#F0FDF4'
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.transform = 'translateY(-2px)';
+            e.currentTarget.style.boxShadow = '0 6px 16px rgba(34, 197, 94, 0.15)';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = 'none';
+          }}
+        >
           <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem'}}>
-            <span style={{color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 700}}>COMPLETED</span>
+            <span style={{color: '#15803D', fontSize: '0.8rem', fontWeight: 800}}>COMPLETED</span>
             <CheckCircle2 size={20} color="#16A34A" />
           </div>
           <h2 style={{margin: 0, fontSize: '1.85rem', fontWeight: 800, color: '#166534'}}>
             {stats.completedJobs || 0}
           </h2>
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.35rem' }}>
-            Total washes finished
+          <span style={{ fontSize: '0.74rem', color: '#15803D', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.35rem' }}>
+            View Finished Slots <ArrowRight size={12} />
           </span>
         </div>
 

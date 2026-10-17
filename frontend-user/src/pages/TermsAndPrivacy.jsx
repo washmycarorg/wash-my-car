@@ -13,9 +13,10 @@ const DEFAULT_TERMS = `1. DOORSTEP ACCESS & SERVICE REQUIREMENTS
 - Personal Belongings & Valuables: Customers are strictly requested to remove all personal belongings, cash, jewelry, electronic items, and important documents from inside the car before service starts. Wash My Car Org and its technicians are not responsible for unattended personal valuables.
 
 2. CANCELLATION, RESCHEDULE & REFUND POLICY
-- Easy Slot Rescheduling: Customers can reschedule any upcoming service slot free of charge up to 2 hours before the scheduled appointment time.
-- Cancellation Before Dispatch: If a booking is cancelled before the service vehicle and technician are dispatched, a 100% refund will be processed immediately to the original payment method or credited to your Wash My Car Org wallet.
-- Failed Doorstep Access / On-Site Trip Fee: If our technician arrives at your doorstep but service cannot be performed due to lack of water/electricity access, gated community denial, or customer unavailability after 20 minutes of waiting, a nominal trip & fuel charge of ₹99 will be deducted and the remaining balance refunded.
+- 9-Hour Full Refund Window: Customers can cancel an upcoming booking up to 9 hours prior to the scheduled slot arrival time on the booking date to receive a 100% full refund. The refund is automatically initiated to your original payment method.
+- Non-Refundable Within 9 Hours: If not cancelled at least 9 hours prior to the scheduled slot time, bookings are strictly non-refundable and no refund will be initiated, as our service technician equipped on scooty/bike with professional wash & detailing kits and complete vehicle care amenities (floor papers, car fresheners, cleaning liquids & detailing supplies) is reserved exclusively for your vehicle.
+- Easy Slot Rescheduling: Customers can reschedule any upcoming service slot free of charge up to 9 hours before the scheduled appointment time.
+- Doorstep Rejection / Non-Refund Policy: If not cancelled at least 9 hours prior to slot time, or if any doorstep rejection is found upon technician arrival (including customer refusal, lack of domestic water/electricity access, gated community denial, or customer unavailability after 20 minutes of waiting), NO refund will be initiated under any circumstances.
 - Bad Weather Policy: In case of sudden torrential monsoon rain or hazardous weather, washes will be placed on hold and rescheduled to the earliest convenient dry time slot with customer consent.
 
 3. PRICING, PROMOTIONS & VIP PASSES
@@ -26,7 +27,7 @@ const DEFAULT_TERMS = `1. DOORSTEP ACCESS & SERVICE REQUIREMENTS
 const DEFAULT_PRIVACY = `1. INFORMATION WE COLLECT & PURPOSE
 - Mobile Number & SMS OTP: Collected exclusively for secure account registration, login verification, passwordless SMS authentication via Twilio, and instant transactional booking updates (booking confirmation, technician arrival alert, and digital invoice).
 - Vehicle Registration Plate Number & Model: Collected strictly to instruct the assigned service technician on exactly which vehicle to wash and detail at your doorstep, guaranteeing service authenticity and preventing wrong-car washing.
-- Service Address & Location: Used solely for navigation and smart dispatch routing of our doorstep mobile detailing van to your home or office parking.
+- Service Address & Location: Used solely for navigation and smart dispatch routing of our doorstep mobile detailing technician (arriving on scooty/bike equipped with complete wash & detailing kit and vehicle care amenities) to your home or office parking.
 
 2. BEFORE & AFTER WASH VERIFICATION PHOTOS
 - Purpose of Vehicle Photos: Our field technicians take high-resolution before-and-after photographs of the vehicle exterior, tyres, and cabin. These photos are taken solely for service completion verification, job quality audit, and internal technician authenticity evaluation.
@@ -333,7 +334,7 @@ const TermsAndPrivacy = ({ defaultTab = 'terms' }) => {
               <RefreshCw size={18} />
             </div>
             <strong style={{ fontSize: '0.88rem', color: '#0F172A', display: 'block', marginBottom: '4px' }}>Fair Refund System</strong>
-            <span style={{ fontSize: '0.78rem', color: '#64748B', lineHeight: 1.4, display: 'block' }}>100% pre-dispatch refunds. Nominal ₹99 trip fee only applies if doorstep access is unavailable.</span>
+            <span style={{ fontSize: '0.78rem', color: '#64748B', lineHeight: 1.4, display: 'block' }}>100% full refund if cancelled up to 9 hours prior to slot time. If not cancelled before 9 hours or if any doorstep rejection is found, no refund will be initiated.</span>
           </div>
 
           <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>

@@ -326,7 +326,7 @@ const CmsSettings = () => {
       title: 'New Franchise Model',
       price: '₹2.0 LAKH',
       badge: 'FRANCHISE OPTION',
-      perks: 'Complete machinery & van kit,Staff training,Dedicated territory,Live digital dispatch'
+      perks: 'Complete machinery & scooty/bike wash kit,Staff training,Dedicated territory,Live digital dispatch'
     };
     setFormData(prev => ({
       ...prev,

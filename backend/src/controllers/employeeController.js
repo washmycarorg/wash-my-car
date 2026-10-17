@@ -413,3 +413,50 @@ export const getEmployeeInventory = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// Report doorstep issue (Customer Not Available, Not Lifting Call, Wrong Location, etc.)
+export const reportBookingIssue = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { issueType, note } = req.body;
+
+    if (!issueType) {
+      return res.status(400).json({ error: 'Please select an issue type to report.' });
+    }
+
+    const booking = await prisma.booking.findUnique({ where: { id: Number(id) } });
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found.' });
+    }
+
+    if (booking.employeeId !== req.user.id) {
+      return res.status(403).json({ error: 'Not authorized to report issues for this booking.' });
+    }
+
+    const updatedBooking = await prisma.booking.update({
+      where: { id: Number(id) },
+      data: {
+        reportedIssue: issueType,
+        reportedIssueNote: note ? String(note).trim() : null,
+        reportedIssueAt: new Date()
+      },
+      include: {
+        user: true,
+        car: true,
+        carType: true,
+        washType: true,
+        serviceArea: true,
+        addons: {
+          include: { addon: true }
+        }
+      }
+    });
+
+    res.json({
+      message: 'Issue reported to administration successfully.',
+      booking: updatedBooking
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message || 'Failed to report issue.' });
+  }
+};

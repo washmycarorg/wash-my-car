@@ -1,6 +1,9 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, CalendarCheck, CalendarDays, Droplets, Car, Gift, User, LogOut, X, Crown } from 'lucide-react';
+import { 
+  LayoutDashboard, CalendarCheck, CalendarDays, Droplets, Car, 
+  Gift, User, LogOut, X, Crown, Headphones 
+} from 'lucide-react';
 
 import logo from '../assets/wash my car.png';
 
@@ -16,6 +19,7 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
     { name: 'Services', path: '/services', icon: Droplets },
     { name: 'Saved Cars', path: '/cars', icon: Car },
     { name: 'Rewards', path: '/rewards', icon: Gift },
+    { name: 'Support', path: '/support', icon: Headphones },
     { name: 'Profile', path: '/profile', icon: User },
   ];
 
@@ -36,8 +40,8 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
       <aside style={{
         position: 'fixed',
         top: 0, left: 0, bottom: 0,
-        width: '300px',
-        maxWidth: '85vw',
+        width: '320px',
+        maxWidth: '88vw',
         background: '#025EBA', // Exact blue from screenshot
         color: 'white',
         zIndex: 50,
@@ -46,40 +50,44 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
         display: 'flex', flexDirection: 'column',
         boxShadow: isOpen ? '4px 0 16px rgba(0,0,0,0.2)' : 'none'
       }}>
+        {/* Header with clean separation so close button never overlaps brand text */}
         <div style={{
-          padding: '1.25rem 1rem',
+          padding: '1.25rem 1rem 1.15rem',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          gap: '0.65rem',
           borderBottom: '1px solid rgba(255,255,255,0.12)'
         }}>
-           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', minWidth: 0 }}>
+           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flex: 1, minWidth: 0 }}>
              <div style={{
-               background: 'white',
-               padding: '2px',
-               borderRadius: '10px',
-               display: 'flex',
-               alignItems: 'center',
-               justifyContent: 'center',
-               width: '44px',
-               height: '44px',
-               flexShrink: 0,
-               boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
-             }}>
-               <img src={logo} alt="Wash My Car Logo" style={{width: '100%', height: '100%', objectFit: 'contain', transform: 'scale(1.15)'}} />
+                background: 'white',
+                padding: '2px',
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '40px',
+                height: '40px',
+                flexShrink: 0,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+              }}>
+                <img src={logo} alt="Wash My Car Logo" style={{width: '100%', height: '100%', objectFit: 'contain', transform: 'scale(1.15)'}} />
              </div>
-             <div style={{ minWidth: 0 }}>
+             <div style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
                <h2 style={{
                  color: 'white',
-                 fontSize: '0.98rem',
+                 fontSize: '0.86rem',
                  margin: 0,
                  fontWeight: 800,
-                 letterSpacing: '0.5px',
+                 letterSpacing: '0.3px',
                  whiteSpace: 'nowrap',
-                 lineHeight: 1.15,
+                 lineHeight: 1.2,
+                 overflow: 'hidden',
+                 textOverflow: 'ellipsis',
                  display: 'flex',
                  alignItems: 'baseline',
-                 gap: '0.3rem'
+                 gap: '0.25rem'
                }}>
                  <span>WASH <span style={{color: 'var(--accent-teal)'}}>MY</span> CAR</span>
                  <span style={{color: 'var(--accent-teal)'}}>ORG</span>
@@ -88,29 +96,36 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
                  fontSize: '0.62rem',
                  margin: '2px 0 0 0',
                  opacity: 0.85,
-                 whiteSpace: 'nowrap'
+                 whiteSpace: 'nowrap',
+                 overflow: 'hidden',
+                 textOverflow: 'ellipsis'
                }}>
                  Your Car, Cleaned At Your Door.
                </p>
              </div>
            </div>
+
            <button 
              onClick={closeSidebar} 
              aria-label="Close menu"
              style={{
-               background: 'transparent',
-               border: 'none',
+               background: 'rgba(255, 255, 255, 0.15)',
+               border: '1px solid rgba(255, 255, 255, 0.25)',
+               borderRadius: '8px',
                color: 'white',
                cursor: 'pointer',
-               padding: '0.35rem',
+               width: '32px',
+               height: '32px',
                display: 'flex',
                alignItems: 'center',
                justifyContent: 'center',
                flexShrink: 0,
-               marginLeft: '0.35rem'
+               transition: 'background 0.2s ease'
              }}
+             onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)'}
+             onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'}
            >
-             <X size={22} />
+             <X size={18} />
            </button>
         </div>
 

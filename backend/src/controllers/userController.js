@@ -1135,7 +1135,7 @@ export const cancelBooking = async (req, res) => {
       });
     }
 
-    // Cancellation policy: Permitted ONLY up to 7 hours before scheduled slot arrival
+    // Cancellation policy: Permitted ONLY up to 9 hours before scheduled slot arrival
     if (booking.date && booking.timeSlot) {
       const slotWindow = parseSlotTimeWindow(booking.timeSlot);
       if (slotWindow) {
@@ -1157,12 +1157,12 @@ export const cancelBooking = async (req, res) => {
         const slotIso = `${bYear}-${bMonth}-${bDay}T${String(slotHour).padStart(2, '0')}:${String(slotMinute).padStart(2, '0')}:00+05:30`;
         const slotStartTime = new Date(slotIso).getTime();
 
-        const cutoffTime = slotStartTime - (7 * 60 * 60 * 1000);
+        const cutoffTime = slotStartTime - (9 * 60 * 60 * 1000);
         const nowTime = Date.now();
 
         if (nowTime > cutoffTime) {
           return res.status(400).json({
-            error: 'Cancellations are only permitted up to 7 hours before your scheduled slot arrival time.'
+            error: 'Cancellations with full refund are only permitted up to 9 hours before your scheduled slot arrival time. If not cancelled before 9 hours or if any doorstep rejection is found, no refund will be initiated per our cancellation policy.'
           });
         }
       }
