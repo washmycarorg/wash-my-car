@@ -151,7 +151,14 @@ const Register = ({ setAuth }) => {
     setError('');
     if (window.google?.accounts?.id && GOOGLE_CLIENT_ID) {
       try {
-        window.google.accounts.id.prompt();
+        window.google.accounts.id.prompt((notification) => {
+          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+            console.warn('Google GSI prompt not displayed or skipped:', 
+              notification.getNotDisplayedReason?.() || notification.getSkippedReason?.()
+            );
+            setShowGooglePrompt(true);
+          }
+        });
       } catch (e) {
         setShowGooglePrompt(true);
       }

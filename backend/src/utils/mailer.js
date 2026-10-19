@@ -7,8 +7,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const LOGO_PATH = path.join(__dirname, '../assets/logo.png');
 
-// Create reusable transporter using Gmail SMTP or custom SMTP
+let cachedTransporter = null;
+
+// Create reusable pooled transporter using Gmail SMTP or custom SMTP
 export const getTransporter = () => {
+  if (cachedTransporter) {
+    return cachedTransporter;
+  }
+
   const user = process.env.EMAIL_USER || process.env.SMTP_USER;
   const pass = process.env.EMAIL_PASS || process.env.SMTP_PASS;
 
@@ -20,7 +26,10 @@ export const getTransporter = () => {
   const port = Number(process.env.EMAIL_PORT || process.env.SMTP_PORT || 465);
   const secure = port === 465;
 
-  return nodemailer.createTransport({
+  cachedTransporter = nodemailer.createTransport({
+    pool: true,
+    maxConnections: 5,
+    maxMessages: 100,
     host,
     port,
     secure,
@@ -29,10 +38,12 @@ export const getTransporter = () => {
       pass: pass.replace(/\s+/g, '') // remove spaces from 16-character Google App Passwords
     }
   });
+
+  return cachedTransporter;
 };
 
 /**
- * Generic email sending helper with automatic CID logo attachment
+ * Generic email sending helper with web-hosted logo (lightweight & instant dispatch)
  */
 export const sendEmail = async ({ to, subject, html, text, customAttachments = [] }) => {
   try {
@@ -49,22 +60,13 @@ export const sendEmail = async ({ to, subject, html, text, customAttachments = [
 
     const fromAddress = process.env.EMAIL_FROM || `"Wash My Car Org" <${process.env.EMAIL_USER || process.env.SMTP_USER}>`;
 
-    const attachments = [...customAttachments];
-    if (fs.existsSync(LOGO_PATH)) {
-      attachments.push({
-        filename: 'logo.png',
-        path: LOGO_PATH,
-        cid: 'wmc-logo'
-      });
-    }
-
     const info = await transporter.sendMail({
       from: fromAddress,
       to,
       subject,
       text: text || '',
       html: html || text,
-      attachments
+      attachments: customAttachments
     });
 
     console.log(`✅ [Mailer] Email sent successfully to ${to} (Message ID: ${info.messageId})`);
@@ -111,7 +113,7 @@ const renderEmailShell = ({ headerTitle, headerSubtitle, bodyContent }) => {
                 <tr>
                   <td align="center">
                     <div style="background: #FFFFFF; width: 68px; height: 68px; border-radius: 16px; margin: 0 auto 0.85rem auto; padding: 4px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28); border: 2px solid rgba(255, 255, 255, 0.35);">
-                      <img src="cid:wmc-logo" alt="Wash My Car Logo" width="60" height="60" style="width: 60px; height: 60px; object-fit: contain; display: block; border-radius: 12px;" />
+                      <img src="https://washmycar.org.in/logo.png" alt="Wash My Car Logo" width="60" height="60" style="width: 60px; height: 60px; object-fit: contain; display: block; border-radius: 12px;" />
                     </div>
                     <h1 style="margin: 0; font-size: 1.6rem; color: #FFFFFF; font-weight: 900; letter-spacing: -0.02em; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
                       WASH MY CAR <span style="color: #38BDF8;">ORG</span>

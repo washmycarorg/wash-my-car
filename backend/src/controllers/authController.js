@@ -648,23 +648,20 @@ export const sendUserEmailOtp = async (req, res) => {
       expiresAt: expiresAt.getTime()
     });
 
-    // Also persist in database if EmailOtp model exists
-    try {
-      if (prisma.emailOtp) {
-        await prisma.emailOtp.deleteMany({
-          where: { email: cleanEmail, purpose }
-        }).catch(() => {});
-        await prisma.emailOtp.create({
-          data: {
-            email: cleanEmail,
-            otp,
-            purpose,
-            expiresAt
-          }
-        }).catch(() => {});
-      }
-    } catch (dbErr) {
-      console.warn('DB EmailOtp write warning:', dbErr?.message);
+    // Also persist in database if EmailOtp model exists (non-blocking in background)
+    if (prisma.emailOtp) {
+      prisma.emailOtp.deleteMany({
+        where: { email: cleanEmail, purpose }
+      })
+      .then(() => prisma.emailOtp.create({
+        data: {
+          email: cleanEmail,
+          otp,
+          purpose,
+          expiresAt
+        }
+      }))
+      .catch((dbErr) => console.warn('DB EmailOtp write warning:', dbErr?.message));
     }
 
     // Send email with OTP
