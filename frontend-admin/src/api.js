@@ -95,6 +95,44 @@ export const cancelBookingByAdmin = async (id, reason) => {
   return res.json();
 };
 
+export const rescheduleBookingByAdmin = async (id, { newDate, newTimeSlot, reason }) => {
+  const res = await fetch(`${API_URL}/admin/bookings/${id}/reschedule`, {
+    method: 'PUT',
+    headers: getHeaders(),
+    body: JSON.stringify({ newDate, newTimeSlot, reason })
+  });
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.error || errorBody.message || 'Failed to reschedule booking');
+  }
+  return res.json();
+};
+
+export const markDoorstepRejectionByAdmin = async (id, note) => {
+  const res = await fetch(`${API_URL}/admin/bookings/${id}/doorstep-rejection`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ note })
+  });
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.error || errorBody.message || 'Failed to process doorstep rejection');
+  }
+  return res.json();
+};
+
+export const getAvailableSlotsForAdmin = async (date, serviceAreaId = '', address = '') => {
+  const params = new URLSearchParams();
+  if (date) params.append('date', date);
+  if (serviceAreaId) params.append('serviceAreaId', serviceAreaId);
+  if (address) params.append('address', address);
+  
+  const res = await fetch(`${API_URL}/users/available-slots?${params.toString()}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+
 export const getLeaves = async () => {
   const res = await fetch(`${API_URL}/admin/leaves`, { headers: getHeaders() });
   if (!res.ok) throw new Error(await res.text());

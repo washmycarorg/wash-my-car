@@ -1,4 +1,8 @@
 import prisma from '../config/db.js';
+import { sendPushNotification } from '../utils/pushNotification.js';
+import { getRazorpayInstance } from '../config/razorpay.js';
+import { sendDoorstepRejectionEmail } from '../utils/mailer.js';
+
 
 export const getProfile = async (req, res) => {
   try {
@@ -207,6 +211,7 @@ export const getAssignedBookings = async (req, res) => {
         carType: true, 
         washType: true, 
         serviceArea: true,
+        review: true,
         addons: {
           include: {
             addon: true
@@ -392,6 +397,12 @@ export const completeBooking = async (req, res) => {
       console.error('Failed to increment washesUsed:', err);
     }
 
+    sendPushNotification('USER', updatedBooking.userId, {
+      title: 'Wash Completed ✨ Give Review & Rating',
+      body: `Your vehicle doorstep wash is completed! Please rate your technician and share your feedback.`,
+      url: `/bookings?review=${updatedBooking.id}`
+    }).catch(e => console.error('[Push Complete User Error]:', e));
+
     res.json(updatedBooking);
   } catch (error) { 
     res.status(500).json({ error: error.message }); 
@@ -460,3 +471,144 @@ export const reportBookingIssue = async (req, res) => {
     res.status(500).json({ error: error.message || 'Failed to report issue.' });
   }
 };
+
+// Employee marks doorstep rejection / customer unavailable
+export const markDoorstepRejectionByEmployee = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { note = 'Customer not available / rejected upon arrival' } = req.body;
+
+    const booking = await prisma.booking.findUnique({
+      where: { id: Number(id) },
+      include: { user: true, washType: true, carType: true }
+    });
+
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found.' });
+    }
+
+    if (booking.employeeId !== req.user.id) {
+      return res.status(403).json({ error: 'Not authorized for this booking.' });
+    }
+
+    if (booking.status === 'COMPLETED' || booking.status === 'CANCELLED') {
+      return res.status(400).json({ error: `Cannot mark rejection on a ${booking.status.toLowerCase()} booking.` });
+    }
+
+    let refundDetails = {
+      refundId: null,
+      refundAmount: 0,
+      refundStatus: 'NONE'
+    };
+
+    const isSubscription = Boolean(booking.userSubscriptionId || booking.subscriptionCovered);
+
+    // 1. Physical payment deduction:
+    if (booking.paymentStatus === 'PAID' && booking.razorpayPaymentId && booking.price > 0) {
+      const payableAmount = booking.price;
+      const refundAmt = Math.max(0, payableAmount - 99);
+
+      if (refundAmt > 0) {
+        try {
+          const razorpay = getRazorpayInstance();
+          const refundResponse = await razorpay.payments.refund(booking.razorpayPaymentId, {
+            amount: Math.round(refundAmt * 100),
+            notes: {
+              bookingId: booking.id,
+              reason: 'Customer Not Available / Doorstep Rejection (₹99 fee deducted)'
+            }
+          });
+
+          refundDetails = {
+            refundId: refundResponse.id,
+            refundAmount: refundAmt,
+            refundStatus: 'PROCESSED'
+          };
+        } catch (err) {
+          console.error('Razorpay refund error on employee doorstep rejection:', err);
+          refundDetails = {
+            refundId: null,
+            refundAmount: refundAmt,
+            refundStatus: 'FAILED'
+          };
+        }
+      } else {
+        refundDetails = {
+          refundId: null,
+          refundAmount: 0,
+          refundStatus: 'NONE'
+        };
+      }
+    }
+
+    // 2. Reward points payment deduction:
+    let pointsRestored = 0;
+    if (booking.pointsRedeemed > 0) {
+      pointsRestored = Math.max(0, booking.pointsRedeemed - 99);
+      if (pointsRestored > 0) {
+        await prisma.user.update({
+          where: { id: booking.userId },
+          data: { points: { increment: pointsRestored } }
+        });
+      }
+    }
+
+    if (booking.pointsEarned > 0) {
+      await prisma.user.update({
+        where: { id: booking.userId },
+        data: { points: { decrement: Math.min(booking.user.points, booking.pointsEarned) } }
+      });
+    }
+
+    // 3. Subscription booking: 1 wash quota burned, zero refund/compensation
+
+    const updatedBooking = await prisma.booking.update({
+      where: { id: Number(id) },
+      data: {
+        status: 'CANCELLED',
+        cancelledAt: new Date(),
+        cancellationReason: `Customer Not Available / Doorstep Rejection (₹99 fee deducted). Note: ${note}`,
+        reportedIssue: 'DOORSTEP_REJECTION',
+        reportedIssueNote: note,
+        reportedIssueAt: new Date(),
+        doorstepFeeDeducted: 99.0,
+        paymentStatus: refundDetails.refundStatus === 'PROCESSED' ? 'REFUNDED' : (booking.price > 99 ? 'REFUND_PENDING' : 'PAID'),
+        refundId: refundDetails.refundId,
+        refundAmount: refundDetails.refundAmount,
+        refundStatus: refundDetails.refundStatus
+      },
+      include: { user: true, washType: true, carType: true }
+    });
+
+    // Notify customer via Web Push
+    sendPushNotification('USER', booking.userId, {
+      title: 'Doorstep Visit Update ⚠️',
+      body: isSubscription
+        ? `Booking #${booking.id} was marked as customer unavailable upon technician arrival. 1 subscription wash limit was deducted per policy.`
+        : `Booking #${booking.id} was marked as customer unavailable. ₹99 visit fee was deducted${refundDetails.refundAmount > 0 ? ` (₹${refundDetails.refundAmount} refunded)` : ''}.`,
+      url: '/bookings'
+    }).catch(err => console.error('[Push Rejection Error]:', err));
+
+    // Send Doorstep Rejection / Unavailability Notice Email with super CSS styling
+    if (booking.user?.email) {
+      sendDoorstepRejectionEmail({
+        to: booking.user.email,
+        name: booking.user.name,
+        booking: updatedBooking,
+        refundDetails,
+        note
+      }).catch(err => console.error('[Email Employee Rejection Error]:', err));
+    }
+
+    res.json({
+      message: isSubscription
+        ? 'Reported as customer unavailable. 1 subscription wash limit deducted with zero refund.'
+        : `Reported as customer unavailable. ₹99 fee deducted${refundDetails.refundAmount > 0 ? `, ₹${refundDetails.refundAmount} refunded` : ''}.`,
+      booking: updatedBooking
+    });
+  } catch (error) {
+    console.error('Employee doorstep rejection error:', error);
+    res.status(500).json({ error: error.message || 'Failed to report doorstep rejection.' });
+  }
+};
+

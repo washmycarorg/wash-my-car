@@ -25,11 +25,13 @@ import {
   verifyBookingPayment,
   cancelPendingPayment,
   cancelBooking,
+  rescheduleBooking,
   getUserSubscriptionPlans,
   getMySubscriptions,
   subscribeToPlan,
   verifySubscriptionPayment,
-  resolveMapsUrl
+  resolveMapsUrl,
+  submitBookingReview
 } from '../controllers/userController.js';
 
 import { submitInquiry } from '../controllers/inquiryController.js';
@@ -65,6 +67,9 @@ router.post('/bookings', createBooking);
 router.post('/bookings/verify-payment', verifyBookingPayment);
 router.post('/bookings/:id/cancel-payment', cancelPendingPayment);
 router.post('/bookings/:id/cancel', cancelBooking);
+router.put('/bookings/:id/reschedule', rescheduleBooking);
+router.post('/bookings/:id/review', submitBookingReview);
+
 
 router.get('/cars', getCars);
 router.post('/cars', addCar);

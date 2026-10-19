@@ -92,7 +92,7 @@ const SettingsPage = () => {
     dashboardAdSubtitle: "Get sparkling exterior foam wash & deep interior cabin sanitize with spot-free purified water at your doorstep.",
     dashboardAdBadge: "PROMOTIONAL OFFER • LIMITED SLOTS",
     subscriptionBannerTitle: "Exclusive VIP Car Care Membership",
-    subscriptionBannerSubtitle: "Save up to 40% with monthly doorstep passes, complimentary add-ons & priority scheduling.",
+    subscriptionBannerSubtitle: "Save up to 40% with monthly doorstep passes, complimentary add-ons & hassle-free vehicle care.",
     subscriptionBannerImage: "https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=1600&q=85",
     termsAndConditionsText: DEFAULT_TERMS,
     privacyPolicyText: DEFAULT_PRIVACY
@@ -180,7 +180,7 @@ const SettingsPage = () => {
           dashboardAdSubtitle: res.dashboardAdSubtitle || "Get sparkling exterior foam wash & deep interior cabin sanitize with spot-free purified water at your doorstep.",
           dashboardAdBadge: res.dashboardAdBadge || "PROMOTIONAL OFFER • LIMITED SLOTS",
           subscriptionBannerTitle: res.subscriptionBannerTitle || "Exclusive VIP Car Care Membership",
-          subscriptionBannerSubtitle: res.subscriptionBannerSubtitle || "Save up to 40% with monthly doorstep passes, complimentary add-ons & priority scheduling.",
+          subscriptionBannerSubtitle: res.subscriptionBannerSubtitle || "Save up to 40% with monthly doorstep passes, complimentary add-ons & hassle-free vehicle care.",
           subscriptionBannerImage: res.subscriptionBannerImage || "https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=1600&q=85",
           termsAndConditionsText: res.termsAndConditionsText || DEFAULT_TERMS,
           privacyPolicyText: res.privacyPolicyText || DEFAULT_PRIVACY

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getBookings, assignSlot, autoAssignSlot, cancelBookingByAdmin, getEmployees, getEmployeesWorkload, getCarTypes, getWashTypes, getSettings, updateSettings } from '../api';
-import { Calendar, User, Car, MapPin, Compass, Image, Eye, RefreshCw, CheckCircle, Navigation, AlertCircle, Search, X, Zap, Sparkles, ChevronDown, CreditCard, Clock, RotateCcw } from 'lucide-react';
+import { getBookings, assignSlot, autoAssignSlot, cancelBookingByAdmin, rescheduleBookingByAdmin, markDoorstepRejectionByAdmin, getAvailableSlotsForAdmin, getEmployees, getEmployeesWorkload, getCarTypes, getWashTypes, getSettings, updateSettings } from '../api';
+import { Calendar, User, Car, MapPin, Compass, Image, Eye, RefreshCw, CheckCircle, Navigation, AlertCircle, Search, X, Zap, Sparkles, ChevronDown, CreditCard, Clock, RotateCcw, Star } from 'lucide-react';
+
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
@@ -318,6 +319,95 @@ const Bookings = () => {
     }
   };
 
+  // Admin Reschedule Modal State
+  const [adminRescheduleModal, setAdminRescheduleModal] = useState(null);
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleSlot, setRescheduleSlot] = useState('');
+  const [rescheduleReason, setRescheduleReason] = useState('');
+  const [rescheduleSlotsList, setRescheduleSlotsList] = useState([]);
+  const [loadingRescheduleSlots, setLoadingRescheduleSlots] = useState(false);
+  const [adminRescheduleLoading, setAdminRescheduleLoading] = useState(false);
+
+  // Doorstep Rejection Modal State
+  const [adminDoorstepModal, setAdminDoorstepModal] = useState(null);
+  const [doorstepRejectionNote, setDoorstepRejectionNote] = useState('');
+  const [doorstepRejectionLoading, setDoorstepRejectionLoading] = useState(false);
+
+  const fetchRescheduleSlots = async (targetDate, serviceAreaId, address) => {
+    if (!targetDate) return;
+    setLoadingRescheduleSlots(true);
+    try {
+      const res = await getAvailableSlotsForAdmin(targetDate, serviceAreaId, address);
+      if (res && Array.isArray(res.slots)) {
+        setRescheduleSlotsList(res.slots);
+      } else {
+        setRescheduleSlotsList([]);
+      }
+    } catch (e) {
+      setRescheduleSlotsList([]);
+    } finally {
+      setLoadingRescheduleSlots(false);
+    }
+  };
+
+  const openAdminRescheduleModal = (b) => {
+    setAdminRescheduleModal(b);
+    const initialDate = b.date ? new Date(b.date).toISOString().split('T')[0] : '';
+    setRescheduleDate(initialDate);
+    setRescheduleSlot(b.timeSlot || '10:00 AM');
+    setRescheduleReason('');
+    fetchRescheduleSlots(initialDate, b.serviceAreaId, b.address);
+  };
+
+  const handleAdminRescheduleSubmit = async () => {
+    if (!adminRescheduleModal) return;
+    if (!rescheduleDate) {
+      alert('Please choose a valid new date for rescheduling.');
+      return;
+    }
+    if (!rescheduleSlot) {
+      alert('Please choose a time slot for the rescheduled date.');
+      return;
+    }
+    if (!rescheduleReason || !rescheduleReason.trim()) {
+      alert('Please enter a mandatory reason for rescheduling (e.g. Unfortunate heavy rain, technician emergency, or customer request).');
+      return;
+    }
+
+    setAdminRescheduleLoading(true);
+    try {
+      const res = await rescheduleBookingByAdmin(adminRescheduleModal.id, {
+        newDate: rescheduleDate,
+        newTimeSlot: rescheduleSlot,
+        reason: rescheduleReason.trim()
+      });
+      alert(res.message || 'Booking rescheduled successfully.');
+      setAdminRescheduleModal(null);
+      fetchData();
+    } catch (err) {
+      alert('Failed to reschedule: ' + (err.message || 'Unknown error'));
+    } finally {
+      setAdminRescheduleLoading(false);
+    }
+  };
+
+  const handleAdminDoorstepRejectionSubmit = async () => {
+    if (!adminDoorstepModal) return;
+    setDoorstepRejectionLoading(true);
+    try {
+      const res = await markDoorstepRejectionByAdmin(adminDoorstepModal.id, doorstepRejectionNote || 'Customer not available upon technician arrival');
+      alert(res.message || 'Doorstep rejection processed and ₹99 visit fee applied.');
+      setAdminDoorstepModal(null);
+      setDoorstepRejectionNote('');
+      fetchData();
+    } catch (err) {
+      alert('Failed to process doorstep rejection: ' + (err.message || 'Unknown error'));
+    } finally {
+      setDoorstepRejectionLoading(false);
+    }
+  };
+
+
   // Search & Filter States
   const [searchPhone, setSearchPhone] = useState('');
   const [filterDate, setFilterDate] = useState('');
@@ -509,6 +599,7 @@ const Bookings = () => {
       const bookingId = String(b.id);
       const razorpayId = (b.razorpayPaymentId || b.razorpayOrderId || '').toLowerCase();
 
+      const bookingSerialId = (b.bookingId || '').toLowerCase();
       const matches = 
         userPhone.includes(q) || 
         userName.includes(q) || 
@@ -516,6 +607,7 @@ const Bookings = () => {
         carModel.includes(q) || 
         bookingId === q || 
         (`#${b.id}`).includes(q) || 
+        bookingSerialId.includes(q) ||
         razorpayId.includes(q) ||
         (b.reportedIssue || '').toLowerCase().includes(q) ||
         (b.reportedIssueNote || '').toLowerCase().includes(q);
@@ -812,7 +904,7 @@ const Bookings = () => {
               <tr key={b.id} style={{ borderBottom: '1px solid #F1F5F9' }} className="hover:bg-gray-50">
                 
                 {/* ID */}
-                <td style={{ padding: '1.25rem 1.25rem', fontWeight: 700, color: 'var(--primary-navy)' }}>#{b.id}</td>
+                <td style={{ padding: '1.25rem 1.25rem', fontWeight: 700, color: 'var(--primary-navy)' }}>{b.bookingId || `#${b.id}`}</td>
                 
                 {/* Customer Details & Car */}
                 <td style={{ padding: '1.25rem 1.25rem' }}>
@@ -1032,6 +1124,49 @@ const Bookings = () => {
                     </div>
                   )}
 
+                  {/* Reschedule Badge */}
+                  {b.rescheduledAt && (
+                    <div style={{
+                      marginTop: '0.4rem',
+                      background: '#EFF6FF',
+                      border: '1.5px solid #93C5FD',
+                      borderRadius: '8px',
+                      padding: '0.35rem 0.5rem',
+                      fontSize: '0.72rem',
+                      color: '#1E40AF',
+                      maxWidth: '180px',
+                      lineHeight: 1.35
+                    }}>
+                      <div style={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#1D4ED8' }}>
+                        <Calendar size={12} /> Rescheduled:
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: '#1E3A8A', marginTop: '0.15rem' }}>
+                        {b.rescheduledReason || 'Unfortunate scenario'}
+                      </div>
+                      {b.originalDate && (
+                        <div style={{ fontSize: '0.65rem', color: '#3B82F6', marginTop: '0.15rem' }}>
+                          Was: {formatDateDMY(b.originalDate)} ({b.originalTimeSlot})
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Doorstep Rejection Fee Badge */}
+                  {b.doorstepFeeDeducted > 0 && (
+                    <div style={{
+                      marginTop: '0.35rem',
+                      background: '#FEF2F2',
+                      border: '1px solid #FECACA',
+                      borderRadius: '6px',
+                      padding: '0.2rem 0.45rem',
+                      fontSize: '0.7rem',
+                      fontWeight: 800,
+                      color: '#B91C1C'
+                    }}>
+                      ⚠️ ₹99 Doorstep Fee Deducted
+                    </div>
+                  )}
+
                   {/* Technician Doorstep Issue Alert */}
                   {b.reportedIssue && (
                     <div style={{
@@ -1064,6 +1199,30 @@ const Bookings = () => {
                       )}
                     </div>
                   )}
+
+                  {/* Customer Review & Rating */}
+                  {b.review && (
+                    <div style={{
+                      marginTop: '0.45rem',
+                      background: '#FEF9C3',
+                      border: '1.5px solid #FACC15',
+                      borderRadius: '8px',
+                      padding: '0.35rem 0.5rem',
+                      fontSize: '0.74rem',
+                      color: '#854D0E',
+                      maxWidth: '190px',
+                      lineHeight: 1.35
+                    }}>
+                      <div style={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#B45309' }}>
+                        <Star size={12} fill="#D97706" color="#D97706" /> Review: {b.review.rating}/5
+                      </div>
+                      {b.review.comment && (
+                        <div style={{ fontStyle: 'italic', marginTop: '0.15rem', color: '#713F12', fontSize: '0.72rem' }} title={b.review.comment}>
+                          "{b.review.comment}"
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </td>
                 
                 {/* Assignment triggers */}
@@ -1088,13 +1247,29 @@ const Bookings = () => {
                         </div>
                       </div>
                       {b.status !== 'COMPLETED' && (
-                        <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.15rem', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.2rem', flexWrap: 'wrap' }}>
                           <button 
                             className="btn btn-outline" 
                             style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', borderRadius: '4px' }}
                             onClick={() => handleManualAssign(b.id, '')}
                           >
                             Unassign
+                          </button>
+                          <button 
+                            className="btn" 
+                            style={{ background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', padding: '0.2rem 0.5rem', fontSize: '0.75rem', borderRadius: '4px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                            onClick={() => openAdminRescheduleModal(b)}
+                            title="Reschedule for unfortunate scenarios (weather, breakdown, etc.)"
+                          >
+                            <Calendar size={12} /> Reschedule
+                          </button>
+                          <button 
+                            className="btn" 
+                            style={{ background: '#FFF7ED', color: '#C2410C', border: '1px solid #FED7AA', padding: '0.2rem 0.5rem', fontSize: '0.75rem', borderRadius: '4px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                            onClick={() => { setAdminDoorstepModal(b); setDoorstepRejectionNote(''); }}
+                            title="Customer not available upon arrival (Deduct ₹99 visit fee)"
+                          >
+                            <AlertCircle size={12} /> Rejection (₹99)
                           </button>
                           <button 
                             className="btn" 
@@ -1116,7 +1291,23 @@ const Bookings = () => {
                         onFetchWorkload={fetchWorkload}
                       />
                       {b.status !== 'COMPLETED' && (
-                        <div>
+                        <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.2rem', flexWrap: 'wrap' }}>
+                          <button 
+                            className="btn" 
+                            style={{ background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', padding: '0.2rem 0.5rem', fontSize: '0.72rem', borderRadius: '4px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                            onClick={() => openAdminRescheduleModal(b)}
+                            title="Reschedule for unfortunate scenarios"
+                          >
+                            <Calendar size={12} /> Reschedule
+                          </button>
+                          <button 
+                            className="btn" 
+                            style={{ background: '#FFF7ED', color: '#C2410C', border: '1px solid #FED7AA', padding: '0.2rem 0.5rem', fontSize: '0.72rem', borderRadius: '4px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                            onClick={() => { setAdminDoorstepModal(b); setDoorstepRejectionNote(''); }}
+                            title="Customer not available upon arrival (Deduct ₹99 visit fee)"
+                          >
+                            <AlertCircle size={12} /> Rejection (₹99)
+                          </button>
                           <button 
                             className="btn" 
                             style={{ background: '#FEE2E2', color: '#DC2626', border: '1px solid #FCA5A5', padding: '0.2rem 0.5rem', fontSize: '0.72rem', borderRadius: '4px', fontWeight: 600 }}
@@ -1129,6 +1320,7 @@ const Bookings = () => {
                     </div>
                   )}
                 </td>
+
 
                 {/* Service Pics Button */}
                 <td style={{ padding: '1.25rem 1.5rem' }}>
@@ -1248,7 +1440,7 @@ const Bookings = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', borderBottom: '1px solid #F1F5F9', paddingBottom: '0.75rem', gap: '0.5rem' }}>
               <div>
                 <h3 style={{ margin: 0, color: 'var(--primary-navy)', fontSize: '1.15rem', fontWeight: 800 }}>
-                  Service Verification #{selectedBooking.id}
+                  Service Verification #{selectedBooking.bookingId || selectedBooking.id}
                 </h3>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem', alignItems: 'center', marginTop: '0.35rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                   <span>📅 {formatDateDMY(selectedBooking.date)} ({selectedBooking.timeSlot})</span>
@@ -1613,7 +1805,7 @@ const Bookings = () => {
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h3 style={{ margin: 0, color: '#DC2626', fontSize: '1.2rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <AlertCircle size={20} color="#DC2626" /> Cancel & Refund Booking #{adminCancelModal.id}
+                <AlertCircle size={20} color="#DC2626" /> Cancel & Refund Booking #{adminCancelModal.bookingId || adminCancelModal.id}
               </h3>
               <button
                 onClick={() => setAdminCancelModal(null)}
@@ -1693,6 +1885,262 @@ const Bookings = () => {
           </div>
         </div>
       )}
+
+      {/* Admin Reschedule Modal (For unfortunate scenarios) */}
+      {adminRescheduleModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1100,
+          padding: '1rem'
+        }}>
+          <div className="admin-modal-content" style={{
+            background: 'white',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '520px',
+            padding: '1.75rem',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            boxSizing: 'border-box'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0, color: '#1E40AF', fontSize: '1.2rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Calendar size={20} color="#1D4ED8" /> Reschedule Booking #{adminRescheduleModal.bookingId || adminRescheduleModal.id}
+              </h3>
+              <button
+                onClick={() => setAdminRescheduleModal(null)}
+                style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <X size={18} color="#64748B" />
+              </button>
+            </div>
+
+            <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '10px', padding: '0.75rem 1rem', marginBottom: '1rem', color: '#1E40AF', fontSize: '0.82rem', lineHeight: 1.45 }}>
+              <strong>⚠️ Unfortunate Scenarios Rescheduling:</strong> Use this panel to reschedule incomplete or assigned bookings during sudden heavy rain, waterlogging, employee vehicle breakdown, machinery malfunction, or direct customer requests. Both customer and technician will receive an instant browser push notification.
+            </div>
+
+            <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '0.75rem 1rem', marginBottom: '1.1rem', fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+              <div><strong>Customer:</strong> {adminRescheduleModal.user?.name || 'Customer'} (+91 {adminRescheduleModal.user?.phone || 'N/A'})</div>
+              <div><strong>Vehicle:</strong> {adminRescheduleModal.carMake} {adminRescheduleModal.carModel} {adminRescheduleModal.carNumber && `(${adminRescheduleModal.carNumber})`}</div>
+              <div><strong>Current Slot:</strong> {formatDateDMY(adminRescheduleModal.date)} &bull; {adminRescheduleModal.timeSlot}</div>
+              {adminRescheduleModal.employee && (
+                <div style={{ color: '#0369A1' }}><strong>Assigned Technician:</strong> {adminRescheduleModal.employee.name} (+91 {adminRescheduleModal.employee.phone})</div>
+              )}
+            </div>
+
+            {/* Date selection */}
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--primary-navy)', marginBottom: '0.35rem' }}>
+                Select New Service Date <span style={{ color: '#DC2626' }}>*</span>
+              </label>
+              <input
+                type="date"
+                min={new Date().toISOString().split('T')[0]}
+                value={rescheduleDate}
+                onChange={e => {
+                  setRescheduleDate(e.target.value);
+                  fetchRescheduleSlots(e.target.value, adminRescheduleModal.serviceAreaId, adminRescheduleModal.address);
+                }}
+                className="form-input"
+                style={{ width: '100%', borderRadius: '8px', border: '1px solid #CBD5E1', padding: '0.55rem 0.75rem', fontSize: '0.85rem', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            {/* Time Slot selection */}
+            <div style={{ marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                <label style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--primary-navy)', margin: 0 }}>
+                  Select New Time Slot <span style={{ color: '#DC2626' }}>*</span>
+                </label>
+                {loadingRescheduleSlots && <span style={{ fontSize: '0.72rem', color: '#64748B' }}>Checking slots...</span>}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.45rem' }}>
+                {(rescheduleSlotsList.length > 0 
+                  ? rescheduleSlotsList.map(s => s.slot) 
+                  : ["08:00 AM", "10:00 AM", "12:00 PM", "02:00 PM", "04:00 PM", "06:00 PM"]
+                ).map(slot => {
+                  const isSelected = rescheduleSlot === slot;
+                  return (
+                    <button
+                      key={slot}
+                      type="button"
+                      onClick={() => setRescheduleSlot(slot)}
+                      style={{
+                        padding: '0.5rem 0.4rem',
+                        borderRadius: '8px',
+                        border: isSelected ? '2px solid #2563EB' : '1px solid #CBD5E1',
+                        background: isSelected ? '#EFF6FF' : 'white',
+                        color: isSelected ? '#1D4ED8' : '#334155',
+                        fontWeight: isSelected ? 800 : 600,
+                        fontSize: '0.8rem',
+                        cursor: 'pointer',
+                        textAlign: 'center'
+                      }}
+                    >
+                      {slot}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Mandatory Reason */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--primary-navy)', marginBottom: '0.35rem' }}>
+                Mandatory Reason for Rescheduling <span style={{ color: '#DC2626' }}>*</span>
+              </label>
+              <textarea
+                rows={3}
+                required
+                className="form-input"
+                placeholder="Enter unfortunate scenario / operational reason (e.g. Sudden severe cloudburst in area, technician motorcycle puncture, machinery replacement, customer emergency call)..."
+                value={rescheduleReason}
+                onChange={e => setRescheduleReason(e.target.value)}
+                style={{ width: '100%', borderRadius: '8px', border: '1.5px solid #CBD5E1', padding: '0.6rem 0.75rem', fontSize: '0.85rem', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button
+                type="button"
+                onClick={() => setAdminRescheduleModal(null)}
+                disabled={adminRescheduleLoading}
+                className="btn btn-outline"
+                style={{ borderRadius: '8px', padding: '0.6rem 1.25rem' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleAdminRescheduleSubmit}
+                disabled={adminRescheduleLoading || !rescheduleReason.trim() || !rescheduleDate || !rescheduleSlot}
+                style={{
+                  background: 'linear-gradient(135deg, #1D4ED8 0%, #1E40AF 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0.6rem 1.4rem',
+                  fontWeight: 700,
+                  cursor: (adminRescheduleLoading || !rescheduleReason.trim()) ? 'not-allowed' : 'pointer',
+                  opacity: (!rescheduleReason.trim() || adminRescheduleLoading) ? 0.7 : 1
+                }}
+              >
+                {adminRescheduleLoading ? 'Rescheduling...' : 'Confirm Reschedule'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Doorstep Rejection / Customer Unavailable Modal */}
+      {adminDoorstepModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1100,
+          padding: '1rem'
+        }}>
+          <div className="admin-modal-content" style={{
+            background: 'white',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '500px',
+            padding: '1.75rem',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            boxSizing: 'border-box'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0, color: '#C2410C', fontSize: '1.2rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <AlertCircle size={20} color="#EA580C" /> Doorstep Rejection #{adminDoorstepModal.bookingId || adminDoorstepModal.id}
+              </h3>
+              <button
+                onClick={() => setAdminDoorstepModal(null)}
+                style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <X size={18} color="#64748B" />
+              </button>
+            </div>
+
+            <p style={{ color: '#475569', fontSize: '0.88rem', lineHeight: 1.5, margin: '0 0 1rem' }}>
+              Mark this service as <strong>Customer Not Available / Doorstep Rejection</strong> for <strong>{adminDoorstepModal.user?.name || 'Customer'}</strong> ({adminDoorstepModal.carMake} {adminDoorstepModal.carModel}).
+            </p>
+
+            <div style={{
+              background: '#FFF7ED',
+              border: '1.5px solid #FDBA74',
+              borderRadius: '12px',
+              padding: '0.85rem 1rem',
+              marginBottom: '1rem',
+              color: '#9A3412',
+              fontSize: '0.82rem',
+              lineHeight: 1.5
+            }}>
+              <div style={{ fontWeight: 800, marginBottom: '0.35rem', color: '#C2410C' }}>
+                ⚖️ Doorstep Rejection & ₹99 Deduction Policy:
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <div>• <strong>Physical Payment:</strong> ₹99 technician visit/dispatch fee will be deducted; {adminDoorstepModal.price > 99 ? `remaining ₹${adminDoorstepModal.price - 99} will be refunded via Razorpay.` : 'no refund as booking price is <= ₹99.'}</div>
+                <div>• <strong>Reward Coins:</strong> If paid by points, 99 points will be deducted and remaining restored.</div>
+                <div>• <strong>Subscription VIP Pass:</strong> 1 subscription wash limit will be deducted with zero refund or compensation.</div>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--primary-navy)', marginBottom: '0.35rem' }}>
+                Rejection Note / Details
+              </label>
+              <textarea
+                rows={3}
+                className="form-input"
+                placeholder="e.g. Customer did not pick up phone calls, gated community access refused, customer declined wash upon technician arrival..."
+                value={doorstepRejectionNote}
+                onChange={e => setDoorstepRejectionNote(e.target.value)}
+                style={{ width: '100%', borderRadius: '8px', border: '1px solid #CBD5E1', padding: '0.6rem 0.75rem', fontSize: '0.85rem', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button
+                type="button"
+                onClick={() => setAdminDoorstepModal(null)}
+                disabled={doorstepRejectionLoading}
+                className="btn btn-outline"
+                style={{ borderRadius: '8px', padding: '0.6rem 1.25rem' }}
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={handleAdminDoorstepRejectionSubmit}
+                disabled={doorstepRejectionLoading}
+                style={{
+                  background: '#C2410C',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0.6rem 1.25rem',
+                  fontWeight: 700,
+                  cursor: doorstepRejectionLoading ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {doorstepRejectionLoading ? 'Processing...' : 'Confirm Rejection (Deduct ₹99)'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* Custom Responsive & Hover CSS */}
       <style>{`

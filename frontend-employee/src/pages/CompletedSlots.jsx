@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getAssignedBookings } from '../api';
 import { 
   CheckCircle2, Calendar, Clock, MapPin, Car, Sparkles, 
-  Search, ShieldCheck, Image as ImageIcon, Eye
+  Search, ShieldCheck, Image as ImageIcon, Eye, Star
 } from 'lucide-react';
 
 const CompletedSlots = () => {
@@ -32,7 +32,7 @@ const CompletedSlots = () => {
   const filteredBookings = bookings.filter(b => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
-    const idMatch = String(b.id).includes(q);
+    const idMatch = (b.bookingId && b.bookingId.toLowerCase().includes(q)) || String(b.id).includes(q);
     const washMatch = (b.washType?.name || '').toLowerCase().includes(q);
     const carMatch = (b.car ? `${b.car.make} ${b.car.model}` : `${b.carMake || ''} ${b.carModel || ''}`).toLowerCase().includes(q);
     return idMatch || washMatch || carMatch;
@@ -133,7 +133,7 @@ const CompletedSlots = () => {
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <span style={{ fontWeight: 800, color: 'var(--primary-navy)', fontSize: '1.05rem' }}>
-                      #{b.id}
+                      {b.bookingId ? b.bookingId : `#${b.id}`}
                     </span>
                     <span style={{
                       background: '#DCFCE7',
@@ -248,6 +248,46 @@ const CompletedSlots = () => {
                   )}
                 </div>
               </div>
+
+              {/* Customer Review & Rating Section */}
+              {b.review && (
+                <div style={{
+                  marginTop: '0.85rem',
+                  background: 'linear-gradient(135deg, #FEF9C3 0%, #FEF08A 100%)',
+                  border: '1.5px solid #FACC15',
+                  borderRadius: '10px',
+                  padding: '0.75rem 1rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.4rem'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <Star size={16} fill="#D97706" color="#D97706" />
+                      <span style={{ fontWeight: 800, color: '#854D0E', fontSize: '0.9rem' }}>
+                        Customer Review: {b.review.rating} / 5 Stars
+                      </span>
+                    </div>
+                    <span style={{ fontSize: '0.72rem', color: '#A16207', fontWeight: 600 }}>
+                      {new Date(b.review.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </span>
+                  </div>
+                  {b.review.comment && (
+                    <p style={{ margin: 0, fontSize: '0.85rem', color: '#713F12', fontStyle: 'italic', lineHeight: 1.4 }}>
+                      "{b.review.comment}"
+                    </p>
+                  )}
+                  {b.review.tags && b.review.tags.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.2rem' }}>
+                      {b.review.tags.map((tag, tIdx) => (
+                        <span key={tIdx} style={{ background: 'white', color: '#854D0E', fontSize: '0.72rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '4px', border: '1px solid #FDE047' }}>
+                          ✓ {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
             </div>
           );

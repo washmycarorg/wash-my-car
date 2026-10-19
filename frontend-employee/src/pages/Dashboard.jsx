@@ -76,8 +76,32 @@ const Dashboard = ({ profile, setProfile }) => {
         marginBottom: '1.5rem',
         boxShadow: '0 8px 24px rgba(2, 132, 199, 0.25)'
       }}>
-        <p style={{margin: '0 0 0.5rem 0', opacity: 0.9, fontSize: '0.9rem'}}>Welcome back,</p>
-        <h1 style={{margin: '0 0 1rem 0', fontSize: '2rem', fontWeight: 800}}>{name}</h1>
+        <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem'}}>
+          <div>
+            <p style={{margin: '0 0 0.25rem 0', opacity: 0.9, fontSize: '0.9rem'}}>Welcome back,</p>
+            <h1 style={{margin: 0, fontSize: '2rem', fontWeight: 800}}>{name}</h1>
+          </div>
+          {profile?.employeeId && (
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.2)',
+              backdropFilter: 'blur(4px)',
+              border: '1.5px solid rgba(255, 255, 255, 0.35)',
+              color: 'white',
+              padding: '0.35rem 0.75rem',
+              borderRadius: '8px',
+              fontSize: '0.82rem',
+              fontWeight: 800,
+              letterSpacing: '0.05em',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+            }}>
+              <span style={{opacity: 0.85, fontSize: '0.72rem'}}>EMP ID:</span>
+              <span style={{fontFamily: 'monospace', fontSize: '0.9rem'}}>{profile.employeeId}</span>
+            </div>
+          )}
+        </div>
         <p style={{margin: '0 0 1.5rem 0', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
           Duty Status: 
           <span style={{
@@ -192,10 +216,10 @@ const Dashboard = ({ profile, setProfile }) => {
             <Star size={20} color="#D97706" />
           </div>
           <h2 style={{margin: 0, fontSize: '1.85rem', fontWeight: 800, color: 'var(--primary-navy)', display: 'flex', alignItems: 'center', gap: '0.4rem'}}>
-            4.9 <Star size={18} fill="#F59E0B" color="#F59E0B" />
+            {profile?.rating !== undefined && profile?.rating !== null ? Number(profile.rating).toFixed(1) : '5.0'} <Star size={18} fill="#F59E0B" color="#F59E0B" />
           </h2>
           <span style={{ fontSize: '0.72rem', color: '#059669', fontWeight: 600, display: 'block', marginTop: '0.35rem' }}>
-            Top Performer
+            {profile?.totalReviews ? `${profile.totalReviews} customer review${profile.totalReviews > 1 ? 's' : ''}` : 'Top Performer'}
           </span>
         </div>
       </div>
@@ -241,7 +265,7 @@ const Dashboard = ({ profile, setProfile }) => {
                     {nextJob.washType?.name} ({nextJob.carType?.name})
                   </h4>
                   <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', background: '#F1F5F9', padding: '0.15rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>
-                    Booking #{nextJob.id}
+                    Booking #{nextJob.bookingId || nextJob.id}
                   </span>
                 </div>
               </div>
@@ -298,27 +322,50 @@ const Dashboard = ({ profile, setProfile }) => {
                 <MapPin size={16} color="var(--primary-blue)" style={{ flexShrink: 0, marginTop: '2px' }} />
                 <span>{nextJob.address || 'Customer doorstep address'}</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #E2E8F0', paddingTop: '0.5rem', marginTop: '0.15rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #E2E8F0', paddingTop: '0.5rem', marginTop: '0.15rem', flexWrap: 'wrap', gap: '0.4rem' }}>
                 <span style={{ fontWeight: 600, color: '#475569' }}>Customer: {nextJob.user?.name || 'Customer'}</span>
-                {nextJob.user?.phone && (
-                  <a
-                    href={`tel:${nextJob.user.phone}`}
-                    style={{
-                      background: '#EFF6FF',
-                      color: 'var(--primary-blue)',
-                      padding: '0.25rem 0.65rem',
-                      borderRadius: '6px',
-                      fontSize: '0.78rem',
-                      fontWeight: 700,
-                      textDecoration: 'none',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.3rem'
-                    }}
-                  >
-                    <Phone size={13} /> {nextJob.user.phone}
-                  </a>
-                )}
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  {nextJob.user?.phone && (
+                    <a
+                      href={`tel:${nextJob.user.phone}`}
+                      style={{
+                        background: '#EFF6FF',
+                        color: 'var(--primary-blue)',
+                        padding: '0.25rem 0.65rem',
+                        borderRadius: '6px',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        textDecoration: 'none',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.3rem'
+                      }}
+                    >
+                      <Phone size={13} /> {nextJob.user.phone}
+                    </a>
+                  )}
+                  {nextJob.alternatePhone && (
+                    <a
+                      href={`tel:${nextJob.alternatePhone}`}
+                      style={{
+                        background: '#FEF3C7',
+                        color: '#92400E',
+                        border: '1px solid #F59E0B',
+                        padding: '0.25rem 0.65rem',
+                        borderRadius: '6px',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        textDecoration: 'none',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.3rem'
+                      }}
+                      title="Customer Alternative Phone"
+                    >
+                      <Phone size={13} color="#D97706" /> Alt: {nextJob.alternatePhone}
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
 

@@ -6,6 +6,7 @@ import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import employeeRoutes from './routes/employeeRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 
 dotenv.config();
 
@@ -57,7 +58,16 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/notifications', notificationRoutes);
 
-app.listen(PORT, '127.0.0.1', () => {
+import { backfillExistingEmployeeIds, backfillExistingBookingIds } from './utils/idGenerator.js';
+
+app.listen(PORT, '127.0.0.1', async () => {
   console.log(`Server running on 127.0.0.1:${PORT}`);
+  try {
+    await backfillExistingEmployeeIds();
+    await backfillExistingBookingIds();
+  } catch (err) {
+    console.error('Startup backfill error:', err);
+  }
 });

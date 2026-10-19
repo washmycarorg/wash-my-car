@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { updateProfile, getServiceAreas, getInventory } from '../api';
-import { MapPin, User as UserIcon, Shield, CreditCard, FileText, Droplet, Wrench, Package } from 'lucide-react';
+import { MapPin, User as UserIcon, Shield, CreditCard, FileText, Droplet, Wrench, Package, Star } from 'lucide-react';
 
 const Profile = ({ profile, setProfile }) => {
   const [formData, setFormData] = useState({ 
@@ -120,12 +120,55 @@ const Profile = ({ profile, setProfile }) => {
       )}
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: '1.25rem', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <UserIcon size={20} color="var(--primary-blue)" />
-          <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--primary-navy)' }}>Employee Profile</h3>
+        <div style={{ padding: '1.25rem', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <UserIcon size={20} color="var(--primary-blue)" />
+            <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--primary-navy)' }}>Employee Profile</h3>
+          </div>
+          {profile?.employeeId && (
+            <div style={{
+              background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
+              border: '1.5px solid #93C5FD',
+              color: '#1D4ED8',
+              padding: '0.3rem 0.75rem',
+              borderRadius: '8px',
+              fontSize: '0.82rem',
+              fontWeight: 800,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              boxShadow: '0 1px 3px rgba(37, 99, 235, 0.1)'
+            }}>
+              <span style={{ fontSize: '0.7rem', color: '#3B82F6', textTransform: 'uppercase' }}>Employee ID:</span>
+              <span style={{ fontFamily: 'monospace', letterSpacing: '0.05em' }}>{profile.employeeId}</span>
+            </div>
+          )}
         </div>
         
         <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+          {/* Rating & Review Summary Badge */}
+          <div style={{
+            background: 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)',
+            border: '1px solid #FCD34D',
+            borderRadius: '10px',
+            padding: '0.75rem 1rem',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '0.5rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Star size={18} fill="#F59E0B" color="#F59E0B" />
+              <span style={{ fontWeight: 800, color: '#92400E', fontSize: '0.95rem' }}>
+                Rating: {profile?.rating !== undefined && profile?.rating !== null ? Number(profile.rating).toFixed(1) : '5.0'} / 5.0
+              </span>
+            </div>
+            <span style={{ fontSize: '0.78rem', color: '#B45309', fontWeight: 600 }}>
+              {profile?.totalReviews ? `${profile.totalReviews} verified review${profile.totalReviews > 1 ? 's' : ''}` : 'No customer reviews yet'}
+            </span>
+          </div>
           
           {/* Avatar Section */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', borderBottom: '1px solid #F1F5F9', paddingBottom: '1.25rem' }}>
@@ -196,8 +239,19 @@ const Profile = ({ profile, setProfile }) => {
             <h4 style={{ margin: '0 0 1rem 0', color: 'var(--primary-navy)', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.95rem' }}>
               <Shield size={16} /> ID & Verification Details
             </h4>
-            
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Employee ID</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  value={profile?.employeeId || 'WMCO-E-001'}
+                  disabled
+                  style={{ background: '#F1F5F9', cursor: 'not-allowed', fontWeight: 700, fontFamily: 'monospace', color: '#1E40AF' }}
+                />
+              </div>
+
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Aadhaar Number</label>
                 <input 

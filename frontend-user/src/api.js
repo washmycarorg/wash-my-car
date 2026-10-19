@@ -1,6 +1,108 @@
 const RAW_URL = import.meta.env.VITE_API_URL || (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'http://localhost:5001/api' : 'https://api.washmycar.org.in/api');
 const API_URL = RAW_URL.endsWith('/api') ? RAW_URL : `${RAW_URL.replace(/\/$/, '')}/api`;
 
+export const loginWithGoogle = async (payload) => {
+  const res = await fetch(`${API_URL}/auth/user/google`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || data.message || 'Google authentication failed');
+  }
+  if (data.token) localStorage.setItem('userToken', data.token);
+  if (data.user) localStorage.setItem('userInfo', JSON.stringify(data.user));
+  return data;
+};
+
+export const registerWithEmail = async (formData) => {
+  const res = await fetch(`${API_URL}/auth/user/email-register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(formData)
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || data.message || 'Registration failed');
+  }
+  if (data.token) localStorage.setItem('userToken', data.token);
+  if (data.user) localStorage.setItem('userInfo', JSON.stringify(data.user));
+  return data;
+};
+
+export const loginWithEmail = async (formData) => {
+  const res = await fetch(`${API_URL}/auth/user/email-login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(formData)
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || data.message || 'Login failed');
+  }
+  if (data.token) localStorage.setItem('userToken', data.token);
+  if (data.user) localStorage.setItem('userInfo', JSON.stringify(data.user));
+  return data;
+};
+
+export const sendUserEmailOtp = async ({ email, purpose = 'LOGIN', phone, name }) => {
+  const res = await fetch(`${API_URL}/auth/user/send-email-otp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, purpose, phone, name })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || data.message || 'Failed to send verification code');
+  }
+  return data;
+};
+
+export const registerWithEmailOtp = async (payload) => {
+  const res = await fetch(`${API_URL}/auth/user/email-otp-register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || data.message || 'Registration failed');
+  }
+  if (data.token) localStorage.setItem('userToken', data.token);
+  if (data.user) localStorage.setItem('userInfo', JSON.stringify(data.user));
+  return data;
+};
+
+export const loginWithEmailOtp = async (payload) => {
+  const res = await fetch(`${API_URL}/auth/user/email-otp-login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || data.message || 'Login failed');
+  }
+  if (data.token) localStorage.setItem('userToken', data.token);
+  if (data.user) localStorage.setItem('userInfo', JSON.stringify(data.user));
+  return data;
+};
+
+export const setUserPhone = async (phone) => {
+  const res = await fetch(`${API_URL}/auth/user/set-phone`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ phone })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || data.message || 'Failed to update phone number');
+  }
+  if (data.user) localStorage.setItem('userInfo', JSON.stringify(data.user));
+  return data;
+};
+
 export const sendUserOtp = async (phone, purpose = 'LOGIN') => {
   const res = await fetch(`${API_URL}/auth/user/send-otp`, {
     method: 'POST',
@@ -112,6 +214,39 @@ export const cancelBooking = async (bookingId, reason) => {
   }
   return res.json();
 };
+
+export const rescheduleBooking = async (bookingId, { newDate, newTimeSlot, reason }) => {
+  const res = await fetch(`${API_URL}/users/bookings/${bookingId}/reschedule`, {
+    method: 'PUT',
+    headers: getHeaders(),
+    body: JSON.stringify({ newDate, newTimeSlot, reason })
+  });
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.error || errorBody.message || 'Failed to reschedule booking');
+  }
+  return res.json();
+};
+
+export const getVapidPublicKey = async () => {
+  const res = await fetch(`${API_URL}/notifications/vapid-public-key`);
+  if (!res.ok) throw new Error('Failed to fetch VAPID key');
+  return res.json();
+};
+
+export const subscribePushNotification = async (subscription, userType = 'USER') => {
+  const res = await fetch(`${API_URL}/notifications/subscribe`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ subscription, userType })
+  });
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.error || 'Failed to register push subscription');
+  }
+  return res.json();
+};
+
 
 export const getCars = async () => {
   const res = await fetch(`${API_URL}/users/cars`, { headers: getHeaders() });
@@ -380,6 +515,24 @@ export const resolveMapsUrl = async (url) => {
       throw new Error(parsed.error || parsed.message || errorText);
     } catch (e) {
       throw new Error(errorText || 'Failed to resolve map URL');
+    }
+  }
+  return res.json();
+};
+
+export const submitBookingReview = async (bookingId, reviewData) => {
+  const res = await fetch(`${API_URL}/users/bookings/${bookingId}/review`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(reviewData)
+  });
+  if (!res.ok) {
+    const errorText = await res.text();
+    try {
+      const parsed = JSON.parse(errorText);
+      throw new Error(parsed.error || parsed.message || errorText);
+    } catch (e) {
+      throw new Error(errorText || 'Failed to submit review');
     }
   }
   return res.json();

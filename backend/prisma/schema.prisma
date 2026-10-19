@@ -20,17 +20,21 @@ model User {
   savedAddresses SavedAddress[]
   offers         Offer[]         @relation("UserEligibleOffers")
   subscriptions  UserSubscription[]
+  reviews        Review[]
   createdAt      DateTime        @default(now())
 }
 
 model Employee {
   id            Int           @id @default(autoincrement())
+  employeeId    String?       @unique // e.g. WMCO-E-001
   phone         String        @unique
   email         String        @unique
   name          String
   password      String?       // Hashed with bcrypt
   status        String        @default("PENDING") // PENDING, ACTIVE, SUSPENDED
   onDuty        Boolean       @default(false)
+  rating        Float         @default(5.0)
+  totalReviews  Int           @default(0)
   salary        Float         @default(0) // Monthly salary or hourly wage
   payType       String        @default("FIXED_SALARY") // FIXED_SALARY, COMMISSION_ONLY, HYBRID
   baseSalary    Float         @default(0) // Base monthly salary for FIXED_SALARY and HYBRID
@@ -39,6 +43,7 @@ model Employee {
   address       String?
   idProofFile   String?       // Base64 ID proof (pdf or image)
   bookings      Booking[]
+  reviews       Review[]
   leaves        Leave[]
   serviceAreas  ServiceArea[] @relation("EmployeeAreas")
   inventoryAllocations InventoryAllocation[]
@@ -141,6 +146,7 @@ model SavedAddress {
 
 model Booking {
   id            Int          @id @default(autoincrement())
+  bookingId     String?      @unique // e.g. WMC-191026-001
   userId        Int
   user          User         @relation(fields: [userId], references: [id])
   employeeId    Int?
@@ -152,6 +158,7 @@ model Booking {
   carModel      String?      // e.g. Swift, Nexon, Creta
   carTypeId     Int
   carType       CarType      @relation(fields: [carTypeId], references: [id])
+  alternatePhone String?     // Customer's alternative contact number for technician
   washTypeId    Int
   washType      WashType     @relation(fields: [washTypeId], references: [id])
   serviceId     Int?         // Optional for fallback/compatibility
@@ -213,6 +220,17 @@ model Booking {
   reportedIssue        String?   // CUSTOMER_NOT_AVAILABLE, NOT_LIFTING_CALL, WRONG_LOCATION, OTHER
   reportedIssueNote    String?
   reportedIssueAt      DateTime?
+
+  // Rescheduling details
+  rescheduledAt        DateTime?
+  rescheduledReason    String?
+  rescheduledBy        String?   // ADMIN, USER
+  originalDate         DateTime?
+  originalTimeSlot     String?
+  doorstepFeeDeducted  Float?    @default(0.0)
+
+  // Customer Review and Rating
+  review               Review?
 
   createdAt   DateTime  @default(now())
 }
@@ -495,5 +513,46 @@ model UserSubscription {
   razorpayOrderId     String?
   razorpayPaymentId   String?
   createdAt           DateTime          @default(now())
+}
+
+model EmailOtp {
+  id        Int      @id @default(autoincrement())
+  email     String
+  otp       String
+  purpose   String   @default("LOGIN") // LOGIN or REGISTER
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email, purpose])
+}
+
+model PushSubscription {
+  id         Int      @id @default(autoincrement())
+  endpoint   String   @unique
+  p256dh     String
+  auth       String
+  userType   String   // USER, EMPLOYEE, ADMIN
+  userId     Int?
+  employeeId Int?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userType, userId])
+  @@index([userType, employeeId])
+}
+
+model Review {
+  id         Int       @id @default(autoincrement())
+  bookingId  Int       @unique
+  booking    Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  userId     Int
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  employeeId Int?
+  employee   Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  rating     Int       // 1 to 5 stars
+  comment    String?   // Feedback note
+  tags       String?   // Optional compliment tags
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt @default(now())
 }
 

@@ -399,8 +399,29 @@ const EmployeeManagement = () => {
                         </div>
                       )}
                       <div>
-                        <div style={{fontWeight: 600, color: 'var(--primary-navy)'}}>{emp.name}</div>
-                        <div style={{fontSize: '0.8rem'}} className={emp.onDuty ? 'text-success' : 'text-muted'}>{emp.onDuty ? '● On Duty' : '○ Off Duty'}</div>
+                        <div style={{fontWeight: 700, color: 'var(--primary-navy)', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap'}}>
+                          {emp.name}
+                          {emp.employeeId && (
+                            <span style={{
+                              background: '#EFF6FF',
+                              color: '#1D4ED8',
+                              border: '1px solid #BFDBFE',
+                              padding: '0.1rem 0.45rem',
+                              borderRadius: '4px',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              fontFamily: 'monospace'
+                            }}>
+                              {emp.employeeId}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.2rem'}}>
+                          <span className={emp.onDuty ? 'text-success' : 'text-muted'}>{emp.onDuty ? '● On Duty' : '○ Off Duty'}</span>
+                          <span style={{ color: '#D97706', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.75rem' }}>
+                            ⭐ {emp.rating !== undefined && emp.rating !== null ? Number(emp.rating).toFixed(1) : '5.0'} ({emp.totalReviews || 0})
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </td>
@@ -495,6 +516,8 @@ const EmployeeManagement = () => {
 
               {/* Grid details */}
               <div className="admin-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.9rem', color: 'var(--text-main)' }}>
+                <div><strong>Employee ID:</strong> <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1D4ED8' }}>{selectedEmployee.employeeId || 'Pending'}</span></div>
+                <div><strong>Rating:</strong> <span style={{ color: '#D97706', fontWeight: 700 }}>⭐ {selectedEmployee.rating !== undefined && selectedEmployee.rating !== null ? Number(selectedEmployee.rating).toFixed(1) : '5.0'} ({selectedEmployee.totalReviews || 0} reviews)</span></div>
                 <div><strong>Phone:</strong> {selectedEmployee.phone}</div>
                 <div><strong>Email:</strong> {selectedEmployee.email}</div>
                 <div><strong>Aadhaar Number:</strong> {selectedEmployee.aadhaarNumber || 'Not provided'}</div>

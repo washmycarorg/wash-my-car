@@ -397,9 +397,9 @@ const Subscriptions = () => {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#38BDF8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Zap size={13} color="white" />
+                <Shield size={13} color="white" />
               </div>
-              Priority Slot Dispatch
+              Zero Checkout Friction
             </div>
           </div>
         </div>
@@ -1302,11 +1302,11 @@ const Subscriptions = () => {
 
           <div style={{ padding: '1rem', background: '#F8FAFC', borderRadius: '16px' }}>
             <div style={{ width: 40, height: 40, borderRadius: '12px', background: '#E0F2FE', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '0.75rem' }}>
-              <Zap size={20} color="#0284C7" />
+              <CheckCircle2 size={20} color="#0284C7" />
             </div>
-            <h4 style={{ margin: '0 0 0.35rem', fontSize: '1rem', fontWeight: 700, color: '#1E293B' }}>Priority Slot Dispatch</h4>
+            <h4 style={{ margin: '0 0 0.35rem', fontSize: '1rem', fontWeight: 700, color: '#1E293B' }}>Zero Checkout Friction</h4>
             <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748B', lineHeight: 1.5 }}>
-              VIP members receive first access to prime morning and weekend slots, with dedicated technician routing straight to your home.
+              Book your included doorstep washes anytime with instant ₹0 checkout. Enjoy predictable vehicle maintenance without repeated payments.
             </p>
           </div>
 

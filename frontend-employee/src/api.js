@@ -115,3 +115,30 @@ export const reportBookingIssue = async (id, issueType, note) => {
   if (!res.ok) throw new Error(await parseError(res));
   return res.json();
 };
+
+export const markDoorstepRejection = async (id, note = '') => {
+  const res = await fetch(`${API_URL}/employees/bookings/${id}/doorstep-rejection`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ note })
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+};
+
+export const getVapidPublicKey = async () => {
+  const res = await fetch(`${API_URL}/notifications/vapid-public-key`);
+  if (!res.ok) throw new Error('Failed to fetch VAPID key');
+  return res.json();
+};
+
+export const subscribePushNotification = async (subscription, userType = 'EMPLOYEE') => {
+  const res = await fetch(`${API_URL}/notifications/subscribe`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ subscription, userType })
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+};
+

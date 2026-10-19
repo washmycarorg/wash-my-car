@@ -1,7 +1,9 @@
 import prisma from '../config/db.js';
 import { getRazorpayInstance } from '../config/razorpay.js';
 import { computeEmployeePayout } from '../utils/payoutHelper.js';
-import { sendCancellationRefundSms } from '../services/smsService.js';
+import { sendPushNotification } from '../utils/pushNotification.js';
+import { sendBookingRescheduledEmail, sendBookingCancelledEmail, sendDoorstepRejectionEmail } from '../utils/mailer.js';
+
 
 export const getDashboardStats = async (req, res) => {
   try {
@@ -642,6 +644,7 @@ export const getBookings = async (req, res) => {
         carType: true,
         washType: true,
         serviceArea: true,
+        review: true,
         addons: {
           include: {
             addon: true
@@ -689,6 +692,22 @@ export const assignSlot = async (req, res) => {
       },
       include: { employee: true, washType: true, carType: true }
     });
+
+    if (employeeId && booking.employee) {
+      const dateStr = new Date(booking.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+      sendPushNotification('USER', booking.userId, {
+        title: 'Technician Assigned 🚗',
+        body: `${booking.employee.name} has been assigned for your doorstep wash on ${dateStr} (${booking.timeSlot}).`,
+        url: '/bookings'
+      }).catch(e => console.error('[Push Assign User Error]:', e));
+
+      sendPushNotification('EMPLOYEE', Number(employeeId), {
+        title: 'New Job Assigned 🚗',
+        body: `New wash booking assigned on ${dateStr} at ${booking.timeSlot} (${booking.washType?.name || 'Car Wash'}).`,
+        url: '/schedule'
+      }).catch(e => console.error('[Push Assign Emp Error]:', e));
+    }
+
     res.json(booking);
   } catch (error) { 
     res.status(500).json({ error: error.message }); 
@@ -758,6 +777,19 @@ export const autoAssignSlot = async (req, res) => {
       },
       include: { employee: true, washType: true, carType: true }
     });
+
+    const dateStr = new Date(updatedBooking.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    sendPushNotification('USER', updatedBooking.userId, {
+      title: 'Technician Assigned 🚗',
+      body: `${chosenEmployee.name} has been assigned for your doorstep wash on ${dateStr} (${updatedBooking.timeSlot}).`,
+      url: '/bookings'
+    }).catch(e => console.error('[Push Auto-Assign User Error]:', e));
+
+    sendPushNotification('EMPLOYEE', chosenEmployee.id, {
+      title: 'New Job Assigned 🚗',
+      body: `New wash booking assigned on ${dateStr} at ${updatedBooking.timeSlot} (${updatedBooking.washType?.name || 'Car Wash'}).`,
+      url: '/schedule'
+    }).catch(e => console.error('[Push Auto-Assign Emp Error]:', e));
 
     res.json({ message: 'Auto-assigned successfully', booking: updatedBooking });
   } catch (error) { 
@@ -838,9 +870,31 @@ export const cancelBookingByAdmin = async (req, res) => {
       include: { employee: true, user: true, washType: true, carType: true }
     });
 
-    // Send cancellation and refund initiation SMS to the customer
-    if (booking.user?.phone) {
-      sendCancellationRefundSms(booking.user.phone, updatedBooking, refundDetails).catch(err => console.error('[SMS Admin Cancel error]:', err));
+    // Send cancellation and refund Email with super CSS styling to customer
+    if (booking.user?.email) {
+      sendBookingCancelledEmail({
+        to: booking.user.email,
+        name: booking.user.name,
+        booking: updatedBooking,
+        refundDetails,
+        reason
+      }).catch(err => console.error('[Email Admin Cancel error]:', err));
+    }
+
+    // Web Push notification to customer
+    sendPushNotification('USER', booking.userId, {
+      title: 'Booking Cancelled ❌',
+      body: `Your booking #${booking.id} was cancelled by administrator. Reason: ${reason}`,
+      url: '/bookings'
+    }).catch(e => console.error('[Push Admin Cancel User Error]:', e));
+
+    // Web Push notification to employee
+    if (booking.employeeId) {
+      sendPushNotification('EMPLOYEE', booking.employeeId, {
+        title: 'Booking Cancelled ❌',
+        body: `Job #${booking.id} on ${new Date(booking.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} (${booking.timeSlot}) was cancelled.`,
+        url: '/schedule'
+      }).catch(e => console.error('[Push Admin Cancel Emp Error]:', e));
     }
 
     res.json({
@@ -853,6 +907,228 @@ export const cancelBookingByAdmin = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// Admin Reschedule Booking (For unfortunate scenarios like heavy rain, employee emergency, etc.)
+export const rescheduleBookingByAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { newDate, newTimeSlot, reason } = req.body;
+
+    if (!newDate || !newTimeSlot) {
+      return res.status(400).json({ error: 'New date and time slot are required for rescheduling.' });
+    }
+
+    if (!reason || !String(reason).trim()) {
+      return res.status(400).json({ error: 'Please enter a valid reason for rescheduling this booking.' });
+    }
+
+    const booking = await prisma.booking.findUnique({
+      where: { id: Number(id) },
+      include: { employee: true, user: true, washType: true, carType: true }
+    });
+
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found.' });
+    }
+
+    if (booking.status === 'COMPLETED' || booking.status === 'CANCELLED') {
+      return res.status(400).json({ error: `Cannot reschedule a ${booking.status.toLowerCase()} booking.` });
+    }
+
+    const updatedBooking = await prisma.booking.update({
+      where: { id: Number(id) },
+      data: {
+        originalDate: booking.originalDate || booking.date,
+        originalTimeSlot: booking.originalTimeSlot || booking.timeSlot,
+        date: new Date(newDate),
+        timeSlot: newTimeSlot,
+        rescheduledAt: new Date(),
+        rescheduledReason: String(reason).trim(),
+        rescheduledBy: 'ADMIN'
+      },
+      include: { employee: true, user: true, washType: true, carType: true, serviceArea: true }
+    });
+
+    const formattedDate = new Date(newDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+
+    // Notify customer via Web Push
+    sendPushNotification('USER', booking.userId, {
+      title: 'Booking Rescheduled 📅',
+      body: `Your doorstep wash has been rescheduled to ${formattedDate} (${newTimeSlot}). Reason: ${reason}`,
+      url: '/bookings'
+    }).catch(err => console.error('[Push Reschedule Error]:', err));
+
+    // Notify assigned employee via Web Push
+    if (booking.employeeId) {
+      sendPushNotification('EMPLOYEE', booking.employeeId, {
+        title: 'Job Rescheduled 📅',
+        body: `Booking #${booking.id} has been rescheduled to ${formattedDate} (${newTimeSlot}). Reason: ${reason}`,
+        url: '/schedule'
+      }).catch(err => console.error('[Push Reschedule Employee Error]:', err));
+    }
+
+    // Send Reschedule Email with super CSS styling to Customer
+    if (booking.user?.email) {
+      sendBookingRescheduledEmail({
+        to: booking.user.email,
+        name: booking.user.name,
+        booking: updatedBooking,
+        oldDate: booking.date,
+        oldTimeSlot: booking.timeSlot,
+        rescheduledBy: 'ADMIN',
+        reason
+      }).catch(err => console.error('[Email Admin Reschedule Error]:', err));
+    }
+
+    res.json({
+      message: 'Booking rescheduled successfully.',
+      booking: updatedBooking
+    });
+  } catch (error) {
+    console.error('Admin reschedule error:', error);
+    res.status(500).json({ error: error.message || 'Failed to reschedule booking.' });
+  }
+};
+
+// Admin Doorstep Rejection / Customer Unavailable (Applies ₹99 visit fee deduction policy)
+export const markDoorstepRejectionByAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { note = 'Customer not available / doorstep rejection upon arrival' } = req.body;
+
+    const booking = await prisma.booking.findUnique({
+      where: { id: Number(id) },
+      include: { employee: true, user: true, washType: true, carType: true }
+    });
+
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found.' });
+    }
+
+    if (booking.status === 'COMPLETED' || booking.status === 'CANCELLED') {
+      return res.status(400).json({ error: `Cannot mark doorstep rejection on a ${booking.status.toLowerCase()} booking.` });
+    }
+
+    let refundDetails = {
+      refundId: null,
+      refundAmount: 0,
+      refundStatus: 'NONE'
+    };
+
+    const isSubscription = Boolean(booking.userSubscriptionId || booking.subscriptionCovered);
+
+    // 1. Physical online payment deduction:
+    // Deduct ₹99 technician dispatch fee; refund remaining if price > 99
+    if (booking.paymentStatus === 'PAID' && booking.razorpayPaymentId && booking.price > 0) {
+      const payableAmount = booking.price;
+      const refundAmt = Math.max(0, payableAmount - 99);
+
+      if (refundAmt > 0) {
+        try {
+          const razorpay = getRazorpayInstance();
+          const refundResponse = await razorpay.payments.refund(booking.razorpayPaymentId, {
+            amount: Math.round(refundAmt * 100),
+            notes: {
+              bookingId: booking.id,
+              reason: 'Customer Not Available / Doorstep Rejection (₹99 visit fee deducted)'
+            }
+          });
+
+          refundDetails = {
+            refundId: refundResponse.id,
+            refundAmount: refundAmt,
+            refundStatus: 'PROCESSED'
+          };
+        } catch (err) {
+          console.error('Razorpay refund error on doorstep rejection:', err);
+          refundDetails = {
+            refundId: null,
+            refundAmount: refundAmt,
+            refundStatus: 'FAILED'
+          };
+        }
+      } else {
+        refundDetails = {
+          refundId: null,
+          refundAmount: 0,
+          refundStatus: 'NONE'
+        };
+      }
+    }
+
+    // 2. Reward points payment:
+    // Deduct 99 points; restore remaining points to user account
+    let pointsRestored = 0;
+    if (booking.pointsRedeemed > 0) {
+      pointsRestored = Math.max(0, booking.pointsRedeemed - 99);
+      if (pointsRestored > 0) {
+        await prisma.user.update({
+          where: { id: booking.userId },
+          data: { points: { increment: pointsRestored } }
+        });
+      }
+    }
+
+    // Revert points earned if any
+    if (booking.pointsEarned > 0) {
+      await prisma.user.update({
+        where: { id: booking.userId },
+        data: { points: { decrement: Math.min(booking.user.points, booking.pointsEarned) } }
+      });
+    }
+
+    // 3. Subscription booking: 1 wash quota already used, no refund and no compensation
+
+    const updatedBooking = await prisma.booking.update({
+      where: { id: Number(id) },
+      data: {
+        status: 'CANCELLED',
+        cancelledAt: new Date(),
+        cancellationReason: `Customer Not Available / Doorstep Rejection (₹99 visit fee deducted). Note: ${note}`,
+        reportedIssue: 'DOORSTEP_REJECTION',
+        reportedIssueNote: note,
+        reportedIssueAt: new Date(),
+        doorstepFeeDeducted: 99.0,
+        paymentStatus: refundDetails.refundStatus === 'PROCESSED' ? 'REFUNDED' : (booking.price > 99 ? 'REFUND_PENDING' : 'PAID'),
+        refundId: refundDetails.refundId,
+        refundAmount: refundDetails.refundAmount,
+        refundStatus: refundDetails.refundStatus
+      },
+      include: { employee: true, user: true, washType: true, carType: true }
+    });
+
+    // Notify customer via Web Push
+    sendPushNotification('USER', booking.userId, {
+      title: 'Doorstep Visit Update ⚠️',
+      body: isSubscription
+        ? `Booking #${booking.id} was marked as customer unavailable upon arrival. Subscription wash limit was deducted with zero refund per policy.`
+        : `Booking #${booking.id} was marked as customer unavailable upon arrival. ₹99 visit fee was deducted${refundDetails.refundAmount > 0 ? ` (₹${refundDetails.refundAmount} refunded)` : ''}.`,
+      url: '/bookings'
+    }).catch(err => console.error('[Push Rejection Error]:', err));
+
+    // Send Doorstep Rejection / Unavailability Notice Email with super CSS styling
+    if (booking.user?.email) {
+      sendDoorstepRejectionEmail({
+        to: booking.user.email,
+        name: booking.user.name,
+        booking: updatedBooking,
+        refundDetails,
+        note
+      }).catch(err => console.error('[Email Admin Rejection Error]:', err));
+    }
+
+    res.json({
+      message: isSubscription
+        ? 'Marked as doorstep rejection. 1 subscription wash limit deducted with zero refund.'
+        : `Marked as doorstep rejection. ₹99 fee deducted${refundDetails.refundAmount > 0 ? `, ₹${refundDetails.refundAmount} refunded` : ''}.`,
+      booking: updatedBooking
+    });
+  } catch (error) {
+    console.error('Doorstep rejection error:', error);
+    res.status(500).json({ error: error.message || 'Failed to process doorstep rejection.' });
+  }
+};
+
 
 export const getEmployeesWorkload = async (req, res) => {
   try {
@@ -1097,7 +1373,7 @@ export const getSystemSettings = async (req, res) => {
           ]),
           bookingTermsText: "1. Access Requirements: Customer agrees to provide adequate water tap access and a standard electric plug point for the technician to perform the doorstep car wash service safely.\n2. Vehicle Parking: The vehicle must be parked in a well-lit area with sufficient clearance around all sides.\n3. Valuable Items: Please remove all personal belongings and valuables from inside the car prior to service commencement.\n4. Cancellation & Refund Policy: Full 100% refund is allocated for cancellations made at least 9 hours prior to scheduled slot time. If not cancelled before 9 hours or if any doorstep rejection is found upon technician arrival, no refund will be initiated.",
           subscriptionBannerTitle: "Exclusive VIP Car Care Membership",
-          subscriptionBannerSubtitle: "Save up to 40% with monthly doorstep passes, complimentary add-ons & priority scheduling.",
+          subscriptionBannerSubtitle: "Save up to 40% with monthly doorstep passes, complimentary add-ons & hassle-free vehicle care.",
           subscriptionBannerImage: "https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=1600&q=85",
           termsAndConditionsText: DEFAULT_TERMS_AND_CONDITIONS,
           privacyPolicyText: DEFAULT_PRIVACY_POLICY
@@ -1217,7 +1493,7 @@ export const updateSystemSettings = async (req, res) => {
         dashboardAdSubtitle: dashboardAdSubtitle || "Get sparkling exterior foam wash & deep interior cabin sanitize with spot-free purified water at your doorstep.",
         dashboardAdBadge: dashboardAdBadge || "PROMOTIONAL OFFER • LIMITED SLOTS",
         subscriptionBannerTitle: subscriptionBannerTitle || "Exclusive VIP Car Care Membership",
-        subscriptionBannerSubtitle: subscriptionBannerSubtitle || "Save up to 40% with monthly doorstep passes, complimentary add-ons & priority scheduling.",
+        subscriptionBannerSubtitle: subscriptionBannerSubtitle || "Save up to 40% with monthly doorstep passes, complimentary add-ons & hassle-free vehicle care.",
         subscriptionBannerImage: subscriptionBannerImage || "https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=1600&q=85",
         socialLinks: socialLinks ? (typeof socialLinks === 'object' ? JSON.stringify(socialLinks) : String(socialLinks)) : undefined,
         termsAndConditionsText: termsAndConditionsText || DEFAULT_TERMS_AND_CONDITIONS,

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { getAssignedBookings, startBooking, completeBooking, reportBookingIssue } from '../api';
+import { getAssignedBookings, startBooking, completeBooking, reportBookingIssue, markDoorstepRejection } from '../api';
+import { initPushNotifications } from '../utils/pushManager';
 import { 
   Phone, MapPin, Compass, CheckCircle, Camera, Navigation, AlertCircle, Sparkles,
   Shield, Bike, Droplets, Feather, Flame, AlertTriangle, X, Clock, Calendar, CheckCircle2,
-  ArrowRight
+  ArrowRight, XCircle, RotateCcw
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -64,8 +65,14 @@ const Schedule = () => {
   const [issueNote, setIssueNote] = useState('');
   const [reportingLoading, setReportingLoading] = useState(false);
 
+  // Doorstep Rejection / Customer Unavailable Modal State
+  const [doorstepModalBooking, setDoorstepModalBooking] = useState(null);
+  const [doorstepNote, setDoorstepNote] = useState('');
+  const [doorstepLoading, setDoorstepLoading] = useState(false);
+
   useEffect(() => {
     fetchBookings();
+    initPushNotifications().catch(e => console.warn('Push init:', e));
   }, []);
 
   const fetchBookings = async () => {
@@ -181,6 +188,24 @@ const Schedule = () => {
       alert('Failed to report issue: ' + (err.message || 'Unknown error'));
     } finally {
       setReportingLoading(false);
+    }
+  };
+
+  // Submit Doorstep Rejection / Unavailability with ₹99 fee deduction
+  const handleConfirmDoorstepRejection = async () => {
+    if (!doorstepModalBooking) return;
+
+    setDoorstepLoading(true);
+    try {
+      const res = await markDoorstepRejection(doorstepModalBooking.id, doorstepNote || 'Customer not available / rejected upon arrival');
+      alert(res.message || 'Doorstep rejection recorded. ₹99 fee deduction applied.');
+      setDoorstepModalBooking(null);
+      setDoorstepNote('');
+      fetchBookings();
+    } catch (err) {
+      alert('Failed to mark doorstep rejection: ' + (err.message || 'Unknown error'));
+    } finally {
+      setDoorstepLoading(false);
     }
   };
 
@@ -301,6 +326,7 @@ const Schedule = () => {
             const address = booking.address || 'User Address';
             const customerName = booking.user?.name || 'Customer';
             const customerPhone = booking.user?.phone || '';
+            const alternatePhone = booking.alternatePhone || '';
             const carDetails = booking.car 
               ? `${booking.car.make} ${booking.car.model}` 
               : (booking.carMake && booking.carModel ? `${booking.carMake} ${booking.carModel}` : 'Vehicle');
@@ -349,7 +375,7 @@ const Schedule = () => {
                       {washType} ({carType})
                     </h4>
                     <span style={{ fontSize: '0.78rem', background: '#F1F5F9', color: 'var(--text-muted)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 700 }}>
-                      Booking #{booking.id}
+                      Booking #{booking.bookingId || booking.id}
                     </span>
                   </div>
                   <span style={{
@@ -365,7 +391,7 @@ const Schedule = () => {
                   </span>
                 </div>
                 
-                {/* Cancelled Notice */}
+                {/* Cancelled Notice & Doorstep Fee Badge */}
                 {booking.status === 'CANCELLED' && (
                   <div style={{ background: '#FEF2F2', border: '1.5px solid #FCA5A5', borderRadius: '8px', padding: '0.75rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#DC2626', fontWeight: 800, fontSize: '0.88rem' }}>
@@ -377,6 +403,30 @@ const Schedule = () => {
                     {booking.cancellationReason && (
                       <div style={{ fontSize: '0.78rem', color: '#7F1D1D', marginTop: '0.15rem' }}>
                         <strong>Reason:</strong> {booking.cancellationReason}
+                      </div>
+                    )}
+                    {booking.doorstepFeeDeducted > 0 && (
+                      <div style={{ marginTop: '0.35rem', background: '#FEF3C7', color: '#92400E', padding: '0.35rem 0.6rem', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700, border: '1px solid #FDE68A', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <span>🚪</span> ₹99 Doorstep Rejection / Unavailability Fee Applied
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Rescheduled Notice Banner */}
+                {booking.rescheduledAt && (
+                  <div style={{ background: '#EFF6FF', border: '1.5px solid #93C5FD', borderRadius: '8px', padding: '0.65rem 0.85rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.82rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#1E40AF', fontWeight: 800 }}>
+                      <RotateCcw size={14} /> Rescheduled by {booking.rescheduledBy || 'Admin'}
+                    </div>
+                    {booking.rescheduledReason && (
+                      <div style={{ color: '#1E3A8A' }}>
+                        <strong>Reason:</strong> {booking.rescheduledReason}
+                      </div>
+                    )}
+                    {booking.originalDate && (
+                      <div style={{ fontSize: '0.74rem', color: '#64748B' }}>
+                        Original Slot: {new Date(booking.originalDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} ({booking.originalTimeSlot})
                       </div>
                     )}
                   </div>
@@ -446,9 +496,58 @@ const Schedule = () => {
                     )}
                   </div>
 
-                  {/* Customer Info */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <strong style={{ color: 'var(--primary-navy)' }}>Customer:</strong> {customerName}
+                  {/* Customer Info & Alt Phone */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <strong style={{ color: 'var(--primary-navy)' }}>Customer:</strong> 
+                      <span style={{ fontWeight: 600 }}>{customerName}</span>
+                      {customerPhone && (
+                        <a 
+                          href={`tel:${customerPhone}`}
+                          style={{
+                            color: 'var(--primary-blue)',
+                            fontWeight: 700,
+                            textDecoration: 'none',
+                            fontSize: '0.84rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.25rem',
+                            background: '#F0F9FF',
+                            padding: '0.15rem 0.5rem',
+                            borderRadius: '6px',
+                            border: '1px solid #BAE6FD'
+                          }}
+                        >
+                          <Phone size={12} /> {customerPhone}
+                        </a>
+                      )}
+                    </div>
+
+                    {/* Prominent Alternative Phone if customer provided one */}
+                    {alternatePhone && (
+                      <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.45rem',
+                        background: '#FEF3C7',
+                        border: '1.5px dashed #F59E0B',
+                        padding: '0.25rem 0.65rem',
+                        borderRadius: '8px',
+                        fontSize: '0.82rem',
+                        width: 'fit-content'
+                      }}>
+                        <strong style={{ color: '#92400E' }}>Alt Contact:</strong>
+                        <a 
+                          href={`tel:${alternatePhone}`} 
+                          style={{ color: '#B45309', fontWeight: 800, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                        >
+                          <Phone size={13} color="#D97706" /> {alternatePhone}
+                        </a>
+                        <span style={{ fontSize: '0.68rem', background: '#F59E0B', color: 'white', padding: '1px 5px', borderRadius: '4px', fontWeight: 800 }}>
+                          BACKUP PHONE
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Date & Time Slot */}
@@ -531,7 +630,7 @@ const Schedule = () => {
                     </div>
                   ) : (
                     <>
-                      {/* Call Customer */}
+                      {/* Call Customer (Primary) */}
                       {customerPhone && (
                         <a 
                           href={`tel:${customerPhone}`}
@@ -539,6 +638,29 @@ const Schedule = () => {
                           style={{ padding: '0.45rem 0.85rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.4rem', borderRadius: 'var(--radius-sm)' }}
                         >
                           <Phone size={15} /> Call Customer
+                        </a>
+                      )}
+
+                      {/* Call Alternate Phone (if provided by customer) */}
+                      {alternatePhone && (
+                        <a 
+                          href={`tel:${alternatePhone}`}
+                          style={{
+                            background: '#FEF3C7',
+                            color: '#92400E',
+                            border: '1.5px solid #F59E0B',
+                            padding: '0.45rem 0.85rem',
+                            fontSize: '0.82rem',
+                            fontWeight: 800,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                            borderRadius: 'var(--radius-sm)',
+                            textDecoration: 'none',
+                            boxShadow: '0 2px 6px rgba(245, 158, 11, 0.2)'
+                          }}
+                        >
+                          <Phone size={15} color="#D97706" /> Call Alt Phone
                         </a>
                       )}
 
@@ -572,8 +694,35 @@ const Schedule = () => {
                         }}
                       >
                         <AlertTriangle size={15} />
-                        {booking.reportedIssue ? 'Update Doorstep Issue' : 'Report Issue'}
+                        {booking.reportedIssue ? 'Update Issue' : 'Report Issue'}
                       </button>
+
+                      {/* Customer Unavailable / Doorstep Rejection Button (₹99 Fee Cut Policy) */}
+                      {['ASSIGNED', 'STARTED'].includes(booking.status) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDoorstepModalBooking(booking);
+                            setDoorstepNote('');
+                          }}
+                          style={{
+                            background: '#FEF2F2',
+                            color: '#DC2626',
+                            border: '1.5px solid #FCA5A5',
+                            borderRadius: 'var(--radius-sm)',
+                            padding: '0.45rem 0.85rem',
+                            fontSize: '0.82rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.4rem'
+                          }}
+                          title="Customer not available or rejected upon arrival (₹99 fee policy)"
+                        >
+                          <XCircle size={15} color="#DC2626" /> Customer Unavailable (₹99 Cut)
+                        </button>
+                      )}
 
                       {/* Booking Flow Buttons: Start Service */}
                       {booking.status === 'ASSIGNED' && (
@@ -690,7 +839,7 @@ const Schedule = () => {
             </div>
 
             <p style={{ margin: '0 0 1rem 0', fontSize: '0.86rem', color: '#475569', lineHeight: 1.4 }}>
-              Reporting an issue for <strong>Booking #{reportModalBooking.id}</strong> ({reportModalBooking.user?.name || 'Customer'}). This immediately alerts administration.
+              Reporting an issue for <strong>Booking #{reportModalBooking.bookingId || reportModalBooking.id}</strong> ({reportModalBooking.user?.name || 'Customer'}). This immediately alerts administration.
             </p>
 
             <form onSubmit={handleSubmitIssueReport} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -776,6 +925,110 @@ const Schedule = () => {
               </div>
 
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Doorstep Rejection / Customer Unavailable Confirmation Modal (₹99 Fee Cut Policy) */}
+      {doorstepModalBooking && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(4px)',
+          zIndex: 1100,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem'
+        }}>
+          <div className="card" style={{
+            background: 'white',
+            borderRadius: '18px',
+            maxWidth: '500px',
+            width: '100%',
+            padding: '1.75rem',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid #F1F5F9', paddingBottom: '0.75rem' }}>
+              <h3 style={{ margin: 0, color: '#DC2626', fontSize: '1.15rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <AlertCircle size={20} color="#DC2626" /> Customer Unavailable / Rejection (₹99 Fee)
+              </h3>
+              <button
+                type="button"
+                onClick={() => setDoorstepModalBooking(null)}
+                style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <X size={16} color="#64748B" />
+              </button>
+            </div>
+
+            <p style={{ margin: '0 0 0.85rem 0', fontSize: '0.88rem', color: '#334155', lineHeight: 1.45 }}>
+              Confirm marking customer unavailable or rejecting service upon arrival for <strong>Booking #{doorstepModalBooking.bookingId || doorstepModalBooking.id}</strong> ({doorstepModalBooking.user?.name || 'Customer'} &bull; {doorstepModalBooking.car?.make} {doorstepModalBooking.car?.model}).
+            </p>
+
+            {/* Policy Enforcement Box */}
+            <div style={{
+              background: '#FFFBEB',
+              border: '1.5px solid #FCD34D',
+              borderRadius: '10px',
+              padding: '0.85rem 1rem',
+              marginBottom: '1rem',
+              fontSize: '0.82rem',
+              color: '#92400E',
+              lineHeight: 1.5
+            }}>
+              <div style={{ fontWeight: 800, marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#B45309' }}>
+                <span>📜</span> Company Policy Deduction Rules:
+              </div>
+              <div>• <strong>Physical Payment:</strong> <strong>₹99</strong> technician visit fee will be deducted; remaining balance refunded automatically to customer via Razorpay.</div>
+              <div>• <strong>Reward Points:</strong> <strong>99</strong> reward coins deducted from redeemed points, remaining coins restored.</div>
+              <div>• <strong>Subscription Booking:</strong> <strong>1 wash limit</strong> is burned from subscription quota with ZERO refund or compensation.</div>
+              <div>• Booking status will immediately change to <strong>CANCELLED</strong>.</div>
+            </div>
+
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 700, color: 'var(--primary-navy)', marginBottom: '0.4rem' }}>
+                Technician Arrival & Attempt Details (Required)
+              </label>
+              <textarea
+                rows={3}
+                className="form-input"
+                placeholder="e.g. Arrived at address, called primary & alt phone 3 times, door locked / customer refused wash..."
+                value={doorstepNote}
+                onChange={e => setDoorstepNote(e.target.value)}
+                style={{ width: '100%', fontSize: '0.85rem', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button
+                type="button"
+                onClick={() => setDoorstepModalBooking(null)}
+                disabled={doorstepLoading}
+                className="btn btn-outline"
+                style={{ borderRadius: '8px', padding: '0.6rem 1.1rem', fontSize: '0.85rem' }}
+              >
+                Keep Active
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDoorstepRejection}
+                disabled={doorstepLoading}
+                style={{
+                  background: '#DC2626',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0.6rem 1.25rem',
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  cursor: doorstepLoading ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {doorstepLoading ? 'Processing Fee Cut...' : 'Confirm Rejection (Deduct ₹99)'}
+              </button>
+            </div>
           </div>
         </div>
       )}

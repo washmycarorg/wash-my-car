@@ -56,7 +56,10 @@ router.post('/wash-prices', adminController.saveWashPrice);
 router.get('/bookings', adminController.getBookings);
 router.put('/bookings/:id/assign', adminController.assignSlot);
 router.put('/bookings/:id/auto-assign', adminController.autoAssignSlot);
+router.put('/bookings/:id/reschedule', adminController.rescheduleBookingByAdmin);
 router.put('/bookings/:id/cancel', adminController.cancelBookingByAdmin);
+router.post('/bookings/:id/doorstep-rejection', adminController.markDoorstepRejectionByAdmin);
+
 
 // Inventory
 router.get('/inventory', adminController.getInventoryItems);

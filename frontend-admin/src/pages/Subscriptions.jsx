@@ -58,7 +58,7 @@ const Subscriptions = () => {
     freeAddonIds: '',
     badge: 'MOST POPULAR',
     features: [
-      'Priority Slot Dispatch',
+      'Zero Checkout Friction',
       'Zero Rescheduling Fee'
     ],
     active: true

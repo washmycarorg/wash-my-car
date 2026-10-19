@@ -2,7 +2,10 @@ import prisma from '../config/db.js';
 import { parseSlotTimeWindow, cleanupExpiredSlotLocks } from './slotController.js';
 import { getRazorpayInstance, verifyRazorpaySignature } from '../config/razorpay.js';
 import { computeEmployeePayout } from '../utils/payoutHelper.js';
-import { sendBookingConfirmationSms, sendCancellationRefundSms } from '../services/smsService.js';
+import { sendBookingConfirmationEmail, sendBookingRescheduledEmail, sendBookingCancelledEmail } from '../utils/mailer.js';
+import { sendPushNotification } from '../utils/pushNotification.js';
+import { generateDailyBookingId } from '../utils/idGenerator.js';
+
 
 export const getProfile = async (req, res) => {
   try {
@@ -98,6 +101,7 @@ export const getBookings = async (req, res) => {
         serviceArea: true, 
         employee: true,
         car: true,
+        review: true,
         addons: {
           include: {
             addon: true
@@ -197,8 +201,35 @@ export const createBooking = async (req, res) => {
       addressName,
       couponCode,
       redeemPoints,
+      customerPhone,
+      alternatePhone,
       addonIds = []
     } = req.body;
+
+    // If customer provided mobile number and profile has no phone or invalid phone, update user profile
+    if (customerPhone) {
+      const cleanCustomerPhone = String(customerPhone).trim();
+      if (cleanCustomerPhone.replace(/\D/g, '').length >= 10) {
+        const formattedCustPhone = cleanCustomerPhone.startsWith('+91') ? cleanCustomerPhone : `+91${cleanCustomerPhone.replace(/\D/g, '').slice(-10)}`;
+        const currentUser = await prisma.user.findUnique({ where: { id: req.user.id } });
+        if (currentUser && (!currentUser.phone || currentUser.phone.trim().length < 10)) {
+          await prisma.user.update({
+            where: { id: req.user.id },
+            data: { phone: formattedCustPhone }
+          }).catch(err => console.warn('Could not auto-update user phone:', err));
+        }
+      }
+    }
+
+    let cleanAlternatePhone = null;
+    if (alternatePhone) {
+      const rawAlt = String(alternatePhone).trim();
+      if (rawAlt.replace(/\D/g, '').length >= 10) {
+        cleanAlternatePhone = rawAlt.startsWith('+91') ? rawAlt : `+91${rawAlt.replace(/\D/g, '').slice(-10)}`;
+      } else if (rawAlt.length > 0) {
+        cleanAlternatePhone = rawAlt;
+      }
+    }
     
     if (!carTypeId || !washTypeId) {
       return res.status(400).json({ 
@@ -700,8 +731,12 @@ export const createBooking = async (req, res) => {
         });
       }
 
+      // Generate serial Booking ID: WMC-DDMMYY-XXX
+      const newBookingId = await generateDailyBookingId(date);
+
       const booking = await prisma.booking.create({
         data: {
+          bookingId: newBookingId,
           userId: req.user.id,
           carTypeId: Number(carTypeId),
           washTypeId: Number(washTypeId),
@@ -710,6 +745,7 @@ export const createBooking = async (req, res) => {
           carNumber: cleanCarNumber,
           carMake: carMake || null,
           carModel: carModel || null,
+          alternatePhone: cleanAlternatePhone,
           date: new Date(date),
           timeSlot: timeSlot || '10:00 AM',
           latitude: Number(latitude),
@@ -798,12 +834,16 @@ export const createBooking = async (req, res) => {
             }
           });
           const confirmedBkg = updatedBooking;
-          sendBookingConfirmationSms(user.phone, confirmedBkg).catch(err => console.error('[SMS Booking Confirmation error]:', err));
+          if (user?.email) {
+            sendBookingConfirmationEmail({ to: user.email, name: user.name, booking: confirmedBkg }).catch(err => console.error('[Email Booking Confirmation error]:', err));
+          }
           return res.json({ requiresPayment: false, booking: confirmedBkg });
         }
       }
 
-      sendBookingConfirmationSms(user.phone, booking).catch(err => console.error('[SMS Booking Confirmation error]:', err));
+      if (user?.email) {
+        sendBookingConfirmationEmail({ to: user.email, name: user.name, booking }).catch(err => console.error('[Email Booking Confirmation error]:', err));
+      }
       return res.json({ requiresPayment: false, booking });
     }
 
@@ -831,9 +871,13 @@ export const createBooking = async (req, res) => {
       });
     }
 
+    // Generate serial Booking ID: WMC-DDMMYY-XXX
+    const newBookingId = await generateDailyBookingId(date);
+
     // 2. Create provisional booking holding a 10-minute slot lock
     const booking = await prisma.booking.create({
       data: {
+        bookingId: newBookingId,
         userId: req.user.id,
         carTypeId: Number(carTypeId),
         washTypeId: Number(washTypeId),
@@ -842,6 +886,7 @@ export const createBooking = async (req, res) => {
         carNumber: cleanCarNumber,
         carMake: carMake || null,
         carModel: carModel || null,
+        alternatePhone: cleanAlternatePhone,
         date: new Date(date),
         timeSlot: timeSlot || '10:00 AM',
         latitude: Number(latitude),
@@ -1064,8 +1109,10 @@ export const verifyBookingPayment = async (req, res) => {
       }
     });
 
-    // Send Booking Confirmation SMS with booking details & Payment ID
-    sendBookingConfirmationSms(user.phone, updatedBooking).catch(err => console.error('[SMS Booking Confirmation error]:', err));
+    // Send Booking Confirmation Email with super CSS styling & booking details
+    if (user?.email) {
+      sendBookingConfirmationEmail({ to: user.email, name: user.name, booking: updatedBooking }).catch(err => console.error('[Email Booking Confirmation error]:', err));
+    }
 
     res.json({ message: 'Payment verified and booking confirmed successfully', booking: updatedBooking });
   } catch (error) {
@@ -1240,9 +1287,24 @@ export const cancelBooking = async (req, res) => {
       }
     });
 
-    // Send Cancellation & Refund Initiation SMS to user
-    if (booking.user?.phone) {
-      sendCancellationRefundSms(booking.user.phone, updatedBooking, refundDetails).catch(err => console.error('[SMS Cancel/Refund error]:', err));
+    // Send Cancellation & Refund Email with super CSS styling to user
+    if (booking.user?.email) {
+      sendBookingCancelledEmail({
+        to: booking.user.email,
+        name: booking.user.name,
+        booking: updatedBooking,
+        refundDetails,
+        reason
+      }).catch(err => console.error('[Email Cancel/Refund error]:', err));
+    }
+
+    // Send push notification to assigned employee if any
+    if (booking.employeeId) {
+      sendPushNotification('EMPLOYEE', booking.employeeId, {
+        title: 'Booking Cancelled ❌',
+        body: `Job #${booking.id} on ${new Date(booking.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} (${booking.timeSlot}) has been cancelled by customer.`,
+        url: '/schedule'
+      }).catch(err => console.error('[SMS Cancel Employee Push error]:', err));
     }
 
     res.json({
@@ -1255,6 +1317,131 @@ export const cancelBooking = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// Customer Reschedule Booking (Allowed ONLY up to 9 hours before slot start time)
+export const rescheduleBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { newDate, newTimeSlot, reason = 'Rescheduled by customer' } = req.body;
+
+    if (!newDate || !newTimeSlot) {
+      return res.status(400).json({ error: 'Please select a new date and time slot.' });
+    }
+
+    const booking = await prisma.booking.findUnique({
+      where: { id: Number(id) },
+      include: { employee: true, user: true, washType: true, carType: true }
+    });
+
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found.' });
+    }
+
+    if (booking.userId !== req.user.id) {
+      return res.status(403).json({ error: 'Unauthorized to reschedule this booking.' });
+    }
+
+    if (booking.status === 'COMPLETED' || booking.status === 'CANCELLED') {
+      return res.status(400).json({ error: `Cannot reschedule a ${booking.status.toLowerCase()} booking.` });
+    }
+
+    if (booking.status === 'STARTED') {
+      return res.status(400).json({ error: 'Technician has already started service. Rescheduling is not permitted.' });
+    }
+
+    // 9-Hour Rescheduling Policy Check:
+    if (booking.date && booking.timeSlot) {
+      const slotWindow = parseSlotTimeWindow(booking.timeSlot);
+      if (slotWindow) {
+        const istDateParts = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Asia/Kolkata',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        }).formatToParts(new Date(booking.date));
+        let bYear, bMonth, bDay;
+        for (const p of istDateParts) {
+          if (p.type === 'year') bYear = p.value;
+          if (p.type === 'month') bMonth = p.value;
+          if (p.type === 'day') bDay = p.value;
+        }
+
+        const slotHour = Math.floor(slotWindow.startMinutes / 60);
+        const slotMinute = slotWindow.startMinutes % 60;
+        const slotIso = `${bYear}-${bMonth}-${bDay}T${String(slotHour).padStart(2, '0')}:${String(slotMinute).padStart(2, '0')}:00+05:30`;
+        const slotStartTime = new Date(slotIso).getTime();
+
+        const cutoffTime = slotStartTime - (9 * 60 * 60 * 1000);
+        const nowTime = Date.now();
+
+        if (nowTime > cutoffTime) {
+          return res.status(400).json({
+            error: 'Rescheduling is only permitted up to 9 hours before your scheduled slot arrival time. Within 9 hours, technician and detailing equipment are already allocated and changes are closed.'
+          });
+        }
+      }
+    }
+
+    const updatedBooking = await prisma.booking.update({
+      where: { id: booking.id },
+      data: {
+        originalDate: booking.originalDate || booking.date,
+        originalTimeSlot: booking.originalTimeSlot || booking.timeSlot,
+        date: new Date(newDate),
+        timeSlot: newTimeSlot,
+        rescheduledAt: new Date(),
+        rescheduledReason: reason,
+        rescheduledBy: 'USER'
+      },
+      include: {
+        employee: true,
+        car: true,
+        washType: true,
+        carType: true
+      }
+    });
+
+    const formattedDate = new Date(newDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+
+    // Send Web Push to Customer
+    sendPushNotification('USER', booking.userId, {
+      title: 'Booking Rescheduled 📅',
+      body: `Your doorstep wash has been rescheduled to ${formattedDate} (${newTimeSlot}).`,
+      url: '/bookings'
+    }).catch(err => console.error('[Push Reschedule User error]:', err));
+
+    // Send Web Push to Assigned Employee if any
+    if (booking.employeeId) {
+      sendPushNotification('EMPLOYEE', booking.employeeId, {
+        title: 'Job Rescheduled 📅',
+        body: `Booking #${booking.id} was rescheduled by customer to ${formattedDate} (${newTimeSlot}).`,
+        url: '/schedule'
+      }).catch(err => console.error('[Push Reschedule Employee error]:', err));
+    }
+
+    // Send Reschedule Email with super CSS styling to Customer
+    if (booking.user?.email) {
+      sendBookingRescheduledEmail({
+        to: booking.user.email,
+        name: booking.user.name,
+        booking: updatedBooking,
+        oldDate: booking.date,
+        oldTimeSlot: booking.timeSlot,
+        rescheduledBy: 'CUSTOMER',
+        reason
+      }).catch(err => console.error('[Email Reschedule error]:', err));
+    }
+
+    res.json({
+      message: 'Booking rescheduled successfully.',
+      booking: updatedBooking
+    });
+  } catch (error) {
+    console.error('Customer reschedule error:', error);
+    res.status(500).json({ error: error.message || 'Failed to reschedule booking.' });
+  }
+};
+
 
 // CRUD for Cars
 export const getCars = async (req, res) => {
@@ -2037,6 +2224,91 @@ export const resolveMapsUrl = async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 };
+
+// Customer Give Review and Feedback for Completed Wash
+export const submitBookingReview = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rating, comment, tags } = req.body;
+
+    const numRating = Number(rating);
+    if (!numRating || numRating < 1 || numRating > 5 || !Number.isInteger(numRating)) {
+      return res.status(400).json({ error: 'Please select a valid rating between 1 and 5 stars' });
+    }
+
+    const booking = await prisma.booking.findUnique({
+      where: { id: Number(id) },
+      include: { employee: true }
+    });
+
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    if (booking.userId !== req.user.id) {
+      return res.status(403).json({ error: 'You are not authorized to review this booking' });
+    }
+
+    if (booking.status !== 'COMPLETED') {
+      return res.status(400).json({ error: 'Review option is only available for completed wash bookings' });
+    }
+
+    const review = await prisma.review.upsert({
+      where: { bookingId: booking.id },
+      update: {
+        rating: numRating,
+        comment: comment ? String(comment).trim() : null,
+        tags: tags ? (Array.isArray(tags) ? JSON.stringify(tags) : String(tags)) : null,
+        employeeId: booking.employeeId,
+        updatedAt: new Date()
+      },
+      create: {
+        bookingId: booking.id,
+        userId: req.user.id,
+        employeeId: booking.employeeId,
+        rating: numRating,
+        comment: comment ? String(comment).trim() : null,
+        tags: tags ? (Array.isArray(tags) ? JSON.stringify(tags) : String(tags)) : null
+      }
+    });
+
+    // Recalculate employee average rating and total reviews
+    if (booking.employeeId) {
+      const empReviews = await prisma.review.findMany({
+        where: { employeeId: booking.employeeId }
+      });
+
+      if (empReviews.length > 0) {
+        const sum = empReviews.reduce((acc, r) => acc + r.rating, 0);
+        const avg = Number((sum / empReviews.length).toFixed(1));
+        await prisma.employee.update({
+          where: { id: booking.employeeId },
+          data: {
+            rating: avg,
+            totalReviews: empReviews.length
+          }
+        });
+      }
+
+      // Notify employee of customer rating & feedback
+      sendPushNotification('EMPLOYEE', booking.employeeId, {
+        title: `Customer Rated Your Wash ⭐ ${numRating}/5`,
+        body: comment ? `"${comment}"` : `You received a ${numRating}-star rating for wash #${booking.bookingId || booking.id}!`,
+        url: '/completed'
+      }).catch(err => console.error('[Push Review to Employee error]:', err));
+    }
+
+    res.json({
+      success: true,
+      message: 'Thank you for your rating and feedback!',
+      review
+    });
+  } catch (error) {
+    console.error('Error submitting review:', error);
+    res.status(500).json({ error: error.message || 'Failed to submit review' });
+  }
+};
+
 
 
 

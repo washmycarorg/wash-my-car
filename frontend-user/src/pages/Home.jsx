@@ -996,7 +996,7 @@ const Home = () => {
             WELCOME OFFER
           </span>
           <span style={{ color: '#F0F9FF' }}>
-            New to Wash My Car? Get Flat <strong>₹100 / 20% OFF</strong> + <strong>100 Free Reward Coins</strong> on your 1st wash in Vizag!
+            New to Wash My Car? Get Flat <strong>₹199 worth Bike Wash FREE</strong> on any car wash booking! Use coupon <strong style={{ color: '#FDE047', background: 'rgba(253, 224, 71, 0.15)', padding: '1px 6px', borderRadius: '4px', letterSpacing: '0.04em' }}>"WELCOME"</strong>
           </span>
         </div>
 
@@ -1229,7 +1229,7 @@ const Home = () => {
             }}>
               <div>
                 <strong style={{ color: '#34D399', fontSize: '0.86rem', display: 'block' }}>🎁 Welcome Offer</strong>
-                <span style={{ color: '#E2E8F0', fontSize: '0.74rem' }}>Save ₹100 + 100 Reward Coins</span>
+                <span style={{ color: '#E2E8F0', fontSize: '0.74rem' }}>Free ₹199 Bike Wash with coupon "WELCOME"</span>
               </div>
               <button 
                 onClick={() => { setMenuOpen(false); navigate('/register?offer=welcome'); }}
@@ -2104,9 +2104,17 @@ const Home = () => {
               fontWeight: 900,
               margin: '0.25rem 0 0',
               letterSpacing: '-0.02em',
-              lineHeight: 1.15
+              lineHeight: 1.15,
+              color: '#FFFFFF'
             }}>
-              Claim Your Welcome Offer – <span style={{ background: 'linear-gradient(135deg, #34D399, #38BDF8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>First Wash Savings</span>
+              Claim Your Welcome Offer –{' '}
+              <span style={{ 
+                background: 'linear-gradient(135deg, #34D399, #38BDF8)', 
+                WebkitBackgroundClip: 'text', 
+                WebkitTextFillColor: 'transparent' 
+              }}>
+                Free ₹199 Bike Wash
+              </span>
             </h2>
 
             <p style={{
@@ -2116,7 +2124,7 @@ const Home = () => {
               margin: '0.2rem 0 0',
               lineHeight: 1.5
             }}>
-              New customer in Vizag? Register your mobile number today and instantly claim flat welcome discounts, bonus reward coins, and hassle-free doorstep car detailing at your home or apartment.
+              New customer in Vizag? Book any car wash service and get an add-on Bike / Scooter Foam Wash worth ₹199 absolutely FREE using coupon code <strong>"WELCOME"</strong>!
             </p>
           </div>
 
@@ -2153,9 +2161,9 @@ const Home = () => {
               }}>
                 <Tag size={22} />
               </div>
-              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: '#FFFFFF' }}>Instant Welcome Discount</h3>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: '#FFFFFF' }}>Flat ₹199 Free Bike Wash</h3>
               <p style={{ fontSize: '0.86rem', color: '#CBD5E1', margin: 0, lineHeight: 1.45 }}>
-                Get flat ₹100 or 20% off your initial booking on any exterior foam wash, interior vacuuming, or full spa package.
+                Book any doorstep car wash package and get a full two-wheeler / bike foam wash worth ₹199 completely free.
               </p>
             </div>
 
@@ -2183,9 +2191,9 @@ const Home = () => {
               }}>
                 <Sparkles size={22} />
               </div>
-              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: '#FFFFFF' }}>100 Free Royalty Coins</h3>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: '#FFFFFF' }}>Coupon Code: "WELCOME"</h3>
               <p style={{ fontSize: '0.86rem', color: '#CBD5E1', margin: 0, lineHeight: 1.45 }}>
-                100 Reward Coins automatically credited to your user wallet on signup. Redeem for future washes, add-ons, or interior detailing.
+                Simply apply coupon code "WELCOME" during booking checkout to automatically activate your ₹0 free bike wash.
               </p>
             </div>
 
@@ -2213,9 +2221,9 @@ const Home = () => {
               }}>
                 <ShieldCheck size={22} />
               </div>
-              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: '#FFFFFF' }}>Zero Upfront Fees</h3>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: '#FFFFFF' }}>Doorstep Dual Shine</h3>
               <p style={{ fontSize: '0.86rem', color: '#CBD5E1', margin: 0, lineHeight: 1.45 }}>
-                Sign up in 30 seconds with mobile OTP. No credit card required. Certified mobile technician arrives at your preferred time window.
+                Our technician arrives at your door with specialized car & bike wash kits, pressure pumps, and spot-free foam.
               </p>
             </div>
           </div>
@@ -2363,7 +2371,7 @@ const Home = () => {
                 lineHeight: 1.6,
                 margin: '0 0 1.75rem 0'
               }}>
-                {settings?.subscriptionBannerSubtitle || 'Save up to 40% every month with doorstep vehicle wash passes, zero booking fees, priority slots & complimentary add-on services!'}
+                {settings?.subscriptionBannerSubtitle || 'Save up to 40% every month with doorstep vehicle wash passes, zero booking fees & complimentary add-on services!'}
               </p>
 
               {/* Perks Row */}
@@ -2395,11 +2403,11 @@ const Home = () => {
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                   <div style={{ width: 32, height: 32, borderRadius: '10px', background: 'rgba(56, 189, 248, 0.2)', border: '1px solid #38BDF8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Zap size={18} color="#38BDF8" />
+                    <Shield size={18} color="#38BDF8" />
                   </div>
                   <div>
-                    <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#F8FAFC' }}>VIP Dispatch</div>
-                    <div style={{ fontSize: '0.72rem', color: '#94A3B8' }}>Priority morning slots</div>
+                    <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#F8FAFC' }}>Dedicated Care</div>
+                    <div style={{ fontSize: '0.72rem', color: '#94A3B8' }}>Exclusive to your vehicle</div>
                   </div>
                 </div>
               </div>

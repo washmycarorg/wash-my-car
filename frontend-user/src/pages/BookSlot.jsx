@@ -313,6 +313,9 @@ const BookSlot = () => {
   const [loading, setLoading] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(null);
   const [userSubscriptions, setUserSubscriptions] = useState([]);
+  const [customerPrimaryPhone, setCustomerPrimaryPhone] = useState('');
+  const [alternatePhone, setAlternatePhone] = useState('');
+  const [phoneError, setPhoneError] = useState('');
 
   // Initial Data Fetch
   useEffect(() => {
@@ -338,6 +341,9 @@ const BookSlot = () => {
       if (profileRes) {
         setUserProfile(profileRes);
         setUserPoints(profileRes.points || 0);
+        if (profileRes.phone) {
+          setCustomerPrimaryPhone(profileRes.phone.replace(/^\+91/, '').trim());
+        }
       }
 
       if (subRes) {
@@ -1319,6 +1325,13 @@ const BookSlot = () => {
       return;
     }
 
+    const cleanPrimaryPhone = (customerPrimaryPhone || userProfile?.phone || '').trim().replace(/^\+91/, '').replace(/\D/g, '');
+    if (!cleanPrimaryPhone || cleanPrimaryPhone.length < 10) {
+      setPhoneError('Please enter your 10-digit mobile number so our doorstep technician can coordinate arrival.');
+      alert('Please enter your 10-digit primary mobile number before confirming your booking.');
+      return;
+    }
+
     if (availableSlotsList.length > 0) {
       const selectedSlotObj = availableSlotsList.find(s => s.slot === timeSlot);
       if (!selectedSlotObj) {
@@ -1366,6 +1379,7 @@ const BookSlot = () => {
         finalCarModel = selectedModel === '__OTHER__' ? customModel.trim() : selectedModel.trim();
       }
 
+      const cleanAltPhone = alternatePhone.trim().replace(/\D/g, '');
       const payload = {
         carTypeId: Number(selectedCarTypeId),
         washTypeId: Number(selectedWashTypeId),
@@ -1384,7 +1398,9 @@ const BookSlot = () => {
         addressName: addressLabel,
         couponCode: isWashCoveredBySub ? null : (selectedCouponCode || null),
         redeemPoints: redeemPoints,
-        addonIds: selectedAddonIds
+        addonIds: selectedAddonIds,
+        customerPhone: cleanPrimaryPhone,
+        alternatePhone: cleanAltPhone.length >= 10 ? cleanAltPhone : null
       };
 
       const res = await createBooking(payload);
@@ -1544,7 +1560,9 @@ const BookSlot = () => {
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
               <span style={{ color: 'var(--text-muted)' }}>Booking ID</span>
-              <span style={{ fontWeight: 700, color: 'var(--primary-navy)' }}>#{bookingSuccess.id}</span>
+              <span style={{ fontWeight: 800, color: 'var(--primary-navy)', fontFamily: 'monospace', letterSpacing: '0.04em' }}>
+                {bookingSuccess.bookingId || `#${bookingSuccess.id}`}
+              </span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
               <span style={{ color: 'var(--text-muted)' }}>Service Plan</span>
@@ -1554,6 +1572,18 @@ const BookSlot = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Vehicle Reg.</span>
                 <span style={{ fontWeight: 700, color: 'var(--primary-blue)', letterSpacing: '0.05em' }}>{carNumber}</span>
+              </div>
+            )}
+            {customerPrimaryPhone && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Technician Contact</span>
+                <span style={{ fontWeight: 700, color: 'var(--primary-navy)' }}>+91 {customerPrimaryPhone}</span>
+              </div>
+            )}
+            {alternatePhone && alternatePhone.replace(/\D/g, '').length >= 10 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Alt Backup Contact</span>
+                <span style={{ fontWeight: 700, color: '#D97706' }}>+91 {alternatePhone.replace(/\D/g, '')}</span>
               </div>
             )}
 
@@ -2476,15 +2506,15 @@ const BookSlot = () => {
 
             <div style={{ background: '#ECFDF5', border: '1.5px solid #86EFAC', borderRadius: '12px', padding: '1rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#15803D', fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.25rem' }}>
-                <RefreshCw size={16} /> Fair Refund System
+                <RefreshCw size={16} /> Reschedule & Refund Policy
               </div>
               <p style={{ margin: 0, fontSize: '0.8rem', color: '#14532D', lineHeight: 1.4 }}>
-                100% full refund up to 9 hours before slot. If not cancelled before 9 hours or if any doorstep rejection is found, no refund will be initiated.
+                Free reschedule & 100% refund up to 9 hours before slot. Within 9 hours changes are closed. Doorstep rejection incurs ₹99 visit fee.
               </p>
             </div>
           </div>
 
-          {/* Dedicated Cancellation & 100% Refund Policy Banner */}
+          {/* Dedicated Cancellation, Rescheduling & Doorstep Rejection Policy Banner */}
           <div style={{
             background: 'linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)',
             border: '1.5px solid #86EFAC',
@@ -2498,27 +2528,32 @@ const BookSlot = () => {
                 <RefreshCw size={17} />
               </div>
               <h4 style={{ margin: 0, color: '#14532D', fontSize: '0.98rem', fontWeight: 800 }}>
-                Transparent Cancellation & Refund Policy
+                Transparent Cancellation, Reschedule & Doorstep Rejection Policy
               </h4>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', fontSize: '0.85rem', color: '#166534', lineHeight: 1.5 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.84rem', color: '#166534', lineHeight: 1.5 }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
                 <span style={{ color: '#16A34A', fontWeight: 800, marginTop: '2px' }}>•</span>
                 <div>
-                  <strong style={{ color: '#14532D' }}>Prior to 9 Hours to Slot:</strong> Full <strong>100% refund</strong> is immediately allocated and initiated back to your original payment method with zero cancellation fees.
+                  <strong style={{ color: '#14532D' }}>Prior to 9 Hours to Slot (Cancellation & Rescheduling):</strong> Free slot rescheduling or 100% full automatic refund is permitted up to 9 hours before your scheduled arrival time with zero cancellation charges.
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
                 <span style={{ color: '#DC2626', fontWeight: 800, marginTop: '2px' }}>•</span>
                 <div>
-                  <strong style={{ color: '#991B1B' }}>Within 9 Hours of Slot Time:</strong> If not cancelled at least 9 hours prior, <strong>no refund will be issued</strong> and cancellation is closed, as our service technician equipped on scooty/bike with wash & detailing kit and vehicle care amenities (floor papers, car fresheners, cleaning liquids & detailing supplies) is already committed and reserved for your vehicle.
+                  <strong style={{ color: '#991B1B' }}>Within 9 Hours of Slot Time:</strong> Rescheduling and cancellation are closed, as our mobile technician equipped on bike with pressure washing machine and detailing materials is already allocated and reserved for your vehicle.
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
-                <span style={{ color: '#DC2626', fontWeight: 800, marginTop: '2px' }}>•</span>
+                <span style={{ color: '#EA580C', fontWeight: 800, marginTop: '2px' }}>•</span>
                 <div>
-                  <strong style={{ color: '#991B1B' }}>Doorstep Rejection / Access Denial:</strong> If any doorstep rejection is found upon technician arrival (including customer refusal, lack of domestic water/electricity access, gated entry denial, or customer unavailability), <strong>no refund will be initiated</strong> under any circumstances.
+                  <strong style={{ color: '#9A3412' }}>Doorstep Rejection / Customer Unavailability Fee:</strong> If no reschedule or cancellation was done prior to 9 hours, but upon technician arrival or contact the service is rejected or customer is unavailable:
+                  <div style={{ marginTop: '0.25rem', paddingLeft: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.2rem', fontSize: '0.8rem', color: '#7C2D12' }}>
+                    <div>- <strong>Physical Payment:</strong> <strong>₹99 technician visit/dispatch fee</strong> will be cut down from the physical amount paid, and remaining balance refunded via Razorpay.</div>
+                    <div>- <strong>Reward Coins:</strong> If paid through rewards, <strong>99 reward points</strong> will be cut down and remaining restored to your account.</div>
+                    <div>- <strong>VIP Subscription:</strong> <strong>1 subscription wash limit</strong> will be cut down with no refund or compensation given.</div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2536,7 +2571,7 @@ const BookSlot = () => {
               Official Service Disclaimer & Terms
             </h4>
             <div style={{ color: '#475569', fontSize: '0.86rem', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
-              {systemSettings?.bookingTermsText || "1. Access Requirements: Customer agrees to provide adequate water tap access and a standard electric plug point for the technician to perform the doorstep car wash service safely.\n2. Vehicle Parking: The vehicle must be parked in a safe area with sufficient clearance around all sides.\n3. Valuable Items: Please remove all personal belongings and valuables from inside the car prior to service commencement.\n4. Cancellation & Refund Policy: Full 100% refund is allocated if cancelled up to 9 hours before scheduled slot time. If not cancelled before 9 hours or if any doorstep rejection is found upon arrival, no refund will be initiated."}
+              {systemSettings?.bookingTermsText || "1. Access Requirements: Customer agrees to provide adequate water tap access and a standard electric plug point for the technician to perform the doorstep car wash service safely.\n2. Vehicle Parking: The vehicle must be parked in a safe area with sufficient clearance around all sides.\n3. Valuable Items: Please remove all personal belongings and valuables from inside the car prior to service commencement.\n4. Cancellation & Rescheduling: Permitted up to 9 hours before slot time. Within 9 hours, changes are closed.\n5. Doorstep Rejection / Unavailability: If customer rejects service or is not available upon arrival, a ₹99 visit fee will be deducted from paid amount (or 99 points from rewards, or 1 wash from subscription pass limit) with no compensation."}
             </div>
           </div>
 
@@ -2577,13 +2612,14 @@ const BookSlot = () => {
             </div>
             <div>
               <span style={{ fontWeight: 700, color: 'var(--primary-navy)', fontSize: '0.92rem', display: 'block' }}>
-                I agree and accept the service requirements, 9-hour cancellation & doorstep rejection refund policy
+                I agree to the service terms, 9-hour cancellation & reschedule policy, and ₹99 doorstep rejection fee
               </span>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                I confirm water/power tap access and understand that 100% full refund applies only if cancelled at least 9 hours prior to slot time. If not cancelled before 9 hours or if any doorstep rejection is found upon arrival, no refund will be initiated.
+                I confirm water/power tap access and understand that 100% refund & free rescheduling apply only up to 9 hours before slot time. If customer rejects service or is unavailable upon technician arrival/contact, ₹99 visit fee is deducted (or 99 reward points, or 1 subscription wash limit) with no compensation.
               </span>
             </div>
           </div>
+
 
           {termsError && (
             <div style={{ background: '#FEE2E2', border: '1px solid #FCA5A5', padding: '0.65rem 0.85rem', borderRadius: '8px', color: '#991B1B', fontSize: '0.85rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -4338,7 +4374,7 @@ const BookSlot = () => {
                         <input
                           type="text"
                           className="form-input"
-                          placeholder="e.g. WC50, SAVE99, FESTIVE20"
+                          placeholder="e.g. WELCOME, FESTIVE20"
                           value={manualCouponInput}
                           onChange={e => {
                             setManualCouponInput(e.target.value.toUpperCase().replace(/\s+/g, ''));
@@ -4839,6 +4875,117 @@ const BookSlot = () => {
                       }} />
                     </span>
                   </label>
+                </div>
+              )}
+            </div>
+
+            {/* Technician Contact & Reachability Card */}
+            <div className="card" style={{ padding: '1.5rem', background: '#FFFFFF', borderRadius: '16px', border: '1px solid #E2E8F0', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Phone size={18} color="#059669" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, color: 'var(--primary-navy)', fontSize: '1.08rem', fontWeight: 800 }}>
+                    Doorstep Technician Contact Details
+                  </h3>
+                  <p style={{ margin: '0.15rem 0 0', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                    Our mobile detailing technician will call these numbers upon arrival at your doorstep
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
+                {/* Primary Mobile Number */}
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>Primary Mobile Number <span style={{ color: '#EF4444' }}>*</span></span>
+                    {userProfile?.phone && (
+                      <span style={{ fontSize: '0.72rem', color: '#059669', background: '#ECFDF5', padding: '0.1rem 0.45rem', borderRadius: '6px', fontWeight: 700 }}>
+                        ✓ Account Number
+                      </span>
+                    )}
+                  </label>
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <div style={{
+                      position: 'absolute',
+                      left: '0.75rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.3rem',
+                      fontSize: '0.86rem',
+                      fontWeight: 700,
+                      color: '#475569',
+                      borderRight: '1px solid #CBD5E1',
+                      paddingRight: '0.5rem',
+                      pointerEvents: 'none'
+                    }}>
+                      <span>🇮🇳</span>
+                      <span>+91</span>
+                    </div>
+                    <input 
+                      type="tel"
+                      required
+                      maxLength={10}
+                      className="form-input"
+                      style={{ paddingLeft: '4.8rem', width: '100%', fontWeight: 700, fontSize: '0.98rem', letterSpacing: '0.02em', border: phoneError ? '1.5px solid #EF4444' : '1px solid #CBD5E1' }}
+                      placeholder="98765 43210"
+                      value={customerPrimaryPhone}
+                      onChange={e => {
+                        setCustomerPrimaryPhone(e.target.value.replace(/\D/g, '').slice(0, 10));
+                        if (phoneError) setPhoneError('');
+                      }}
+                    />
+                  </div>
+                  <small style={{ fontSize: '0.73rem', color: '#64748B', marginTop: '0.25rem', display: 'block' }}>
+                    {userProfile?.phone ? 'Technician will dial this primary number when reaching your parking spot.' : 'Required: enter your 10-digit mobile number so our technician can reach you.'}
+                  </small>
+                </div>
+
+                {/* Alternative Phone Number (Optional) */}
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>Alternative Mobile Number <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>(Optional)</span></span>
+                    <span style={{ fontSize: '0.72rem', color: '#D97706', background: '#FEF3C7', padding: '0.1rem 0.45rem', borderRadius: '6px', fontWeight: 700 }}>
+                      ⚡ Technician Backup
+                    </span>
+                  </label>
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <div style={{
+                      position: 'absolute',
+                      left: '0.75rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.3rem',
+                      fontSize: '0.86rem',
+                      fontWeight: 700,
+                      color: '#475569',
+                      borderRight: '1px solid #CBD5E1',
+                      paddingRight: '0.5rem',
+                      pointerEvents: 'none'
+                    }}>
+                      <span>🇮🇳</span>
+                      <span>+91</span>
+                    </div>
+                    <input 
+                      type="tel"
+                      maxLength={10}
+                      className="form-input"
+                      style={{ paddingLeft: '4.8rem', width: '100%', fontWeight: 700, fontSize: '0.98rem', letterSpacing: '0.02em' }}
+                      placeholder="Backup number (optional)"
+                      value={alternatePhone}
+                      onChange={e => setAlternatePhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    />
+                  </div>
+                  <small style={{ fontSize: '0.73rem', color: '#64748B', marginTop: '0.25rem', display: 'block' }}>
+                    Technician will call this secondary contact if your primary phone is busy or has weak reception.
+                  </small>
+                </div>
+              </div>
+
+              {phoneError && (
+                <div style={{ background: '#FEE2E2', border: '1px solid #FCA5A5', padding: '0.55rem 0.75rem', borderRadius: '8px', color: '#991B1B', fontSize: '0.82rem', marginTop: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <AlertCircle size={15} /> {phoneError}
                 </div>
               )}
             </div>

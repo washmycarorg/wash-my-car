@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { getBookings, getCars, getProfile, cancelBooking } from '../api';
+import { getBookings, getCars, getProfile, cancelBooking, rescheduleBooking, getAvailableSlots, submitBookingReview } from '../api';
+import { initPushNotifications } from '../utils/pushManager';
 import { 
   Calendar, Car, Filter, ChevronDown, CheckCircle, Clock, 
   AlertCircle, XCircle, Star, Tag, Gift, Sparkles,
   Shield, Bike, Droplets, Feather, Flame, X, RefreshCw
 } from 'lucide-react';
+
 
 const renderAddonIcon = (iconName, size = 14) => {
   if (!iconName) return <Sparkles size={size} />;
@@ -88,8 +90,118 @@ const Bookings = () => {
   const [cancelReason, setCancelReason] = useState('');
   const [cancelLoading, setCancelLoading] = useState(false);
 
+  // Reschedule modal state
+  const [reschedulingBooking, setReschedulingBooking] = useState(null);
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleSlot, setRescheduleSlot] = useState('');
+  const [rescheduleReason, setRescheduleReason] = useState('');
+  const [rescheduleSlotsList, setRescheduleSlotsList] = useState([]);
+  const [loadingRescheduleSlots, setLoadingRescheduleSlots] = useState(false);
+  const [rescheduleLoading, setRescheduleLoading] = useState(false);
+
+  // Review & Feedback modal state
+  const [reviewBooking, setReviewBooking] = useState(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewHoverRating, setReviewHoverRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewSelectedTags, setReviewSelectedTags] = useState([]);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+
+  const openReviewModal = (booking) => {
+    setReviewBooking(booking);
+    setReviewRating(booking.review?.rating || 5);
+    setReviewHoverRating(0);
+    setReviewComment(booking.review?.comment || '');
+    try {
+      setReviewSelectedTags(booking.review?.tags ? JSON.parse(booking.review.tags) : []);
+    } catch (e) {
+      setReviewSelectedTags([]);
+    }
+  };
+
+  const handleReviewSubmit = async () => {
+    if (!reviewBooking) return;
+    setReviewSubmitting(true);
+    try {
+      const res = await submitBookingReview(reviewBooking.id, {
+        rating: reviewRating,
+        comment: reviewComment,
+        tags: reviewSelectedTags
+      });
+      alert(res.message || 'Thank you for your rating and feedback!');
+      setReviewBooking(null);
+      await fetchBookingsList();
+    } catch (err) {
+      alert('Failed to submit review: ' + (err.message || 'Unknown error'));
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
   const fetchBookingsList = () => {
     return getBookings().then(bks => setBookings(bks)).catch(err => console.error(err));
+  };
+
+  const fetchRescheduleSlots = async (targetDate, serviceAreaId, address) => {
+    if (!targetDate) return;
+    setLoadingRescheduleSlots(true);
+    try {
+      const res = await getAvailableSlots(targetDate, serviceAreaId, address);
+      if (res && Array.isArray(res.slots)) {
+        setRescheduleSlotsList(res.slots);
+      } else {
+        setRescheduleSlotsList([]);
+      }
+    } catch (e) {
+      setRescheduleSlotsList([]);
+    } finally {
+      setLoadingRescheduleSlots(false);
+    }
+  };
+
+  const openRescheduleModal = (b) => {
+    if (!canCancelBooking(b.date, b.timeSlot)) {
+      alert('⚠️ Rescheduling Closed\n\nPer our policy, rescheduling is only permitted up to 9 hours before your scheduled slot arrival time. Within 9 hours, technician and detailing equipment are already allocated.');
+      return;
+    }
+    setReschedulingBooking(b);
+    const initialDate = b.date ? new Date(b.date).toISOString().split('T')[0] : '';
+    setRescheduleDate(initialDate);
+    setRescheduleSlot(b.timeSlot || '10:00 AM');
+    setRescheduleReason('');
+    fetchRescheduleSlots(initialDate, b.serviceAreaId, b.address);
+  };
+
+  const handleConfirmReschedule = async () => {
+    if (!reschedulingBooking) return;
+
+    if (!canCancelBooking(reschedulingBooking.date, reschedulingBooking.timeSlot)) {
+      alert('⚠️ Rescheduling Closed\n\nPer our policy, rescheduling is only permitted up to 9 hours before your scheduled slot arrival time. If not rescheduled or cancelled before 9 hours, changes are closed.');
+      setReschedulingBooking(null);
+      await fetchBookingsList();
+      return;
+    }
+
+    if (!rescheduleDate || !rescheduleSlot) {
+      alert('Please select a new date and an approved time slot.');
+      return;
+    }
+
+    setRescheduleLoading(true);
+    try {
+      const res = await rescheduleBooking(reschedulingBooking.id, {
+        newDate: rescheduleDate,
+        newTimeSlot: rescheduleSlot,
+        reason: rescheduleReason || 'Customer requested reschedule'
+      });
+      alert(res.message || 'Booking rescheduled successfully.');
+      setReschedulingBooking(null);
+      await fetchBookingsList();
+    } catch (err) {
+      alert('⚠️ Reschedule Notice: ' + (err.message || 'Failed to reschedule.'));
+    } finally {
+      setRescheduleLoading(false);
+    }
   };
 
   const handleCancelBooking = async () => {
@@ -120,15 +232,28 @@ const Bookings = () => {
   };
 
   useEffect(() => {
+    initPushNotifications().catch(() => {});
     Promise.all([getBookings(), getCars().catch(() => []), getProfile().catch(() => null)])
       .then(([bks, cars, prof]) => {
         setBookings(bks);
         setSavedCars(cars);
         setProfile(prof);
         setLoading(false);
+
+        // Check if navigated from notification with ?review=<id>
+        const searchParams = new URLSearchParams(window.location.search);
+        const reviewTargetId = searchParams.get('review');
+        if (reviewTargetId && Array.isArray(bks)) {
+          const target = bks.find(b => b.id.toString() === reviewTargetId && b.status === 'COMPLETED');
+          if (target) {
+            openReviewModal(target);
+            setExpandedId(target.id);
+          }
+        }
       })
       .catch(err => { console.error(err); setLoading(false); });
   }, []);
+
 
   // Apply filters
   const filtered = bookings.filter(b => {
@@ -192,6 +317,19 @@ const Bookings = () => {
               <span style={{ fontWeight: 700, color: 'var(--primary-navy)', fontSize: '0.95rem' }}>
                 {washLabel}
               </span>
+              <span style={{
+                background: '#F1F5F9',
+                color: '#0F172A',
+                padding: '0.15rem 0.5rem',
+                borderRadius: '6px',
+                fontSize: '0.74rem',
+                fontWeight: 800,
+                fontFamily: 'monospace',
+                border: '1px solid #E2E8F0',
+                letterSpacing: '0.04em'
+              }}>
+                {booking.bookingId || `#${booking.id}`}
+              </span>
               {carTypeLabel && (
                 <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', background: '#F1F5F9', padding: '0.1rem 0.5rem', borderRadius: '8px' }}>
                   {carTypeLabel}
@@ -231,6 +369,26 @@ const Bookings = () => {
         {/* Expanded Details */}
         {isExpanded && (
           <div style={{ borderTop: '1px solid #F1F5F9', padding: '1rem 1.25rem', background: '#FAFBFC', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+
+            {/* Rescheduled Notice */}
+            {booking.rescheduledAt && (
+              <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '10px', padding: '0.75rem 1rem', color: '#1E40AF', fontSize: '0.85rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 800 }}>
+                  <Calendar size={15} color="#2563EB" />
+                  <span>Service Rescheduled by {booking.rescheduledBy === 'ADMIN' ? 'Administration' : 'You'}</span>
+                </div>
+                {booking.rescheduledReason && (
+                  <div style={{ marginTop: '0.25rem', color: '#1E3A8A' }}>
+                    <strong>Reason:</strong> {booking.rescheduledReason}
+                  </div>
+                )}
+                {booking.originalDate && (
+                  <div style={{ fontSize: '0.76rem', color: '#3B82F6', marginTop: '0.2rem' }}>
+                    Originally scheduled for: {new Date(booking.originalDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} ({booking.originalTimeSlot})
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Vehicle */}
             <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
@@ -382,6 +540,19 @@ const Bookings = () => {
                     <strong>Reason:</strong> {booking.cancellationReason}
                   </div>
                 )}
+
+                {/* Doorstep Rejection / Unavailability Notice */}
+                {booking.doorstepFeeDeducted > 0 && (
+                  <div style={{ marginTop: '0.55rem', background: '#FFF7ED', border: '1px solid #FDBA74', borderRadius: '8px', padding: '0.6rem 0.8rem', color: '#9A3412', fontSize: '0.8rem', lineHeight: 1.45 }}>
+                    <div style={{ fontWeight: 800, color: '#C2410C', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <AlertCircle size={14} color="#EA580C" /> Doorstep Rejection / Unavailability Fee Applied
+                    </div>
+                    <div style={{ marginTop: '0.2rem' }}>
+                      As per company policy, a <strong>₹99 technician visit/dispatch fee</strong> was deducted because cancellation or rescheduling was not performed at least 9 hours prior, and service could not proceed upon technician arrival or contact.
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #FCA5A5' }}>
                   {booking.refundStatus === 'PROCESSED' ? (
                     <div style={{ background: '#DCFCE7', color: '#166534', padding: '0.65rem 0.85rem', borderRadius: '8px', fontSize: '0.82rem', lineHeight: 1.5 }}>
@@ -424,40 +595,65 @@ const Bookings = () => {
               </div>
             )}
 
-            {/* Cancel Action Button for Active Bookings */}
+            {/* Cancel & Reschedule Action Buttons for Active Bookings */}
             {['PENDING', 'ASSIGNED'].includes(booking.status) && (
               <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.75rem', paddingTop: '0.35rem', flexWrap: 'wrap' }}>
                 {canCancelBooking(booking.date, booking.timeSlot) ? (
-                  <button
-                    type="button"
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      // Real-time check to prevent opening modal if client data was cached and 9-hour limit has now passed
-                      if (!canCancelBooking(booking.date, booking.timeSlot)) {
-                        alert('⚠️ Cancellation Policy Notice\n\nCancellations with 100% full refund are only permitted up to 9 hours before your scheduled slot arrival time.\n\nIf not cancelled before 9 hours or if any doorstep rejection is found, no refund will be initiated per company policy.');
-                        await fetchBookingsList();
-                        return;
-                      }
-                      setCancellingBooking(booking);
-                      setCancelReason('');
-                    }}
-                    className="btn"
-                    style={{
-                      background: '#FEE2E2',
-                      color: '#DC2626',
-                      border: '1.5px solid #FCA5A5',
-                      padding: '0.45rem 1rem',
-                      borderRadius: '8px',
-                      fontWeight: 700,
-                      fontSize: '0.82rem',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.4rem'
-                    }}
-                  >
-                    <XCircle size={15} /> Cancel Booking & Refund
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openRescheduleModal(booking);
+                      }}
+                      className="btn"
+                      style={{
+                        background: '#EFF6FF',
+                        color: '#1D4ED8',
+                        border: '1.5px solid #93C5FD',
+                        padding: '0.45rem 1rem',
+                        borderRadius: '8px',
+                        fontWeight: 700,
+                        fontSize: '0.82rem',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.4rem'
+                      }}
+                    >
+                      <Calendar size={15} /> Reschedule Slot
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        // Real-time check to prevent opening modal if client data was cached and 9-hour limit has now passed
+                        if (!canCancelBooking(booking.date, booking.timeSlot)) {
+                          alert('⚠️ Cancellation Policy Notice\n\nCancellations with 100% full refund are only permitted up to 9 hours before your scheduled slot arrival time.\n\nIf not cancelled before 9 hours or if any doorstep rejection is found, no refund will be initiated per company policy.');
+                          await fetchBookingsList();
+                          return;
+                        }
+                        setCancellingBooking(booking);
+                        setCancelReason('');
+                      }}
+                      className="btn"
+                      style={{
+                        background: '#FEE2E2',
+                        color: '#DC2626',
+                        border: '1.5px solid #FCA5A5',
+                        padding: '0.45rem 1rem',
+                        borderRadius: '8px',
+                        fontWeight: 700,
+                        fontSize: '0.82rem',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.4rem'
+                      }}
+                    >
+                      <XCircle size={15} /> Cancel Booking & Refund
+                    </button>
+                  </>
                 ) : (
                   <div style={{
                     fontSize: '0.78rem',
@@ -472,7 +668,119 @@ const Bookings = () => {
                     fontWeight: 600
                   }}>
                     <Clock size={13} color="#94A3B8" />
-                    Cancellation closed (Allowed up to 9 hrs before slot arrival)
+                    Reschedule & Cancellation closed (Allowed up to 9 hrs before slot arrival)
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Customer Review & Rating Section (STRICTLY for COMPLETED bookings ONLY) */}
+            {booking.status === 'COMPLETED' && (
+              <div style={{
+                marginTop: '0.35rem',
+                background: booking.review ? '#F0FDF4' : 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)',
+                border: booking.review ? '1.5px solid #86EFAC' : '1.5px solid #FCD34D',
+                borderRadius: '12px',
+                padding: '0.85rem 1rem'
+              }}>
+                {booking.review ? (
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          Your Rating:
+                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                          {[1, 2, 3, 4, 5].map(s => (
+                            <Star
+                              key={s}
+                              size={15}
+                              fill={s <= booking.review.rating ? '#F59E0B' : '#E2E8F0'}
+                              color={s <= booking.review.rating ? '#F59E0B' : '#CBD5E1'}
+                            />
+                          ))}
+                          <span style={{ fontWeight: 800, fontSize: '0.88rem', color: '#B45309', marginLeft: '4px' }}>
+                            {booking.review.rating}/5
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openReviewModal(booking);
+                        }}
+                        style={{
+                          background: 'white',
+                          border: '1.5px solid #86EFAC',
+                          color: '#15803D',
+                          padding: '0.25rem 0.65rem',
+                          borderRadius: '6px',
+                          fontSize: '0.76rem',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Edit Review
+                      </button>
+                    </div>
+
+                    {booking.review.comment && (
+                      <p style={{ margin: '0.4rem 0 0', fontSize: '0.85rem', color: '#14532D', fontStyle: 'italic', lineHeight: 1.45 }}>
+                        "{booking.review.comment}"
+                      </p>
+                    )}
+
+                    {booking.review.tags && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginTop: '0.45rem' }}>
+                        {(() => {
+                          try {
+                            const parsed = JSON.parse(booking.review.tags);
+                            return Array.isArray(parsed) ? parsed.map((t, idx) => (
+                              <span key={idx} style={{ background: '#DCFCE7', color: '#166534', fontSize: '0.72rem', padding: '0.15rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>
+                                {t}
+                              </span>
+                            )) : null;
+                          } catch (e) {
+                            return null;
+                          }
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem' }}>
+                    <div>
+                      <div style={{ fontWeight: 800, color: '#92400E', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <Star size={17} fill="#F59E0B" color="#F59E0B" /> How was your doorstep wash?
+                      </div>
+                      <p style={{ margin: '0.2rem 0 0', fontSize: '0.8rem', color: '#78350F' }}>
+                        Rate your service done by {employeeName || 'technician'} to share your feedback and help us improve.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openReviewModal(booking);
+                      }}
+                      style={{
+                        background: 'linear-gradient(135deg, #D97706 0%, #B45309 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '0.5rem 1.1rem',
+                        borderRadius: '8px',
+                        fontWeight: 800,
+                        fontSize: '0.82rem',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        boxShadow: '0 2px 8px rgba(217, 119, 6, 0.3)'
+                      }}
+                    >
+                      <Star size={14} fill="white" /> Give Review & Feedback
+                    </button>
                   </div>
                 )}
               </div>
@@ -483,6 +791,9 @@ const Bookings = () => {
     );
   };
 
+
+  const unreviewedCompleted = bookings.find(b => b.status === 'COMPLETED' && !b.review);
+
   return (
     <div style={{ maxWidth: '700px', margin: '0 auto', paddingBottom: '3rem' }}>
       {/* Header */}
@@ -490,6 +801,57 @@ const Bookings = () => {
         <h2 style={{ margin: '0 0 0.25rem', color: 'var(--primary-navy)', fontSize: '1.4rem', fontWeight: 800 }}>My Bookings</h2>
         <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem' }}>All active and past bookings with full details</p>
       </div>
+
+      {/* Unreviewed Completed Booking Notification Banner */}
+      {unreviewedCompleted && (
+        <div style={{
+          background: 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)',
+          border: '1.5px solid #FCD34D',
+          borderRadius: '16px',
+          padding: '1rem 1.25rem',
+          marginBottom: '1.5rem',
+          boxShadow: '0 4px 14px rgba(245, 158, 11, 0.15)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.75rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: '240px', flex: 1 }}>
+            <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#F59E0B', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 2px 6px rgba(245, 158, 11, 0.4)' }}>
+              <Star size={22} fill="white" />
+            </div>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#92400E' }}>
+                Rate Your Wash ({unreviewedCompleted.bookingId || `#${unreviewedCompleted.id}`})
+              </h4>
+              <p style={{ margin: '0.15rem 0 0', fontSize: '0.82rem', color: '#78350F' }}>
+                Your service on {new Date(unreviewedCompleted.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} was completed! Please share your rating & feedback for {unreviewedCompleted.employee?.name || 'your technician'}.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => openReviewModal(unreviewedCompleted)}
+            style={{
+              background: 'linear-gradient(135deg, #D97706 0%, #B45309 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '0.55rem 1.25rem',
+              fontWeight: 800,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              boxShadow: '0 2px 8px rgba(217, 119, 6, 0.3)'
+            }}
+          >
+            <Star size={15} fill="white" /> Give Review
+          </button>
+        </div>
+      )}
 
       {/* Filters */}
       <div style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '1rem 1.25rem', marginBottom: '1.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'flex-end' }}>
@@ -614,7 +976,7 @@ const Bookings = () => {
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h3 style={{ margin: 0, color: '#DC2626', fontSize: '1.15rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <AlertCircle size={20} color="#DC2626" /> Cancel Booking #{cancellingBooking.id}
+                <AlertCircle size={20} color="#DC2626" /> Cancel Booking {cancellingBooking.bookingId || `#${cancellingBooking.id}`}
               </h3>
               <button
                 onClick={() => setCancellingBooking(null)}
@@ -703,6 +1065,380 @@ const Bookings = () => {
           </div>
         </div>
       )}
+
+      {/* Reschedule Booking Modal */}
+      {reschedulingBooking && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(4px)',
+          zIndex: 1100,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem'
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '20px',
+            width: '100%',
+            maxWidth: '500px',
+            padding: '1.75rem',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            boxSizing: 'border-box'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0, color: '#1E40AF', fontSize: '1.2rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Calendar size={20} color="#2563EB" /> Reschedule Wash {reschedulingBooking.bookingId || `#${reschedulingBooking.id}`}
+              </h3>
+              <button
+                onClick={() => setReschedulingBooking(null)}
+                style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <X size={18} color="#64748B" />
+              </button>
+            </div>
+
+            <div style={{
+              background: '#F0FDF4',
+              border: '1px solid #BBF7D0',
+              borderRadius: '10px',
+              padding: '0.65rem 0.85rem',
+              marginBottom: '1rem',
+              fontSize: '0.82rem',
+              color: '#166534',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <CheckCircle size={16} color="#16A34A" style={{ flexShrink: 0 }} />
+              <span><strong>9-Hour Rescheduling Window Active:</strong> You are rescheduling at least 9 hours prior to slot time. Zero charges applied.</span>
+            </div>
+
+            <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '0.75rem 1rem', marginBottom: '1rem', fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+              <div><strong>Service:</strong> {reschedulingBooking.washType?.name || 'Doorstep Car Wash'}</div>
+              <div><strong>Vehicle:</strong> {reschedulingBooking.car ? `${reschedulingBooking.car.make} ${reschedulingBooking.car.model}` : (reschedulingBooking.carType?.name || 'Vehicle')} {reschedulingBooking.car?.carNumber && `(${reschedulingBooking.car.carNumber})`}</div>
+              <div><strong>Current Slot:</strong> {new Date(reschedulingBooking.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} ({reschedulingBooking.timeSlot})</div>
+            </div>
+
+            {/* New Date Selector */}
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--primary-navy)', marginBottom: '0.35rem' }}>
+                Select New Service Date <span style={{ color: '#DC2626' }}>*</span>
+              </label>
+              <input
+                type="date"
+                min={new Date().toISOString().split('T')[0]}
+                value={rescheduleDate}
+                onChange={e => {
+                  setRescheduleDate(e.target.value);
+                  fetchRescheduleSlots(e.target.value, reschedulingBooking.serviceAreaId, reschedulingBooking.address);
+                }}
+                className="form-input"
+                style={{ width: '100%', borderRadius: '8px', border: '1px solid #CBD5E1', padding: '0.55rem 0.75rem', fontSize: '0.85rem', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            {/* New Time Slot Selector */}
+            <div style={{ marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                <label style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--primary-navy)', margin: 0 }}>
+                  Select New Time Window <span style={{ color: '#DC2626' }}>*</span>
+                </label>
+                {loadingRescheduleSlots && <span style={{ fontSize: '0.72rem', color: '#64748B' }}>Checking slot availability...</span>}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.45rem' }}>
+                {(rescheduleSlotsList.length > 0
+                  ? rescheduleSlotsList.map(s => s.slot)
+                  : ["08:00 AM", "10:00 AM", "12:00 PM", "02:00 PM", "04:00 PM", "06:00 PM"]
+                ).map(slot => {
+                  const isSelected = rescheduleSlot === slot;
+                  return (
+                    <button
+                      key={slot}
+                      type="button"
+                      onClick={() => setRescheduleSlot(slot)}
+                      style={{
+                        padding: '0.5rem 0.4rem',
+                        borderRadius: '8px',
+                        border: isSelected ? '2px solid #2563EB' : '1px solid #CBD5E1',
+                        background: isSelected ? '#EFF6FF' : 'white',
+                        color: isSelected ? '#1D4ED8' : '#334155',
+                        fontWeight: isSelected ? 800 : 600,
+                        fontSize: '0.8rem',
+                        cursor: 'pointer',
+                        textAlign: 'center'
+                      }}
+                    >
+                      {slot}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Reason input */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--primary-navy)', marginBottom: '0.35rem' }}>
+                Reason for Rescheduling (Optional)
+              </label>
+              <textarea
+                rows={2}
+                className="form-input"
+                placeholder="e.g. Need different time window, traveling, schedule change..."
+                value={rescheduleReason}
+                onChange={e => setRescheduleReason(e.target.value)}
+                style={{ width: '100%', borderRadius: '8px', border: '1px solid #CBD5E1', padding: '0.55rem 0.75rem', fontSize: '0.85rem', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button
+                type="button"
+                onClick={() => setReschedulingBooking(null)}
+                disabled={rescheduleLoading}
+                className="btn btn-outline"
+                style={{ borderRadius: '8px', padding: '0.6rem 1.25rem' }}
+              >
+                Keep Current Slot
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmReschedule}
+                disabled={rescheduleLoading || !rescheduleDate || !rescheduleSlot}
+                style={{
+                  background: 'linear-gradient(135deg, #1D4ED8 0%, #1E40AF 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0.6rem 1.35rem',
+                  fontWeight: 700,
+                  cursor: (rescheduleLoading || !rescheduleDate || !rescheduleSlot) ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {rescheduleLoading ? 'Rescheduling...' : 'Confirm Reschedule'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Customer Review and Feedback Modal */}
+      {reviewBooking && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.7)',
+          backdropFilter: 'blur(4px)',
+          zIndex: 1200,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem'
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '20px',
+            width: '100%',
+            maxWidth: '500px',
+            padding: '1.75rem',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+            boxSizing: 'border-box'
+          }}>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: 'var(--primary-navy)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Star size={22} fill="#F59E0B" color="#F59E0B" /> Rate Your Wash Service
+                </h3>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem', display: 'block' }}>
+                  Booking <strong>{reviewBooking.bookingId || `#${reviewBooking.id}`}</strong> &bull; {new Date(reviewBooking.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </span>
+              </div>
+              <button
+                onClick={() => setReviewBooking(null)}
+                style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <X size={18} color="#64748B" />
+              </button>
+            </div>
+
+            {/* Technician Info Banner */}
+            <div style={{
+              background: '#F0F9FF',
+              border: '1px solid #BAE6FD',
+              borderRadius: '12px',
+              padding: '0.85rem 1rem',
+              marginBottom: '1.25rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem'
+            }}>
+              {reviewBooking.employee?.photo ? (
+                <img src={reviewBooking.employee.photo} alt="Technician" style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #0EA5E9' }} />
+              ) : (
+                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: '#0EA5E9', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1rem' }}>
+                  {reviewBooking.employee?.name ? reviewBooking.employee.name[0] : 'T'}
+                </div>
+              )}
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '0.72rem', color: '#0369A1', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Service Technician</div>
+                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--primary-navy)' }}>
+                  {reviewBooking.employee?.name || 'Assigned Technician'}
+                  {reviewBooking.employee?.employeeId && (
+                    <span style={{ marginLeft: '6px', fontSize: '0.72rem', background: '#E0F2FE', color: '#0369A1', padding: '0.1rem 0.45rem', borderRadius: '4px', fontFamily: 'monospace', fontWeight: 700 }}>
+                      {reviewBooking.employee.employeeId}
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: '0.76rem', color: '#64748B' }}>
+                  {reviewBooking.washType?.name} ({reviewBooking.car ? `${reviewBooking.car.make} ${reviewBooking.car.model}` : 'Vehicle'})
+                </div>
+              </div>
+            </div>
+
+            {/* Interactive 5-Star Rating */}
+            <div style={{ textAlign: 'center', marginBottom: '1.25rem', background: '#F8FAFC', padding: '1rem', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--primary-navy)', marginBottom: '0.5rem' }}>
+                Tap stars to rate your detailing service
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '0.6rem', marginBottom: '0.4rem' }}>
+                {[1, 2, 3, 4, 5].map(s => {
+                  const activeStar = (reviewHoverRating || reviewRating) >= s;
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setReviewRating(s)}
+                      onMouseEnter={e => {
+                        setReviewHoverRating(s);
+                        e.currentTarget.style.transform = 'scale(1.2)';
+                      }}
+                      onMouseLeave={e => {
+                        setReviewHoverRating(0);
+                        e.currentTarget.style.transform = 'scale(1)';
+                      }}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        transition: 'transform 0.15s'
+                      }}
+                    >
+                      <Star
+                        size={38}
+                        fill={activeStar ? '#F59E0B' : '#E2E8F0'}
+                        color={activeStar ? '#F59E0B' : '#CBD5E1'}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#D97706' }}>
+                {reviewRating === 5 ? '⭐⭐⭐⭐⭐ 5/5 - Excellent & Sparkling Clean!' :
+                 reviewRating === 4 ? '⭐⭐⭐⭐ 4/5 - Very Good Detailing!' :
+                 reviewRating === 3 ? '⭐⭐⭐ 3/5 - Good Job' :
+                 reviewRating === 2 ? '⭐⭐ 2/5 - Fair' : '⭐ 1/5 - Needs Improvement'}
+              </div>
+            </div>
+
+            {/* Quick Compliment Tags */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--primary-navy)', marginBottom: '0.4rem' }}>
+                What did you like the most? (Optional)
+              </label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                {[
+                  '⏰ On-Time Arrival',
+                  '✨ Showroom Shine',
+                  '🧼 Deep Interior Clean',
+                  '👔 Polite Technician',
+                  '🛡️ Careful Vehicle Care',
+                  '💧 Efficient Water Usage'
+                ].map(tag => {
+                  const isSelected = reviewSelectedTags.includes(tag);
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => {
+                        if (isSelected) {
+                          setReviewSelectedTags(reviewSelectedTags.filter(t => t !== tag));
+                        } else {
+                          setReviewSelectedTags([...reviewSelectedTags, tag]);
+                        }
+                      }}
+                      style={{
+                        padding: '0.35rem 0.65rem',
+                        borderRadius: '20px',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        border: isSelected ? '1.5px solid #059669' : '1px solid #CBD5E1',
+                        background: isSelected ? '#ECFDF5' : 'white',
+                        color: isSelected ? '#065F46' : '#475569',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      {isSelected ? '✓ ' : ''}{tag}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Feedback Textarea */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--primary-navy)', marginBottom: '0.4rem' }}>
+                Detailed Feedback & Comments (Optional)
+              </label>
+              <textarea
+                rows={3}
+                value={reviewComment}
+                onChange={e => setReviewComment(e.target.value)}
+                placeholder="Tell us about the wash quality, technician punctuality, or any suggestions..."
+                className="form-input"
+                style={{ width: '100%', borderRadius: '10px', border: '1.5px solid #CBD5E1', padding: '0.6rem 0.75rem', fontSize: '0.85rem', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button
+                type="button"
+                onClick={() => setReviewBooking(null)}
+                disabled={reviewSubmitting}
+                className="btn btn-outline"
+                style={{ borderRadius: '8px', padding: '0.6rem 1.25rem' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleReviewSubmit}
+                disabled={reviewSubmitting}
+                style={{
+                  background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0.6rem 1.4rem',
+                  fontWeight: 800,
+                  fontSize: '0.88rem',
+                  cursor: reviewSubmitting ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)'
+                }}
+              >
+                {reviewSubmitting ? 'Submitting...' : 'Submit Rating & Feedback'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
