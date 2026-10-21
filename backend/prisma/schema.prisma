@@ -9,9 +9,11 @@ datasource db {
 
 model User {
   id             Int             @id @default(autoincrement())
-  phone          String          @unique
+  phone          String?         @unique
   name           String?
   email          String?
+  googleId       String?         @unique
+  password       String?
   points         Int             @default(0)
   referralCode   String?         @unique
   referredByCode String?

@@ -388,11 +388,12 @@ export const googleAuth = async (req, res) => {
 
     const token = generateToken({ id: user.id, role: 'USER' });
     const needsPhone = !user.phone || user.phone.trim().length < 10;
+    const { password: _, ...userData } = user;
 
     res.json({
       message: 'Google authentication successful',
       token,
-      user,
+      user: userData,
       needsPhone
     });
   } catch (error) {
@@ -536,7 +537,19 @@ export const userEmailLogin = async (req, res) => {
 export const userSetPhone = async (req, res) => {
   try {
     const { phone } = req.body;
-    const userId = req.user?.id || req.body.userId;
+    let userId = req.user?.id || req.body.userId;
+    
+    if (!userId && req.headers.authorization) {
+      try {
+        const token = req.headers.authorization.split(' ')[1];
+        if (token) {
+          const decoded = jwt.verify(token, JWT_SECRET);
+          userId = decoded.id;
+        }
+      } catch (e) {
+        console.warn('Token verify in userSetPhone warning:', e.message);
+      }
+    }
     
     if (!userId) {
       return res.status(401).json({ error: 'Authentication required' });
