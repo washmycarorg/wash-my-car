@@ -267,14 +267,14 @@ const Login = ({ setAuth }) => {
       <div className="md:hidden" style={{
         background: 'linear-gradient(135deg, #0A0F1D 0%, #0F172A 50%, #0369A1 100%)',
         color: 'white',
-        padding: '1.25rem 1.25rem 2.85rem',
+        padding: '0.85rem 1rem 1.85rem',
         position: 'relative',
         overflow: 'hidden'
       }}>
         <div style={{ position: 'absolute', top: '-50px', right: '-50px', width: '180px', height: '180px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(56, 189, 248, 0.35) 0%, transparent 70%)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', bottom: '10px', left: '-30px', width: '140px', height: '140px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(14, 165, 233, 0.3) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', position: 'relative', zIndex: 2 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', position: 'relative', zIndex: 2 }}>
           <Link 
             to="/" 
             style={{ 
@@ -287,9 +287,9 @@ const Login = ({ setAuth }) => {
               border: '1px solid rgba(255, 255, 255, 0.22)',
               color: '#FFFFFF', 
               textDecoration: 'none', 
-              padding: '0.42rem 0.85rem', 
+              padding: '0.4rem 0.8rem', 
               borderRadius: '20px',
-              fontSize: '0.8rem', 
+              fontSize: '0.78rem', 
               fontWeight: 700 
             }}
           >
@@ -299,60 +299,39 @@ const Login = ({ setAuth }) => {
           <div style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '0.4rem',
+            gap: '0.35rem',
             background: 'rgba(16, 185, 129, 0.18)',
             border: '1px solid rgba(52, 211, 153, 0.4)',
             color: '#34D399',
-            padding: '0.35rem 0.75rem',
-            borderRadius: '20px',
-            fontSize: '0.72rem',
+            padding: '0.25rem 0.6rem',
+            borderRadius: '14px',
+            fontSize: '0.68rem',
             fontWeight: 800,
             letterSpacing: '0.02em'
           }}>
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34D399', boxShadow: '0 0 6px #34D399' }} />
-            <span>VIZAG DOORSTEP CARE</span>
+            <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#34D399' }} />
+            <span>VIZAG</span>
           </div>
         </div>
 
-        <div style={{ textAlign: 'center', position: 'relative', zIndex: 2 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.65rem' }}>
           <div style={{
             background: '#FFFFFF',
-            width: '82px',
-            height: '82px',
-            borderRadius: '20px',
-            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.4), 0 0 25px rgba(56, 189, 248, 0.35)',
+            width: '36px',
+            height: '36px',
+            borderRadius: '10px',
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
-            marginBottom: '0.85rem',
-            border: '1.5px solid rgba(255, 255, 255, 0.4)',
+            padding: '2px',
             overflow: 'hidden',
-            padding: '4px'
+            boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
           }}>
-            <img src={logo} alt="Wash My Car Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', transform: 'scale(1.42)', transformOrigin: 'center' }} />
+            <img src={logo} alt="Wash My Car Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', transform: 'scale(1.3)' }} />
           </div>
-
-          <h1 style={{ fontSize: '1.35rem', fontWeight: 900, margin: '0 0 0.3rem', letterSpacing: '-0.02em' }}>
-            <span style={{ color: '#FFFFFF' }}>WASH </span>
-            <span style={{ color: '#38BDF8' }}>MY </span>
-            <span style={{ color: '#FFFFFF' }}>CAR </span>
-            <span style={{ color: '#38BDF8' }}>ORG</span>
-          </h1>
-          <p style={{ margin: 0, fontSize: '0.84rem', color: '#CBD5E1', fontWeight: 500 }}>
-            Professional Car Detailing & Wash At Your Doorstep
-          </p>
-
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginTop: '1rem', flexWrap: 'wrap' }}>
-            <span style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.16)', padding: '0.28rem 0.65rem', borderRadius: '12px', fontSize: '0.72rem', color: '#F1F5F9', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}>
-              ✨ <strong style={{ color: '#FCD34D' }}>Professional</strong> Service
-            </span>
-            <span style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.16)', padding: '0.28rem 0.65rem', borderRadius: '12px', fontSize: '0.72rem', color: '#F1F5F9', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}>
-              <ShieldCheck size={14} color="#38BDF8" /> Google & Email Verified
-            </span>
-            <span style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.16)', padding: '0.28rem 0.65rem', borderRadius: '12px', fontSize: '0.72rem', color: '#F1F5F9', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}>
-              💧 100% Spot-Free Care
-            </span>
-          </div>
+          <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#FFFFFF', letterSpacing: '-0.02em' }}>
+            WASH <span style={{ color: '#38BDF8' }}>MY CAR</span> ORG
+          </span>
         </div>
       </div>
 
@@ -384,98 +363,109 @@ const Login = ({ setAuth }) => {
       </div>
 
       {/* Right side form */}
-      <div className="flex flex-col justify-center p-6 md:p-16 auth-card-container" style={{
+      <div className="flex flex-col justify-center p-5 md:p-14 auth-card-container" style={{
         flex: 1, 
         background: 'white',
-        borderTopLeftRadius: '28px',
-        borderTopRightRadius: '28px',
-        marginTop: '-1.5rem',
+        borderTopLeftRadius: '24px',
+        borderTopRightRadius: '24px',
+        marginTop: '-1rem',
         position: 'relative',
         zIndex: 10,
         boxShadow: '0 -10px 30px rgba(0,0,0,0.08)'
       }}>
         <div style={{ maxWidth: '420px', width: '100%', margin: '0 auto' }}>
-          <Link to="/" className="hidden md:inline-flex items-center gap-2" style={{ color: 'var(--text-muted)', textDecoration: 'none', marginBottom: '1.5rem', fontSize: '0.9rem', fontWeight: 600 }}>
-            <ArrowLeft size={16} /> Back to Homepage
-          </Link>
-
-          <div style={{ marginBottom: '1.25rem' }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.72rem', fontWeight: 800, color: '#0284C7', background: '#F0F9FF', padding: '0.2rem 0.6rem', borderRadius: '12px', border: '1px solid #BAE6FD', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              <ShieldCheck size={13} /> Secure Customer Portal
-            </div>
-            <h1 style={{ margin: 0, fontWeight: 900, fontSize: '1.6rem', color: 'var(--primary-navy)', letterSpacing: '-0.02em' }}>Customer Login</h1>
-            <p style={{ margin: '0.35rem 0 0', color: 'var(--text-muted)', fontSize: '0.88rem' }}>Sign in to schedule doorstep washes and track your vehicle care technician.</p>
-          </div>
-
-          {/* Welcome Offer Banner */}
+          
+          {/* TAB SWITCHER: SIGN IN / CREATE ACCOUNT */}
           <div style={{
-            background: 'linear-gradient(135deg, #F0FDF4 0%, #EFF6FF 100%)',
-            border: '1.5px dashed #0EA5E9',
-            borderRadius: '14px',
-            padding: '0.85rem 1rem',
-            marginBottom: '1.25rem',
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '0.75rem',
-            boxShadow: '0 2px 8px rgba(14, 165, 233, 0.08)'
+            background: '#F1F5F9',
+            padding: '4px',
+            borderRadius: '12px',
+            marginBottom: '1rem',
+            border: '1px solid #E2E8F0'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-              <div style={{
-                background: 'linear-gradient(135deg, #0284C7, #0369A1)',
-                color: 'white',
-                width: '36px',
-                height: '36px',
-                borderRadius: '10px',
+            <Link
+              to="/login"
+              style={{
+                flex: 1,
+                textAlign: 'center',
+                padding: '0.6rem 0.5rem',
+                borderRadius: '8px',
+                fontSize: '0.88rem',
+                fontWeight: 800,
+                background: '#FFFFFF',
+                color: '#0284C7',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
+                textDecoration: 'none',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                flexShrink: 0,
-                boxShadow: '0 3px 8px rgba(2, 132, 199, 0.35)'
-              }}>
-                <Gift size={20} />
-              </div>
-              <div>
-                <div style={{ fontWeight: 800, fontSize: '0.84rem', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <span>Claim Welcome Offer</span>
-                  <span style={{ background: '#22C55E', color: 'white', fontSize: '0.62rem', padding: '1px 6px', borderRadius: '10px', fontWeight: 800 }}>NEW</span>
-                </div>
-                <div style={{ fontSize: '0.74rem', color: '#475569', marginTop: '2px', lineHeight: 1.3 }}>
-                  Get Flat ₹199 worth Bike Wash FREE on any car wash booking with coupon "WELCOME"!
-                </div>
-              </div>
-            </div>
-            <Link 
-              to="/register?offer=welcome"
-              style={{
-                background: 'linear-gradient(135deg, #0284C7, #0369A1)',
-                color: 'white',
-                textDecoration: 'none',
-                padding: '0.45rem 0.85rem',
-                borderRadius: '8px',
-                fontSize: '0.76rem',
-                fontWeight: 700,
-                whiteSpace: 'nowrap',
-                boxShadow: '0 2px 6px rgba(2, 132, 199, 0.3)',
-                flexShrink: 0
+                gap: '0.35rem'
               }}
             >
-              Claim Offer →
+              <span>Sign In</span>
+            </Link>
+            <Link
+              to="/register"
+              style={{
+                flex: 1,
+                textAlign: 'center',
+                padding: '0.6rem 0.5rem',
+                borderRadius: '8px',
+                fontSize: '0.88rem',
+                fontWeight: 600,
+                background: 'transparent',
+                color: '#64748B',
+                textDecoration: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.35rem'
+              }}
+            >
+              <span>Create Account</span>
             </Link>
           </div>
-          
-          {error && (
-            <div className="badge badge-danger w-full mb-4 py-2 text-center" style={{ padding: '0.75rem', fontSize: '0.9rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center' }}>
-              <AlertCircle size={16} /> <span>{error}</span>
-            </div>
-          )}
 
-          {successMsg && (
-            <div className="badge badge-success w-full mb-4 py-2 text-center" style={{ padding: '0.75rem', fontSize: '0.9rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-              <CheckCircle2 size={16} />
-              <span>{successMsg}</span>
+          {/* COMPACT WELCOME OFFER BANNER */}
+          <div style={{
+            background: 'linear-gradient(135deg, #ECFDF5 0%, #F0FDF4 100%)',
+            border: '1px solid #A7F3D0',
+            borderRadius: '10px',
+            padding: '0.45rem 0.75rem',
+            marginBottom: '1rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '0.5rem',
+            fontSize: '0.78rem',
+            color: '#065F46'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}>
+              <span>🎁</span>
+              <span>Welcome: <strong>Free ₹199 Bike Wash</strong> on 1st wash</span>
             </div>
-          )}
+            <span style={{ 
+              background: '#059669', 
+              color: 'white', 
+              fontSize: '0.66rem', 
+              fontWeight: 800, 
+              padding: '2px 7px', 
+              borderRadius: '6px',
+              letterSpacing: '0.04em' 
+            }}>
+              WELCOME
+            </span>
+          </div>
+
+          <div style={{ marginBottom: '1rem' }}>
+            <h1 style={{ margin: 0, fontWeight: 900, fontSize: '1.45rem', color: 'var(--primary-navy)', letterSpacing: '-0.02em' }}>
+              Welcome Back
+            </h1>
+            <p style={{ margin: '0.2rem 0 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+              Sign in to manage doorstep washes and track your technician.
+            </p>
+          </div>
 
           {/* PRIMARY: CONTINUE WITH GOOGLE BUTTON */}
           <div style={{ marginBottom: '1.25rem' }}>

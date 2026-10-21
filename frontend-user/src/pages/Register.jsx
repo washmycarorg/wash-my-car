@@ -338,14 +338,14 @@ const Register = ({ setAuth }) => {
       <div className="md:hidden" style={{
         background: 'linear-gradient(135deg, #0A0F1D 0%, #0F172A 50%, #0369A1 100%)',
         color: 'white',
-        padding: '1.25rem 1.25rem 2.85rem',
+        padding: '0.85rem 1rem 1.85rem',
         position: 'relative',
         overflow: 'hidden'
       }}>
         <div style={{ position: 'absolute', top: '-50px', right: '-50px', width: '180px', height: '180px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(56, 189, 248, 0.35) 0%, transparent 70%)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', bottom: '10px', left: '-30px', width: '140px', height: '140px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(14, 165, 233, 0.3) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', position: 'relative', zIndex: 2 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', position: 'relative', zIndex: 2 }}>
           <Link 
             to="/" 
             style={{ 
@@ -358,9 +358,9 @@ const Register = ({ setAuth }) => {
               border: '1px solid rgba(255, 255, 255, 0.22)',
               color: '#FFFFFF', 
               textDecoration: 'none', 
-              padding: '0.42rem 0.85rem', 
+              padding: '0.4rem 0.8rem', 
               borderRadius: '20px',
-              fontSize: '0.8rem', 
+              fontSize: '0.78rem', 
               fontWeight: 700 
             }}
           >
@@ -370,60 +370,39 @@ const Register = ({ setAuth }) => {
           <div style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '0.4rem',
+            gap: '0.35rem',
             background: 'rgba(16, 185, 129, 0.18)',
             border: '1px solid rgba(52, 211, 153, 0.4)',
             color: '#34D399',
-            padding: '0.35rem 0.75rem',
-            borderRadius: '20px',
-            fontSize: '0.72rem',
+            padding: '0.25rem 0.6rem',
+            borderRadius: '14px',
+            fontSize: '0.68rem',
             fontWeight: 800,
             letterSpacing: '0.02em'
           }}>
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34D399', boxShadow: '0 0 6px #34D399' }} />
-            <span>VIZAG DOORSTEP CARE</span>
+            <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#34D399' }} />
+            <span>VIZAG</span>
           </div>
         </div>
 
-        <div style={{ textAlign: 'center', position: 'relative', zIndex: 2 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.65rem' }}>
           <div style={{
             background: '#FFFFFF',
-            width: '82px',
-            height: '82px',
-            borderRadius: '20px',
-            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.4), 0 0 25px rgba(56, 189, 248, 0.35)',
+            width: '36px',
+            height: '36px',
+            borderRadius: '10px',
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
-            marginBottom: '0.85rem',
-            border: '1.5px solid rgba(255, 255, 255, 0.4)',
+            padding: '2px',
             overflow: 'hidden',
-            padding: '4px'
+            boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
           }}>
-            <img src={logo} alt="Wash My Car Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', transform: 'scale(1.42)', transformOrigin: 'center' }} />
+            <img src={logo} alt="Wash My Car Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', transform: 'scale(1.3)' }} />
           </div>
-
-          <h1 style={{ fontSize: '1.35rem', fontWeight: 900, margin: '0 0 0.3rem', letterSpacing: '-0.02em' }}>
-            <span style={{ color: '#FFFFFF' }}>WASH </span>
-            <span style={{ color: '#38BDF8' }}>MY </span>
-            <span style={{ color: '#FFFFFF' }}>CAR </span>
-            <span style={{ color: '#38BDF8' }}>ORG</span>
-          </h1>
-          <p style={{ margin: 0, fontSize: '0.84rem', color: '#CBD5E1', fontWeight: 500 }}>
-            Professional Car Detailing & Wash At Your Doorstep
-          </p>
-
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginTop: '1rem', flexWrap: 'wrap' }}>
-            <span style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.16)', padding: '0.28rem 0.65rem', borderRadius: '12px', fontSize: '0.72rem', color: '#F1F5F9', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}>
-              ✨ <strong style={{ color: '#FCD34D' }}>Professional</strong> Service
-            </span>
-            <span style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.16)', padding: '0.28rem 0.65rem', borderRadius: '12px', fontSize: '0.72rem', color: '#F1F5F9', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}>
-              <ShieldCheck size={14} color="#38BDF8" /> Google & Email Verified
-            </span>
-            <span style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.16)', padding: '0.28rem 0.65rem', borderRadius: '12px', fontSize: '0.72rem', color: '#F1F5F9', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}>
-              💧 100% Spot-Free Care
-            </span>
-          </div>
+          <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#FFFFFF', letterSpacing: '-0.02em' }}>
+            WASH <span style={{ color: '#38BDF8' }}>MY CAR</span> ORG
+          </span>
         </div>
       </div>
 
@@ -453,80 +432,108 @@ const Register = ({ setAuth }) => {
       </div>
 
       {/* Right side form */}
-      <div className="flex flex-col justify-center p-6 md:p-16 auth-card-container" style={{
+      <div className="flex flex-col justify-center p-5 md:p-14 auth-card-container" style={{
         flex: 1, 
         background: 'white',
-        borderTopLeftRadius: '28px',
-        borderTopRightRadius: '28px',
-        marginTop: '-1.5rem',
+        borderTopLeftRadius: '24px',
+        borderTopRightRadius: '24px',
+        marginTop: '-1rem',
         position: 'relative',
         zIndex: 10,
         boxShadow: '0 -10px 30px rgba(0,0,0,0.08)'
       }}>
         <div style={{ maxWidth: '450px', width: '100%', margin: '0 auto' }}>
-          <Link to="/" className="hidden md:inline-flex items-center gap-2" style={{ color: 'var(--text-muted)', textDecoration: 'none', marginBottom: '1.5rem', fontSize: '0.9rem', fontWeight: 600 }}>
-            <ArrowLeft size={16} /> Back to Homepage
-          </Link>
-
-          <div style={{ marginBottom: '1.25rem' }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.72rem', fontWeight: 800, color: '#0284C7', background: '#F0F9FF', padding: '0.2rem 0.6rem', borderRadius: '12px', border: '1px solid #BAE6FD', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              <ShieldCheck size={13} /> Quick Verified Registration
-            </div>
-            <h1 style={{ margin: 0, fontWeight: 900, fontSize: '1.6rem', color: 'var(--primary-navy)', letterSpacing: '-0.02em' }}>Register & Claim Welcome Offer</h1>
-            <p style={{ margin: '0.35rem 0 0', color: 'var(--text-muted)', fontSize: '0.88rem' }}>Join us in seconds for hassle-free doorstep car care in Vizag.</p>
-          </div>
-
-          {/* Welcome Offer Unlocked Card */}
+          
+          {/* TAB SWITCHER: SIGN IN / CREATE ACCOUNT */}
           <div style={{
-            background: 'linear-gradient(135deg, #ECFDF5 0%, #EFF6FF 100%)',
-            border: '1.5px solid #10B981',
-            borderRadius: '16px',
-            padding: '1rem',
-            marginBottom: '1.25rem',
-            boxShadow: '0 4px 15px rgba(16, 185, 129, 0.12)',
-            position: 'relative',
-            overflow: 'hidden'
+            display: 'flex',
+            background: '#F1F5F9',
+            padding: '4px',
+            borderRadius: '12px',
+            marginBottom: '1rem',
+            border: '1px solid #E2E8F0'
           }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
-              <div style={{
-                background: 'linear-gradient(135deg, #10B981, #059669)',
-                color: 'white',
-                width: '40px',
-                height: '40px',
-                borderRadius: '12px',
+            <Link
+              to="/login"
+              style={{
+                flex: 1,
+                textAlign: 'center',
+                padding: '0.6rem 0.5rem',
+                borderRadius: '8px',
+                fontSize: '0.88rem',
+                fontWeight: 600,
+                background: 'transparent',
+                color: '#64748B',
+                textDecoration: 'none',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                flexShrink: 0,
-                boxShadow: '0 4px 10px rgba(16, 185, 129, 0.35)'
-              }}>
-                <Gift size={22} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <span style={{ fontWeight: 900, fontSize: '0.92rem', color: '#065F46' }}>
-                    🎉 Welcome Offer Activated!
-                  </span>
-                  <span style={{ background: '#059669', color: 'white', fontSize: '0.65rem', padding: '2px 8px', borderRadius: '12px', fontWeight: 800 }}>
-                    FLAT ₹199 FREE BIKE WASH
-                  </span>
-                </div>
-                <p style={{ margin: '0.25rem 0 0', fontSize: '0.78rem', color: '#047857', lineHeight: 1.4 }}>
-                  Register below to unlock your welcome offer: get a <strong>Flat ₹199 worth Bike / Two-Wheeler Foam Wash FREE</strong> on any car wash booking with coupon code <strong style={{ color: '#047857', textDecoration: 'underline' }}>"WELCOME"</strong>!
-                </p>
-                <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-                  <span style={{ background: 'rgba(5, 150, 105, 0.12)', color: '#047857', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: '8px' }}>
-                    ✓ Free ₹199 Bike Wash
-                  </span>
-                  <span style={{ background: 'rgba(5, 150, 105, 0.12)', color: '#047857', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: '8px' }}>
-                    ✓ Coupon: WELCOME
-                  </span>
-                  <span style={{ background: 'rgba(5, 150, 105, 0.12)', color: '#047857', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: '8px' }}>
-                    ✓ Doorstep Arrival
-                  </span>
-                </div>
-              </div>
+                gap: '0.35rem'
+              }}
+            >
+              <span>Sign In</span>
+            </Link>
+            <Link
+              to="/register"
+              style={{
+                flex: 1,
+                textAlign: 'center',
+                padding: '0.6rem 0.5rem',
+                borderRadius: '8px',
+                fontSize: '0.88rem',
+                fontWeight: 800,
+                background: '#FFFFFF',
+                color: '#0284C7',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
+                textDecoration: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.35rem'
+              }}
+            >
+              <span>Create Account</span>
+            </Link>
+          </div>
+
+          {/* COMPACT WELCOME OFFER BANNER */}
+          <div style={{
+            background: 'linear-gradient(135deg, #ECFDF5 0%, #F0FDF4 100%)',
+            border: '1px solid #A7F3D0',
+            borderRadius: '10px',
+            padding: '0.45rem 0.75rem',
+            marginBottom: '1rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '0.5rem',
+            fontSize: '0.78rem',
+            color: '#065F46'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}>
+              <span>🎁</span>
+              <span>Welcome: <strong>Free ₹199 Bike Wash</strong> on 1st wash</span>
             </div>
+            <span style={{ 
+              background: '#059669', 
+              color: 'white', 
+              fontSize: '0.66rem', 
+              fontWeight: 800, 
+              padding: '2px 7px', 
+              borderRadius: '6px',
+              letterSpacing: '0.04em' 
+            }}>
+              WELCOME
+            </span>
+          </div>
+
+          <div style={{ marginBottom: '1rem' }}>
+            <h1 style={{ margin: 0, fontWeight: 900, fontSize: '1.45rem', color: 'var(--primary-navy)', letterSpacing: '-0.02em' }}>
+              Create Your Free Account
+            </h1>
+            <p style={{ margin: '0.2rem 0 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+              Instant sign up with Google or Email. No passwords required.
+            </p>
           </div>
           
           {error && (

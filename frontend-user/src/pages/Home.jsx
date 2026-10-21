@@ -204,6 +204,7 @@ const Home = () => {
 
   // Slider State (Pexa Car Care Carousel - Continuously Auto-scrolling)
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const [isSlidePaused, setIsSlidePaused] = useState(false);
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
   const isDragging = useRef(false);
@@ -358,6 +359,11 @@ const Home = () => {
   };
 
   useEffect(() => {
+    document.title = "Best Car Wash Service in Visakhapatnam | Doorstep Car Cleaning Vizag - Wash My Car";
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) {
+      metaDesc.setAttribute('content', 'Book affordable car cleaning & doorstep car wash service in Visakhapatnam (Vizag). Professional snow foam wash, interior vacuuming & steam detailing at your home. Top-rated 4.9★ service!');
+    }
     loadHomePageData();
   }, []);
 
@@ -398,14 +404,14 @@ const Home = () => {
     setCurrentSlideIndex(idx);
   };
 
-  // Carousel Continuous Autoplay (automatically scrolls without pausing)
+  // Carousel Continuous Autoplay (10 seconds duration to give users ample time to read comfortably)
   useEffect(() => {
-    if (slides.length <= 1) return;
+    if (slides.length <= 1 || isSlidePaused) return;
     const interval = setInterval(() => {
       setCurrentSlideIndex(prev => (prev === slides.length - 1 ? 0 : prev + 1));
-    }, 4500);
+    }, 10000);
     return () => clearInterval(interval);
-  }, [slides.length]);
+  }, [slides.length, currentSlideIndex, isSlidePaused]);
 
   const handleCopyCoupon = (code) => {
     if (navigator?.clipboard?.writeText) {
@@ -1256,11 +1262,21 @@ const Home = () => {
       {/* 2. PEXA CAR CARE-STYLE HERO CAROUSEL (SLIDER FRONT PAGE) */}
       <header
         className="hero-carousel-header"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
+        onTouchStart={(e) => {
+          setIsSlidePaused(true);
+          handleTouchStart(e);
+        }}
+        onTouchEnd={(e) => {
+          handleTouchEnd(e);
+          setIsSlidePaused(false);
+        }}
+        onMouseEnter={() => setIsSlidePaused(true)}
+        onMouseLeave={(e) => {
+          setIsSlidePaused(false);
+          handleMouseLeave(e);
+        }}
         onMouseDown={handleMouseDown}
         onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseLeave}
         style={{
           position: 'relative',
           minHeight: '88vh',
@@ -1275,6 +1291,13 @@ const Home = () => {
           cursor: isSwipingActive ? 'grabbing' : 'default'
         }}
       >
+        <style>{`
+          @keyframes slideProgressFill {
+            from { width: 0%; }
+            to { width: 100%; }
+          }
+        `}</style>
+
         {/* Dynamic Background Slides with Smooth Crossfade */}
         {slides.map((slide, sIdx) => {
           const isCurrent = sIdx === currentSlideIndex;
@@ -1289,7 +1312,7 @@ const Home = () => {
                 backgroundPosition: 'center',
                 opacity: isCurrent ? 1 : 0,
                 transform: isCurrent ? 'scale(1)' : 'scale(1.05)',
-                transition: 'opacity 0.85s ease-in-out, transform 7s ease-out',
+                transition: 'opacity 0.85s ease-in-out, transform 10s ease-out',
                 pointerEvents: 'none',
                 zIndex: 1
               }}
@@ -1696,7 +1719,7 @@ const Home = () => {
             <span>›</span>
           </div>
 
-          {/* Clickable Indicator Pills */}
+          {/* Clickable Indicator Pills with 10s Progress Bar */}
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             {slides.map((_, sIdx) => {
               const isActive = sIdx === currentSlideIndex;
@@ -1706,17 +1729,34 @@ const Home = () => {
                   onClick={() => goToSlide(sIdx)}
                   aria-label={`Go to slide ${sIdx + 1}`}
                   style={{
-                    width: isActive ? '36px' : '10px',
+                    width: isActive ? '38px' : '10px',
                     height: '8px',
                     borderRadius: '4px',
-                    background: isActive ? 'linear-gradient(90deg, #38BDF8, #0EA5E9)' : 'rgba(255,255,255,0.3)',
+                    background: isActive ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.3)',
                     border: 'none',
                     padding: 0,
                     cursor: 'pointer',
+                    position: 'relative',
+                    overflow: 'hidden',
                     transition: 'all 0.3s ease',
                     boxShadow: isActive ? '0 0 10px rgba(56,189,248,0.7)' : 'none'
                   }}
-                />
+                >
+                  {isActive && (
+                    <span 
+                      key={`progress-${currentSlideIndex}`}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        bottom: 0,
+                        background: 'linear-gradient(90deg, #38BDF8, #0EA5E9)',
+                        borderRadius: '4px',
+                        animation: `slideProgressFill 10s linear ${isSlidePaused ? 'paused' : 'running'}`
+                      }}
+                    />
+                  )}
+                </button>
               );
             })}
           </div>
@@ -3685,112 +3725,6 @@ const Home = () => {
                   </button>
                 </div>
               ))}
-          </div>
-
-          {/* Complete 38+ Neighborhoods Keyword Tag Cloud */}
-          <div style={{
-            background: '#F8FAFC',
-            border: '1px solid #E2E8F0',
-            borderRadius: '24px',
-            padding: '2rem 2.25rem',
-            textAlign: 'center'
-          }}>
-            <h4 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0F172A', margin: '0 0 0.5rem' }}>
-              Full Visakhapatnam Doorstep Coverage Neighborhoods (A to Z)
-            </h4>
-            <p style={{ color: '#64748B', fontSize: '0.85rem', maxWidth: '680px', margin: '0 auto 1.25rem', lineHeight: 1.5 }}>
-              Our mobile car cleaning scooties &amp; detailers travel to all residential colonies, gated apartments, and independent houses across Vizag:
-            </p>
-
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem', justifyContent: 'center' }}>
-              {ALL_VIZAG_LOCALITIES.map(area => (
-                <button
-                  key={area}
-                  onClick={() => {
-                    setSeoAreaSearch(area);
-                    const el = document.getElementById('service-areas');
-                    if (el) el.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  style={{
-                    background: '#FFFFFF',
-                    border: '1px solid #CBD5E1',
-                    borderRadius: '20px',
-                    padding: '0.35rem 0.8rem',
-                    fontSize: '0.78rem',
-                    fontWeight: 700,
-                    color: '#1E293B',
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.3rem',
-                    transition: 'all 0.15s ease'
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.borderColor = '#0284C7';
-                    e.currentTarget.style.color = '#0284C7';
-                    e.currentTarget.style.background = '#F0F9FF';
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.borderColor = '#CBD5E1';
-                    e.currentTarget.style.color = '#1E293B';
-                    e.currentTarget.style.background = '#FFFFFF';
-                  }}
-                >
-                  <span>✓ Car Wash {area}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Quick 4-Pill Guarantees Banner */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-              gap: '1rem',
-              marginTop: '1.75rem',
-              paddingTop: '1.5rem',
-              borderTop: '1px solid #E2E8F0',
-              textAlign: 'left'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#E0F2FE', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284C7', flexShrink: 0 }}>
-                  <Clock size={18} />
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0F172A' }}>Save 2+ Hours</div>
-                  <div style={{ fontSize: '0.74rem', color: '#64748B' }}>No queues or traffic in Vizag</div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#DCFCE7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16A34A', flexShrink: 0 }}>
-                  <Droplets size={18} />
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0F172A' }}>Pure Spot-Free Foam</div>
-                  <div style={{ fontSize: '0.74rem', color: '#64748B' }}>pH-neutral scratch-free wash</div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#D97706', flexShrink: 0 }}>
-                  <ShieldCheck size={18} />
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0F172A' }}>Trained Detailers</div>
-                  <div style={{ fontSize: '0.74rem', color: '#64748B' }}>Equipped mobile professionals</div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284C7', flexShrink: 0 }}>
-                  <Calendar size={18} />
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0F172A' }}>Live Slot Windows</div>
-                  <div style={{ fontSize: '0.74rem', color: '#64748B' }}>Instant online booking confirmation</div>
-                </div>
-              </div>
-            </div>
           </div>
 
         </div>
