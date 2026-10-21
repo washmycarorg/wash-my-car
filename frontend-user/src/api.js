@@ -11,8 +11,17 @@ export const loginWithGoogle = async (payload) => {
   if (!res.ok) {
     throw new Error(data.error || data.message || 'Google authentication failed');
   }
-  if (data.token) localStorage.setItem('userToken', data.token);
-  if (data.user) localStorage.setItem('userInfo', JSON.stringify(data.user));
+  if (data.needsPhone) {
+    if (data.token) sessionStorage.setItem('pendingUserToken', data.token);
+    if (data.user) sessionStorage.setItem('pendingUser', JSON.stringify(data.user));
+    localStorage.removeItem('userToken');
+    localStorage.removeItem('userInfo');
+  } else {
+    if (data.token) localStorage.setItem('userToken', data.token);
+    if (data.user) localStorage.setItem('userInfo', JSON.stringify(data.user));
+    sessionStorage.removeItem('pendingUserToken');
+    sessionStorage.removeItem('pendingUser');
+  }
   return data;
 };
 
@@ -84,22 +93,39 @@ export const loginWithEmailOtp = async (payload) => {
   if (!res.ok) {
     throw new Error(data.error || data.message || 'Login failed');
   }
-  if (data.token) localStorage.setItem('userToken', data.token);
-  if (data.user) localStorage.setItem('userInfo', JSON.stringify(data.user));
+  if (data.needsPhone) {
+    if (data.token) sessionStorage.setItem('pendingUserToken', data.token);
+    if (data.user) sessionStorage.setItem('pendingUser', JSON.stringify(data.user));
+    localStorage.removeItem('userToken');
+    localStorage.removeItem('userInfo');
+  } else {
+    if (data.token) localStorage.setItem('userToken', data.token);
+    if (data.user) localStorage.setItem('userInfo', JSON.stringify(data.user));
+    sessionStorage.removeItem('pendingUserToken');
+    sessionStorage.removeItem('pendingUser');
+  }
   return data;
 };
 
 export const setUserPhone = async (phone) => {
+  const activeToken = localStorage.getItem('userToken') || sessionStorage.getItem('pendingUserToken');
   const res = await fetch(`${API_URL}/auth/user/set-phone`, {
     method: 'POST',
-    headers: getHeaders(),
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${activeToken}`
+    },
     body: JSON.stringify({ phone })
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error(data.error || data.message || 'Failed to update phone number');
   }
+  const finalToken = data.token || activeToken;
+  if (finalToken) localStorage.setItem('userToken', finalToken);
   if (data.user) localStorage.setItem('userInfo', JSON.stringify(data.user));
+  sessionStorage.removeItem('pendingUserToken');
+  sessionStorage.removeItem('pendingUser');
   return data;
 };
 
@@ -279,7 +305,10 @@ export const updateProfile = async (data) => {
     headers: getHeaders(),
     body: JSON.stringify(data)
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.error || errorBody.message || 'Failed to update profile');
+  }
   return res.json();
 };
 

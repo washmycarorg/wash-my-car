@@ -23,7 +23,7 @@ const DashboardLayout = ({ children }) => {
         {children}
       </main>
 
-      <FloatingDock onOpenMenu={() => setIsSidebarOpen(true)} />
+      <FloatingDock onOpenMenu={() => setIsSidebarOpen(true)} isSidebarOpen={isSidebarOpen} />
     </div>
   );
 };

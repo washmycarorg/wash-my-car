@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Calendar, Car, Sparkles, Gift, Menu, Crown } from 'lucide-react';
 import { getSettings } from '../api';
 
-const FloatingDock = ({ onOpenMenu }) => {
+const FloatingDock = ({ onOpenMenu, isSidebarOpen = false }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [subscriptionsEnabled, setSubscriptionsEnabled] = useState(true);
@@ -30,8 +30,12 @@ const FloatingDock = ({ onOpenMenu }) => {
         position: 'fixed',
         bottom: '20px',
         left: '50%',
-        transform: 'translateX(-50%)',
-        zIndex: 1000,
+        transform: isSidebarOpen ? 'translate(-50%, 80px)' : 'translateX(-50%)',
+        opacity: isSidebarOpen ? 0 : 1,
+        pointerEvents: isSidebarOpen ? 'none' : 'auto',
+        visibility: isSidebarOpen ? 'hidden' : 'visible',
+        transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease, visibility 0.25s',
+        zIndex: 40,
         width: 'calc(100% - 24px)',
         maxWidth: '460px',
         background: '#FFFFFF',

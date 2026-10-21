@@ -554,6 +554,17 @@ export const userSetPhone = async (req, res) => {
     if (!userId) {
       return res.status(401).json({ error: 'Authentication required' });
     }
+
+    const currentUser = await prisma.user.findUnique({
+      where: { id: Number(userId) }
+    });
+    if (!currentUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    if (currentUser.phone && currentUser.phone.trim().length >= 10) {
+      return res.status(400).json({ error: 'Phone number once updated cannot be changed.' });
+    }
+
     const cleanPhone = String(phone || '').trim();
     const rawDigits = cleanPhone.replace(/^\+91/, '').replace(/\D/g, '');
     if (!rawDigits || rawDigits.length < 10) {
@@ -584,7 +595,10 @@ export const userSetPhone = async (req, res) => {
       data: { phone: formattedPhone }
     });
 
-    res.json({ message: 'Mobile number updated successfully', user: updatedUser });
+    const token = generateToken({ id: updatedUser.id, role: 'USER' });
+    const { password: _, ...userData } = updatedUser;
+
+    res.json({ message: 'Mobile number updated successfully', token, user: userData });
   } catch (error) {
     console.error('Set phone error:', error);
     res.status(500).json({ error: error.message || 'Failed to update mobile number' });

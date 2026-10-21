@@ -838,6 +838,9 @@ const Login = ({ setAuth }) => {
                     }}
                   />
                 </div>
+                <small style={{ fontSize: '0.74rem', color: '#64748B', marginTop: '0.3rem', display: 'block' }}>
+                  🔒 For account security, your phone number cannot be changed once updated.
+                </small>
               </div>
 
               <button
@@ -856,6 +859,28 @@ const Login = ({ setAuth }) => {
                 }}
               >
                 {savingPhone ? 'Saving Mobile Number...' : 'Save & Continue to Dashboard →'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  sessionStorage.removeItem('pendingUserToken');
+                  sessionStorage.removeItem('pendingUser');
+                  setShowPhoneModal(false);
+                  setPendingUser(null);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#64748B',
+                  fontSize: '0.8rem',
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  textDecoration: 'underline',
+                  padding: '0.2rem'
+                }}
+              >
+                Cancel and sign in with another method
               </button>
             </form>
           </div>

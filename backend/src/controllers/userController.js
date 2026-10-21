@@ -5,6 +5,7 @@ import { computeEmployeePayout } from '../utils/payoutHelper.js';
 import { sendBookingConfirmationEmail, sendBookingRescheduledEmail, sendBookingCancelledEmail } from '../utils/mailer.js';
 import { sendPushNotification } from '../utils/pushNotification.js';
 import { generateDailyBookingId } from '../utils/idGenerator.js';
+import { formatToE164 } from '../services/smsService.js';
 
 
 export const getProfile = async (req, res) => {
@@ -82,13 +83,89 @@ export const getProfile = async (req, res) => {
 
 export const updateProfile = async (req, res) => {
   try {
-    const user = await prisma.user.update({
-      where: { id: req.user.id },
-      data: req.body
+    const currentUser = await prisma.user.findUnique({
+      where: { id: req.user.id }
     });
-    res.json(user);
+
+    if (!currentUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const { name, email, phone } = req.body;
+    const dataToUpdate = {};
+
+    // Full name is always editable
+    if (name !== undefined) {
+      dataToUpdate.name = String(name).trim();
+    }
+
+    // Phone number once updated cannot be changed
+    if (phone !== undefined) {
+      const cleanPhone = String(phone || '').trim();
+      const rawDigits = cleanPhone.replace(/^\+91/, '').replace(/\D/g, '');
+
+      if (currentUser.phone && currentUser.phone.trim().length >= 10) {
+        const existingDigits = currentUser.phone.replace(/^\+91/, '').replace(/\D/g, '');
+        if (rawDigits !== existingDigits) {
+          return res.status(400).json({ error: 'Phone number once updated cannot be changed.' });
+        }
+      } else if (rawDigits) {
+        if (rawDigits.length < 10) {
+          return res.status(400).json({ error: 'Please enter a valid 10-digit mobile number' });
+        }
+        const formattedPhone = formatToE164(rawDigits);
+        const conflict = await prisma.user.findFirst({
+          where: {
+            id: { not: req.user.id },
+            OR: [
+              { phone: cleanPhone },
+              { phone: formattedPhone },
+              { phone: rawDigits },
+              { phone: `+91${rawDigits}` }
+            ]
+          }
+        });
+        if (conflict) {
+          return res.status(400).json({ error: 'This mobile number is already registered with another account.' });
+        }
+        dataToUpdate.phone = formattedPhone;
+      }
+    }
+
+    // Email address once updated cannot be changed
+    if (email !== undefined) {
+      const cleanEmail = String(email || '').trim().toLowerCase();
+
+      if (currentUser.email && currentUser.email.trim().length > 0) {
+        if (cleanEmail !== currentUser.email.trim().toLowerCase()) {
+          return res.status(400).json({ error: 'Email address once updated cannot be changed.' });
+        }
+      } else if (cleanEmail) {
+        if (!cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+          return res.status(400).json({ error: 'Please enter a valid email address' });
+        }
+        const conflict = await prisma.user.findFirst({
+          where: {
+            id: { not: req.user.id },
+            email: cleanEmail
+          }
+        });
+        if (conflict) {
+          return res.status(400).json({ error: 'This email address is already registered with another account.' });
+        }
+        dataToUpdate.email = cleanEmail;
+      }
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: req.user.id },
+      data: dataToUpdate
+    });
+
+    const { password: _, ...safeUser } = updated;
+    res.json(safeUser);
   } catch (error) { 
-    res.status(500).json({ error: error.message }); 
+    res.status(500).json({ error: error.message || 'Failed to update profile' }); 
   }
 };
 

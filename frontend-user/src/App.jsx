@@ -17,25 +17,36 @@ import Subscriptions from './pages/Subscriptions';
 import TermsAndPrivacy from './pages/TermsAndPrivacy';
 import Support from './pages/Support';
 
-// Guard wrapper: checks token and user info on mount and on storage change
-const ProtectedRoute = ({ children }) => {
+// Helper: checks if user has both valid token and a verified 10-digit phone number
+const isUserFullyAuthenticated = () => {
   const token = localStorage.getItem('userToken');
-  const userInfo = localStorage.getItem('userInfo');
-  if (!token || !userInfo) return <Navigate to="/login" replace />;
+  const userInfoStr = localStorage.getItem('userInfo');
+  if (!token || !userInfoStr) return false;
+  try {
+    const user = JSON.parse(userInfoStr);
+    const rawDigits = (user?.phone || '').replace(/^\+91/, '').replace(/\D/g, '');
+    return rawDigits.length >= 10;
+  } catch {
+    return false;
+  }
+};
+
+// Guard wrapper: checks authentication and verified phone on mount and on storage change
+const ProtectedRoute = ({ children }) => {
+  const isAuth = isUserFullyAuthenticated();
+  if (!isAuth) return <Navigate to="/login" replace />;
   return children;
 };
 
 const App = () => {
-  const [auth, setAuth] = useState(!!localStorage.getItem('userToken') && !!localStorage.getItem('userInfo'));
+  const [auth, setAuth] = useState(isUserFullyAuthenticated());
 
-  // Listen for token or userInfo being cleared (logout from another tab, or manually)
+  // Listen for token or userInfo being updated or cleared
   useEffect(() => {
     const syncAuth = () => {
-      const hasAuth = !!localStorage.getItem('userToken') && !!localStorage.getItem('userInfo');
-      setAuth(hasAuth);
+      setAuth(isUserFullyAuthenticated());
     };
     window.addEventListener('storage', syncAuth);
-    // Also poll on focus in case the same tab cleared the credentials
     window.addEventListener('focus', syncAuth);
     return () => {
       window.removeEventListener('storage', syncAuth);
@@ -48,6 +59,8 @@ const App = () => {
     if (!val) {
       localStorage.removeItem('userToken');
       localStorage.removeItem('userInfo');
+      sessionStorage.removeItem('pendingUserToken');
+      sessionStorage.removeItem('pendingUser');
     }
   };
 

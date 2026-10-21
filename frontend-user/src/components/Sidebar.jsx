@@ -31,7 +31,7 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
           onClick={closeSidebar}
           style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0,0,0,0.5)', zIndex: 45
+            background: 'rgba(0,0,0,0.5)', zIndex: 998
           }}
         />
       )}
@@ -44,7 +44,7 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
         maxWidth: '88vw',
         background: '#025EBA', // Exact blue from screenshot
         color: 'white',
-        zIndex: 50,
+        zIndex: 999,
         transform: isOpen ? 'translateX(0)' : 'translateX(-100%)',
         transition: 'transform 0.3s ease-in-out',
         display: 'flex', flexDirection: 'column',

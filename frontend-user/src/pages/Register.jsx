@@ -131,13 +131,18 @@ const Register = ({ setAuth }) => {
     setGoogleLoading(true);
 
     try {
+      const cleanFormPhone = formData.phone ? formData.phone.trim().replace(/\D/g, '') : '';
       const res = await loginWithGoogle({
         credential: response.credential,
+        phone: cleanFormPhone.length >= 10 ? cleanFormPhone : undefined,
         referralCode: formData.referralCode || googleReferralInput
       });
 
       if (res.needsPhone) {
         setPendingGoogleUser(res.user);
+        if (cleanFormPhone && cleanFormPhone.length === 10) {
+          setGooglePhoneInput(cleanFormPhone);
+        }
         setShowPhoneModal(true);
       } else {
         setSuccessMsg('Account registered with Google successfully! Welcome offer applied.');
@@ -182,15 +187,20 @@ const Register = ({ setAuth }) => {
     setGoogleLoading(true);
     setError('');
     try {
+      const cleanFormPhone = formData.phone ? formData.phone.trim().replace(/\D/g, '') : '';
       const res = await loginWithGoogle({
         email: googlePromptEmail.trim().toLowerCase(),
         name: googlePromptName.trim() || 'Valued Customer',
         googleId: `google_${Date.now()}`,
+        phone: cleanFormPhone.length >= 10 ? cleanFormPhone : undefined,
         referralCode: formData.referralCode || googleReferralInput
       });
       setShowGooglePrompt(false);
       if (res.needsPhone) {
         setPendingGoogleUser(res.user);
+        if (cleanFormPhone && cleanFormPhone.length === 10) {
+          setGooglePhoneInput(cleanFormPhone);
+        }
         setShowPhoneModal(true);
       } else {
         setSuccessMsg('Registered with Google successfully!');
@@ -572,6 +582,9 @@ const Register = ({ setAuth }) => {
               </svg>
               <span>{googleLoading ? 'Connecting to Google...' : 'Sign up with Google'}</span>
             </button>
+            <p style={{ margin: '0.45rem 0 0 0', textAlign: 'center', fontSize: '0.74rem', color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
+              <Phone size={12} color="#0284C7" /> Verified mobile number requested before logging in
+            </p>
             <div ref={googleBtnContainerRef} style={{ display: 'none' }} />
           </div>
 
@@ -961,9 +974,14 @@ const Register = ({ setAuth }) => {
 
             <form onSubmit={handleSaveGooglePhone} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.86rem' }}>
-                  Mobile Number <span style={{ color: '#EF4444' }}>*</span>
-                </label>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                  <label className="form-label" style={{ fontWeight: 700, fontSize: '0.86rem', margin: 0 }}>
+                    Mobile Number <span style={{ color: '#EF4444' }}>*</span>
+                  </label>
+                  <span style={{ fontSize: '0.72rem', color: '#D97706', fontWeight: 600 }}>
+                    Locks once saved
+                  </span>
+                </div>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                   <div style={{
                     position: 'absolute',
@@ -996,6 +1014,9 @@ const Register = ({ setAuth }) => {
                     }}
                   />
                 </div>
+                <small style={{ fontSize: '0.74rem', color: '#64748B', marginTop: '0.3rem', display: 'block' }}>
+                  🔒 For account security, your phone number cannot be changed once updated.
+                </small>
               </div>
 
               <button
@@ -1013,7 +1034,29 @@ const Register = ({ setAuth }) => {
                   gap: '0.5rem'
                 }}
               >
-                {savingPhone ? 'Activating Account...' : 'Complete Registration & Claim Offer →'}
+                {savingPhone ? 'Activating Account...' : 'Save Mobile Number & Log In →'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  sessionStorage.removeItem('pendingUserToken');
+                  sessionStorage.removeItem('pendingUser');
+                  setShowPhoneModal(false);
+                  setPendingGoogleUser(null);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#64748B',
+                  fontSize: '0.8rem',
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  textDecoration: 'underline',
+                  padding: '0.2rem'
+                }}
+              >
+                Cancel and register using another method
               </button>
             </form>
           </div>
