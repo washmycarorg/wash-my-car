@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, Car, Sparkles, Gift, MapPin, Share2, Copy, Check, Crown } from 'lucide-react';
 import { getProfile, getServiceAreas, getSettings } from '../api';
+import { loadGoogleMaps } from '../utils/googleMapsLoader';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 const VIZAG_COORDS = { lat: 17.7042, lng: 83.2980 };
@@ -43,71 +44,154 @@ const Dashboard = () => {
       });
   }, []);
 
-  // Initialize Google Maps showing active regions
+  // Initialize Google Maps showing active regions with auto-framing and automatic zoom in/out
   useEffect(() => {
     if (loading || !mapContainerRef.current) return;
 
+    let autoZoomTimer = null;
+    let resizeObserver = null;
+
+    const zoneCoordsFallback = {
+      'maddilapalem': { lat: 17.7389, lng: 83.3184, radius: 5000 },
+      'madhurawada': { lat: 17.8180, lng: 83.3512, radius: 5000 },
+      'nad junction': { lat: 17.7428, lng: 83.2353, radius: 5000 },
+      'old gajuwaka': { lat: 17.6863, lng: 83.2041, radius: 5000 },
+      'gajuwaka': { lat: 17.6863, lng: 83.2041, radius: 5000 },
+      'pendurthi': { lat: 17.8286, lng: 83.1973, radius: 5000 },
+    };
+
     const initUserMap = () => {
-      if (googleMapInstance.current || !window.google) return;
+      if (googleMapInstance.current || !window.google || !mapContainerRef.current) return;
 
       const maps = window.google.maps;
-      // Initialize map centered at Vizag or first region center
-      const center = areas.length > 0 && areas[0].latitude 
-        ? { lat: areas[0].latitude, lng: areas[0].longitude } 
-        : VIZAG_COORDS;
 
+      // Create pure visual map: all interactive controls and gestures disabled
       const map = new maps.Map(mapContainerRef.current, {
-        center: center,
+        center: VIZAG_COORDS,
         zoom: 11,
-        disableDefaultUI: false,
+        disableDefaultUI: true, // No map/sat buttons, street view pegman, zoom buttons, or fullscreen
+        gestureHandling: 'none', // No touch or mouse gesture hijacking
+        draggable: false,
+        scrollwheel: false,
+        disableDoubleClickZoom: true,
+        keyboardShortcuts: false,
+        clickableIcons: false,
+        mapTypeId: maps.MapTypeId.ROADMAP
       });
       googleMapInstance.current = map;
 
-      // Draw coverage circles
+      const bounds = new maps.LatLngBounds();
+      const validPoints = [];
+
       areas.forEach(area => {
-        if (area.latitude && area.longitude && area.radius) {
-          const circle = new maps.Circle({
+        const nameKey = (area.name || '').toLowerCase().trim();
+        const fallback = zoneCoordsFallback[nameKey] || {};
+        const lat = Number(area.latitude || fallback.lat);
+        const lng = Number(area.longitude || fallback.lng);
+        const radiusMeters = Number(area.radius || fallback.radius || 5000);
+
+        if (lat && lng) {
+          validPoints.push({ lat, lng, radiusMeters, name: area.name });
+
+          // Calculate latitude/longitude offsets based on radius so full circles fit comfortably
+          const latOffset = (radiusMeters / 111000) * 1.15;
+          const lngOffset = (radiusMeters / (111000 * Math.cos((lat * Math.PI) / 180))) * 1.15;
+
+          bounds.extend({ lat: lat + latOffset, lng });
+          bounds.extend({ lat: lat - latOffset, lng });
+          bounds.extend({ lat, lng: lng + lngOffset });
+          bounds.extend({ lat, lng: lng - lngOffset });
+
+          // Draw coverage circles
+          new maps.Circle({
             map: map,
-            center: { lat: area.latitude, lng: area.longitude },
-            radius: area.radius,
-            fillColor: '#3b82f6',
-            fillOpacity: 0.15,
-            strokeColor: '#2563eb',
-            strokeOpacity: 0.7,
-            strokeWeight: 1.5
+            center: { lat, lng },
+            radius: radiusMeters,
+            fillColor: '#0284C7',
+            fillOpacity: 0.16,
+            strokeColor: '#0284C7',
+            strokeOpacity: 0.75,
+            strokeWeight: 1.5,
+            clickable: false
           });
 
-          const infoWindow = new maps.InfoWindow({
-            content: `<div style="font-family: Outfit, sans-serif; color: var(--primary-navy); padding: 2px;">
-              <strong style="font-size: 0.9rem;">${area.name}</strong><br/>
-              Active doorstep wash coverage zone!
-            </div>`
-          });
-
-          circle.addListener('click', (e) => {
-            infoWindow.setPosition(e.latLng);
-            infoWindow.open(map);
+          // Pin marker with name label
+          new maps.Marker({
+            position: { lat, lng },
+            map: map,
+            title: area.name,
+            icon: {
+              path: maps.SymbolPath.CIRCLE,
+              scale: 6,
+              fillColor: '#0284C7',
+              fillOpacity: 1,
+              strokeColor: '#FFFFFF',
+              strokeWeight: 2
+            },
+            label: {
+              text: area.name,
+              color: '#0F172A',
+              fontSize: '11px',
+              fontWeight: '700'
+            },
+            clickable: false
           });
         }
       });
-    };
 
-    // Load Google Maps dynamically
-    const loadGoogleMaps = () => {
-      if (window.google && window.google.maps) {
-        initUserMap();
-        return;
+      // Fit map bounds to show all covered locations clearly based on container size
+      const fitAllCoveredLocations = () => {
+        if (!bounds.isEmpty()) {
+          map.fitBounds(bounds, { top: 32, right: 32, bottom: 32, left: 32 });
+        }
+      };
+
+      fitAllCoveredLocations();
+
+      // Listen for container resize to automatically re-fit bounds on mobile/tablet/desktop
+      if (window.ResizeObserver && mapContainerRef.current) {
+        resizeObserver = new ResizeObserver(() => {
+          fitAllCoveredLocations();
+        });
+        resizeObserver.observe(mapContainerRef.current);
       }
 
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}`;
-      script.async = true;
-      script.defer = true;
-      script.onload = () => initUserMap();
-      document.head.appendChild(script);
+      // Automatic zoom in and zoom out showcase cycle (no user interaction required)
+      if (validPoints.length > 0) {
+        let cycleIndex = 0;
+        let isZoomedIn = false;
+
+        autoZoomTimer = setInterval(() => {
+          if (!map || bounds.isEmpty()) return;
+
+          if (!isZoomedIn) {
+            // Smoothly pan & zoom in to highlight one of the operational hubs
+            const targetPoint = validPoints[cycleIndex % validPoints.length];
+            map.panTo({ lat: targetPoint.lat, lng: targetPoint.lng });
+            setTimeout(() => {
+              map.setZoom(13);
+            }, 400);
+            isZoomedIn = true;
+            cycleIndex++;
+          } else {
+            // Smoothly zoom back out to encompass all covered locations
+            fitAllCoveredLocations();
+            isZoomedIn = false;
+          }
+        }, 6000);
+      }
     };
 
-    loadGoogleMaps();
+    loadGoogleMaps()
+      .then(() => initUserMap())
+      .catch((err) => console.warn('Dashboard map load warning:', err));
+
+    return () => {
+      if (autoZoomTimer) clearInterval(autoZoomTimer);
+      if (resizeObserver && mapContainerRef.current) {
+        resizeObserver.disconnect();
+      }
+    };
   }, [loading, areas]);
 
   if (loading) return (
@@ -583,22 +667,97 @@ const Dashboard = () => {
       </div>
 
       {/* Service Area Map */}
-      <div className="card" style={{padding: 0, overflow: 'hidden'}}>
-        <div className="p-4 border-b border-gray-100 flex items-center gap-2">
-          <MapPin size={18} color="var(--primary-blue)" />
-          <h3 style={{margin: 0, fontSize: '1.1rem', color: 'var(--primary-navy)'}}>Our Active Service Regions</h3>
+      <div className="card" style={{padding: 0, overflow: 'hidden', borderRadius: '18px', border: '1.5px solid #E2E8F0'}}>
+        <div style={{
+          padding: '1rem 1.25rem',
+          borderBottom: '1px solid #F1F5F9',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.5rem',
+          background: '#FAFCFF'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ width: 28, height: 28, borderRadius: '8px', background: '#E0F2FE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <MapPin size={16} color="var(--primary-blue)" />
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--primary-navy)', fontWeight: 800 }}>
+                Our Active Service Regions
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                Doorstep mobile wash coverage across Visakhapatnam
+              </p>
+            </div>
+          </div>
+
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.35rem',
+            background: '#ECFDF5',
+            border: '1px solid #A7F3D0',
+            color: '#047857',
+            padding: '0.25rem 0.65rem',
+            borderRadius: '999px',
+            fontSize: '0.72rem',
+            fontWeight: 800
+          }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10B981', display: 'inline-block' }} />
+            <span>Auto-Framed Coverage View</span>
+          </div>
         </div>
-        <div className="p-4">
+
+        <div style={{ padding: '0.75rem', position: 'relative' }}>
           <div 
             ref={mapContainerRef} 
             style={{
-              height: '250px', 
-              borderRadius: 'var(--radius-md)', 
+              height: '260px', 
+              width: '100%',
+              borderRadius: '14px', 
               border: '1px solid #E2E8F0',
-              zIndex: 1
+              overflow: 'hidden',
+              background: '#F1F5F9'
             }}
           />
         </div>
+
+        {/* Operational Hubs Chips */}
+        {areas && areas.length > 0 && (
+          <div style={{
+            padding: '0.65rem 1.25rem 1rem',
+            borderTop: '1px solid #F8FAFC',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.45rem',
+            flexWrap: 'wrap',
+            background: '#FAFCFF'
+          }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em', marginRight: '0.25rem' }}>
+              Covered Zones:
+            </span>
+            {areas.map(a => (
+              <span
+                key={a.id}
+                style={{
+                  background: '#FFFFFF',
+                  border: '1px solid #CBD5E1',
+                  color: '#1E293B',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  padding: '0.2rem 0.6rem',
+                  borderRadius: '6px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.25rem'
+                }}
+              >
+                <span style={{ color: '#0284C7' }}>📍</span> {a.name}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

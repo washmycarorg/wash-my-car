@@ -124,11 +124,213 @@ export const getUsers = async (req, res) => {
         },
         cars: {
           include: { carType: true }
+        },
+        pointTransactions: {
+          orderBy: { createdAt: 'desc' }
         }
       },
       orderBy: { createdAt: 'desc' }
     });
     res.json(users);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const updateUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, email, phone } = req.body;
+
+    const user = await prisma.user.findUnique({
+      where: { id: Number(id) }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const data = {};
+    if (name !== undefined) data.name = String(name).trim();
+    if (email !== undefined) data.email = email ? String(email).trim().toLowerCase() : null;
+    if (phone !== undefined) {
+      const cleanPhone = String(phone).trim();
+      const phoneConflict = await prisma.user.findFirst({
+        where: {
+          phone: cleanPhone,
+          id: { not: Number(id) }
+        }
+      });
+      if (phoneConflict) {
+        return res.status(400).json({ error: 'Phone number already registered to another user.' });
+      }
+      data.phone = cleanPhone;
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: Number(id) },
+      data,
+      include: {
+        subscriptions: {
+          include: { plan: true, carType: true },
+          orderBy: { createdAt: 'desc' }
+        },
+        bookings: {
+          include: { carType: true, washType: true, employee: true },
+          orderBy: { date: 'desc' }
+        },
+        cars: { include: { carType: true } },
+        pointTransactions: {
+          orderBy: { createdAt: 'desc' }
+        }
+      }
+    });
+
+    res.json({ message: 'User updated successfully', user: updated });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const addUserPoints = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { points, reason } = req.body;
+
+    const pts = parseInt(points, 10);
+    if (isNaN(pts) || pts === 0) {
+      return res.status(400).json({ error: 'Please enter a valid non-zero points value.' });
+    }
+
+    if (!reason || !String(reason).trim()) {
+      return res.status(400).json({ error: 'Reason for adding points is mandatory.' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: Number(id) }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const newPoints = Math.max(0, (user.points || 0) + pts);
+
+    const [updatedUser, transaction] = await prisma.$transaction([
+      prisma.user.update({
+        where: { id: Number(id) },
+        data: { points: newPoints }
+      }),
+      prisma.pointTransaction.create({
+        data: {
+          userId: Number(id),
+          points: pts,
+          type: pts >= 0 ? 'CREDIT' : 'DEBIT',
+          reason: String(reason).trim()
+        }
+      })
+    ]);
+
+    // Send push notification to user
+    sendPushNotification('USER', Number(id), {
+      title: pts >= 0 ? '🎁 Points Added to Wallet!' : 'Points Deducted from Wallet',
+      body: `${pts >= 0 ? '+' : ''}${pts} wallet points were ${pts >= 0 ? 'added' : 'deducted'}. Reason: ${reason}`,
+      url: '/rewards'
+    }).catch(err => console.error('[Push Points Error]:', err));
+
+    res.json({
+      message: `${pts >= 0 ? '+' : ''}${pts} points successfully ${pts >= 0 ? 'credited' : 'debited'}.`,
+      user: updatedUser,
+      transaction
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const grantFreeSubscription = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { planId, carId, carNumber, carMake, carModel } = req.body;
+
+    if (!planId) {
+      return res.status(400).json({ error: 'Subscription plan is required.' });
+    }
+
+    const plan = await prisma.subscriptionPlan.findUnique({
+      where: { id: Number(planId) },
+      include: { carType: true }
+    });
+
+    if (!plan) {
+      return res.status(404).json({ error: 'Subscription plan not found.' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: Number(id) },
+      include: { cars: true }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    // Determine car details
+    let selectedCar = null;
+    if (carId) {
+      selectedCar = user.cars.find(c => c.id === Number(carId));
+    } else if (user.cars.length > 0) {
+      selectedCar = user.cars[0];
+    }
+
+    const finalCarNumber = carNumber || selectedCar?.carNumber || null;
+    const finalCarMake = carMake || selectedCar?.make || null;
+    const finalCarModel = carModel || selectedCar?.model || null;
+    const finalCarId = selectedCar?.id || null;
+
+    const startDate = new Date();
+    const endDate = new Date(Date.now() + (plan.durationDays || 30) * 24 * 60 * 60 * 1000);
+
+    const subscription = await prisma.userSubscription.create({
+      data: {
+        userId: Number(id),
+        planId: plan.id,
+        carTypeId: plan.carTypeId,
+        carId: finalCarId,
+        carNumber: finalCarNumber,
+        carMake: finalCarMake,
+        carModel: finalCarModel,
+        startDate,
+        endDate,
+        price: 0.0,
+        washesTotal: plan.washesCount,
+        washesRemaining: plan.washesCount,
+        washesBreakdown: plan.includedWashes || '[]',
+        freeAddonsTotal: plan.freeAddonsCount || 0,
+        freeAddonsRemaining: plan.freeAddonsCount || 0,
+        addonsBreakdown: plan.includedAddons || '[]',
+        status: 'ACTIVE',
+        paymentStatus: 'PAID',
+        razorpayOrderId: 'ADMIN_FREE_GRANT',
+        razorpayPaymentId: 'ADMIN_FREE_GRANT'
+      },
+      include: {
+        plan: true,
+        carType: true
+      }
+    });
+
+    // Notify user via Web Push
+    sendPushNotification('USER', Number(id), {
+      title: '👑 Free VIP Pass Granted!',
+      body: `You've been gifted the ${plan.name} (${plan.washesCount} washes) pass by Wash My Car Org Administration.`,
+      url: '/subscriptions'
+    }).catch(err => console.error('[Push Free Sub Error]:', err));
+
+    res.json({
+      message: `Free ${plan.name} pass successfully granted to ${user.name || user.phone}!`,
+      subscription
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -659,6 +861,184 @@ export const getBookings = async (req, res) => {
   }
 };
 
+// Helper: Resolve Coordinates from Google Maps URL
+export const resolveCoordinatesFromUrl = async (url) => {
+  if (!url) return null;
+  const cleanedUrl = url.trim();
+
+  let atMatch = cleanedUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (atMatch) return { lat: parseFloat(atMatch[1]), lng: parseFloat(atMatch[2]) };
+
+  let dMatch = cleanedUrl.match(/!3d(-?\d+\.\d+).*?!4d(-?\d+\.\d+)/);
+  if (dMatch) return { lat: parseFloat(dMatch[1]), lng: parseFloat(dMatch[2]) };
+
+  let qMatch = cleanedUrl.match(/[?&](?:q|query|ll|destination|daddr|origin|center)=loc:?(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/i) ||
+               cleanedUrl.match(/[?&](?:q|query|ll|destination|daddr|origin|center)=(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/i);
+  if (qMatch) return { lat: parseFloat(qMatch[1]), lng: parseFloat(qMatch[2]) };
+
+  if (cleanedUrl.includes('goo.gl') || cleanedUrl.includes('maps.app') || cleanedUrl.includes('bit.ly') || cleanedUrl.includes('tinyurl')) {
+    try {
+      const response = await fetch(cleanedUrl, {
+        method: 'GET',
+        redirect: 'follow',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+      });
+      const finalUrl = response.url || cleanedUrl;
+
+      atMatch = finalUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+      if (atMatch) return { lat: parseFloat(atMatch[1]), lng: parseFloat(atMatch[2]) };
+
+      dMatch = finalUrl.match(/!3d(-?\d+\.\d+).*?!4d(-?\d+\.\d+)/);
+      if (dMatch) return { lat: parseFloat(dMatch[1]), lng: parseFloat(dMatch[2]) };
+
+      qMatch = finalUrl.match(/[?&](?:q|query|ll|destination|daddr|origin|center)=loc:?(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/i) ||
+               finalUrl.match(/[?&](?:q|query|ll|destination|daddr|origin|center)=(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/i);
+      if (qMatch) return { lat: parseFloat(qMatch[1]), lng: parseFloat(qMatch[2]) };
+    } catch (e) {
+      console.warn('URL follow error:', e.message);
+    }
+  }
+  return null;
+};
+
+// Admin Edit Booking Details
+export const updateBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      carNumber,
+      carMake,
+      carModel,
+      carTypeId,
+      address,
+      mapsUrl,
+      latitude,
+      longitude,
+      phone,
+      alternatePhone,
+      washTypeId,
+      serviceAreaId
+    } = req.body;
+
+    const existingBooking = await prisma.booking.findUnique({
+      where: { id: Number(id) },
+      include: { car: true, user: true }
+    });
+
+    if (!existingBooking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    let finalLat = latitude !== undefined && latitude !== '' ? parseFloat(latitude) : existingBooking.latitude;
+    let finalLng = longitude !== undefined && longitude !== '' ? parseFloat(longitude) : existingBooking.longitude;
+
+    // If mapsUrl is passed, attempt resolution
+    if (mapsUrl && String(mapsUrl).trim()) {
+      try {
+        const resolved = await resolveCoordinatesFromUrl(mapsUrl);
+        if (resolved && resolved.lat && resolved.lng) {
+          finalLat = resolved.lat;
+          finalLng = resolved.lng;
+        }
+      } catch (err) {
+        console.warn('Failed to resolve mapsUrl:', err);
+      }
+    }
+
+    const data = {};
+    if (carNumber !== undefined) data.carNumber = String(carNumber).trim().toUpperCase();
+    if (carMake !== undefined) data.carMake = String(carMake).trim();
+    if (carModel !== undefined) data.carModel = String(carModel).trim();
+    if (carTypeId !== undefined) data.carTypeId = Number(carTypeId);
+    if (address !== undefined) data.address = String(address).trim();
+    if (!isNaN(finalLat)) data.latitude = finalLat;
+    if (!isNaN(finalLng)) data.longitude = finalLng;
+    if (alternatePhone !== undefined) data.alternatePhone = String(alternatePhone).trim();
+    if (washTypeId !== undefined) data.washTypeId = Number(washTypeId);
+    if (serviceAreaId !== undefined) data.serviceAreaId = Number(serviceAreaId);
+
+    // If customer's main phone number was provided to update:
+    if (phone && String(phone).trim() && existingBooking.userId) {
+      const cleanPhone = String(phone).trim();
+      data.alternatePhone = data.alternatePhone || cleanPhone;
+      try {
+        await prisma.user.update({
+          where: { id: existingBooking.userId },
+          data: { phone: cleanPhone }
+        });
+      } catch (phoneErr) {
+        console.warn('Could not update user phone:', phoneErr.message);
+      }
+    }
+
+    // Sync car table if carId is present
+    if (existingBooking.carId) {
+      try {
+        await prisma.car.update({
+          where: { id: existingBooking.carId },
+          data: {
+            ...(data.carNumber && { carNumber: data.carNumber }),
+            ...(data.carMake && { make: data.carMake }),
+            ...(data.carModel && { model: data.carModel }),
+            ...(data.carTypeId && { carTypeId: data.carTypeId })
+          }
+        });
+      } catch (carErr) {
+        console.warn('Could not sync Car model:', carErr.message);
+      }
+    }
+
+    const updatedBooking = await prisma.booking.update({
+      where: { id: Number(id) },
+      data,
+      include: {
+        user: true,
+        employee: true,
+        car: true,
+        carType: true,
+        washType: true,
+        serviceArea: true,
+        review: true,
+        addons: { include: { addon: true } }
+      }
+    });
+
+    res.json({ message: 'Booking updated successfully', booking: updatedBooking });
+  } catch (error) {
+    console.error('Error updating booking:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Admin Delete Booking
+export const deleteBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const booking = await prisma.booking.findUnique({
+      where: { id: Number(id) }
+    });
+
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    // Delete related addons & reviews first
+    await prisma.bookingAddon.deleteMany({ where: { bookingId: Number(id) } });
+    await prisma.review.deleteMany({ where: { bookingId: Number(id) } });
+
+    await prisma.booking.delete({
+      where: { id: Number(id) }
+    });
+
+    res.json({ success: true, message: 'Booking deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting booking:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 // Manual Assign Slot
 export const assignSlot = async (req, res) => {
   try {
@@ -848,12 +1228,26 @@ export const cancelBookingByAdmin = async (req, res) => {
       }
     }
 
-    // Refund loyalty points if redeemed
-    if (booking.pointsRedeemed > 0) {
-      await prisma.user.update({
-        where: { id: booking.userId },
-        data: { points: { increment: booking.pointsRedeemed } }
-      });
+    // Update loyalty points: restore redeemed points and deduct given reward points if booking was paid
+    const freshUser = await prisma.user.findUnique({ where: { id: booking.userId } });
+    if (freshUser) {
+      let netPointsChange = 0;
+      // 1. Refund redeemed loyalty points back to customer
+      if (booking.pointsRedeemed > 0) {
+        netPointsChange += booking.pointsRedeemed;
+      }
+      // 2. Revert earned reward points if the booking was paid and reward points were credited
+      if (booking.paymentStatus === 'PAID' && booking.pointsEarned > 0) {
+        netPointsChange -= booking.pointsEarned;
+      }
+      if (netPointsChange !== 0) {
+        await prisma.user.update({
+          where: { id: booking.userId },
+          data: {
+            points: Math.max(0, freshUser.points + netPointsChange)
+          }
+        });
+      }
     }
 
     const updatedBooking = await prisma.booking.update({
@@ -1056,25 +1450,27 @@ export const markDoorstepRejectionByAdmin = async (req, res) => {
       }
     }
 
-    // 2. Reward points payment:
-    // Deduct 99 points; restore remaining points to user account
-    let pointsRestored = 0;
-    if (booking.pointsRedeemed > 0) {
-      pointsRestored = Math.max(0, booking.pointsRedeemed - 99);
-      if (pointsRestored > 0) {
+    // 2. Reward points adjustment & reversal of points earned
+    const freshUserRejection = await prisma.user.findUnique({ where: { id: booking.userId } });
+    if (freshUserRejection) {
+      let netPointsChange = 0;
+      // If customer paid through reward points: deduct 99 points doorstep visit fee, restore remaining points
+      if (booking.pointsRedeemed > 0) {
+        const pointsRestored = Math.max(0, booking.pointsRedeemed - 99);
+        netPointsChange += pointsRestored;
+      }
+      // Revert reward points earned on successful payment if any
+      if (booking.paymentStatus === 'PAID' && booking.pointsEarned > 0) {
+        netPointsChange -= booking.pointsEarned;
+      }
+      if (netPointsChange !== 0) {
         await prisma.user.update({
           where: { id: booking.userId },
-          data: { points: { increment: pointsRestored } }
+          data: {
+            points: Math.max(0, freshUserRejection.points + netPointsChange)
+          }
         });
       }
-    }
-
-    // Revert points earned if any
-    if (booking.pointsEarned > 0) {
-      await prisma.user.update({
-        where: { id: booking.userId },
-        data: { points: { decrement: Math.min(booking.user.points, booking.pointsEarned) } }
-      });
     }
 
     // 3. Subscription booking: 1 wash quota already used, no refund and no compensation
@@ -1214,6 +1610,37 @@ export const createInventoryItem = async (req, res) => {
   }
 };
 
+export const updateInventoryItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, type, totalQuantity, washesPerUnit } = req.body;
+
+    const data = {};
+    if (name !== undefined) data.name = String(name).trim();
+    if (type !== undefined) data.type = type;
+    if (totalQuantity !== undefined) data.totalQuantity = Number(totalQuantity);
+    if (washesPerUnit !== undefined) data.washesPerUnit = Number(washesPerUnit);
+
+    const item = await prisma.inventoryItem.update({
+      where: { id: Number(id) },
+      data,
+      include: {
+        allocations: {
+          include: {
+            employee: {
+              select: { id: true, name: true, phone: true }
+            }
+          }
+        }
+      }
+    });
+
+    res.json(item);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 export const deleteInventoryItem = async (req, res) => {
   try {
     const { id } = req.params;
@@ -1276,6 +1703,63 @@ export const allocateInventory = async (req, res) => {
     }
 
     res.json(allocation);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const updateAllocation = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { quantity, washesUsed } = req.body;
+
+    const allocation = await prisma.inventoryAllocation.findUnique({
+      where: { id: Number(id) },
+      include: { inventoryItem: true }
+    });
+
+    if (!allocation) {
+      return res.status(404).json({ error: 'Allocation not found' });
+    }
+
+    const data = {};
+    if (washesUsed !== undefined) {
+      data.washesUsed = Number(washesUsed);
+    }
+
+    if (quantity !== undefined) {
+      const newQty = Number(quantity);
+      const diff = newQty - allocation.quantity;
+
+      if (diff > 0 && allocation.inventoryItem.totalQuantity < diff) {
+        return res.status(400).json({
+          error: `Insufficient warehouse stock to increase allocation. Available: ${allocation.inventoryItem.totalQuantity}, required: ${diff}`
+        });
+      }
+
+      // Adjust warehouse stock accordingly
+      await prisma.inventoryItem.update({
+        where: { id: allocation.inventoryItemId },
+        data: {
+          totalQuantity: allocation.inventoryItem.totalQuantity - diff
+        }
+      });
+
+      data.quantity = newQty;
+    }
+
+    const updated = await prisma.inventoryAllocation.update({
+      where: { id: Number(id) },
+      data,
+      include: {
+        inventoryItem: true,
+        employee: {
+          select: { id: true, name: true, phone: true }
+        }
+      }
+    });
+
+    res.json(updated);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

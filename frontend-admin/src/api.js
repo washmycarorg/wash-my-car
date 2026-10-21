@@ -37,6 +37,45 @@ export const getUsers = async () => {
   return res.json();
 };
 
+export const updateUser = async (id, data) => {
+  const res = await fetch(`${API_URL}/admin/users/${id}`, {
+    method: 'PUT',
+    headers: getHeaders(),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.error || errorBody.message || 'Failed to update user');
+  }
+  return res.json();
+};
+
+export const addUserPoints = async (id, data) => {
+  const res = await fetch(`${API_URL}/admin/users/${id}/points`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.error || errorBody.message || 'Failed to add points');
+  }
+  return res.json();
+};
+
+export const grantFreeSubscription = async (id, data) => {
+  const res = await fetch(`${API_URL}/admin/users/${id}/grant-subscription`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.error || errorBody.message || 'Failed to grant free subscription');
+  }
+  return res.json();
+};
+
 export const toggleEmployeeStatus = async (id, status) => {
   const res = await fetch(`${API_URL}/admin/employees/${id}/status`, {
     method: 'PUT',
@@ -60,6 +99,31 @@ export const updateEmployee = async (id, data) => {
 export const getBookings = async () => {
   const res = await fetch(`${API_URL}/admin/bookings`, { headers: getHeaders() });
   if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const updateBooking = async (id, data) => {
+  const res = await fetch(`${API_URL}/admin/bookings/${id}`, {
+    method: 'PUT',
+    headers: getHeaders(),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.error || errorBody.message || 'Failed to update booking');
+  }
+  return res.json();
+};
+
+export const deleteBooking = async (id) => {
+  const res = await fetch(`${API_URL}/admin/bookings/${id}`, {
+    method: 'DELETE',
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.error || errorBody.message || 'Failed to delete booking');
+  }
   return res.json();
 };
 
@@ -370,6 +434,19 @@ export const createInventoryItem = async (data) => {
   return res.json();
 };
 
+export const updateInventoryItem = async (id, data) => {
+  const res = await fetch(`${API_URL}/admin/inventory/${id}`, {
+    method: 'PUT',
+    headers: getHeaders(),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.error || errorBody.message || 'Failed to update inventory item');
+  }
+  return res.json();
+};
+
 export const deleteInventoryItem = async (id) => {
   const res = await fetch(`${API_URL}/admin/inventory/${id}`, {
     method: 'DELETE',
@@ -386,6 +463,19 @@ export const allocateInventory = async (data) => {
     body: JSON.stringify(data)
   });
   if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const updateAllocation = async (id, data) => {
+  const res = await fetch(`${API_URL}/admin/inventory/allocate/${id}`, {
+    method: 'PUT',
+    headers: getHeaders(),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.error || errorBody.message || 'Failed to update allocation');
+  }
   return res.json();
 };
 

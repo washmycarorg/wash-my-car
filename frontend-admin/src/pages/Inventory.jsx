@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  getInventoryItems, createInventoryItem, deleteInventoryItem,
-  allocateInventory, deleteAllocation, getEmployees
+  getInventoryItems, createInventoryItem, updateInventoryItem, deleteInventoryItem,
+  allocateInventory, updateAllocation, deleteAllocation, getEmployees
 } from '../api';
-import { Plus, Trash2, Shield, Wrench, Droplet, User, Package, RefreshCw, BarChart2 } from 'lucide-react';
+import { Plus, Trash2, Shield, Wrench, Droplet, User, Package, RefreshCw, BarChart2, Edit2, X, AlertCircle } from 'lucide-react';
 
 const Inventory = () => {
   const [items, setItems] = useState([]);
@@ -13,6 +13,14 @@ const Inventory = () => {
   // Form states
   const [newItem, setNewItem] = useState({ name: '', type: 'CHEMICAL', totalQuantity: '', washesPerUnit: '' });
   const [newAllocation, setNewAllocation] = useState({ inventoryItemId: '', employeeId: '', quantity: '' });
+
+  // Edit Warehouse Stock Item Modal State
+  const [editItemModal, setEditItemModal] = useState(null);
+  const [editItemLoading, setEditItemLoading] = useState(false);
+
+  // Edit Handed Out / Allocation Modal State
+  const [editAllocationModal, setEditAllocationModal] = useState(null);
+  const [editAllocationLoading, setEditAllocationLoading] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -53,6 +61,28 @@ const Inventory = () => {
     }
   };
 
+  const handleUpdateItemSubmit = async (e) => {
+    e.preventDefault();
+    if (!editItemModal || !editItemModal.name.trim()) return;
+    setEditItemLoading(true);
+    try {
+      await updateInventoryItem(editItemModal.id, {
+        name: editItemModal.name.trim(),
+        type: editItemModal.type,
+        totalQuantity: Number(editItemModal.totalQuantity),
+        washesPerUnit: Number(editItemModal.washesPerUnit)
+      });
+      alert('Warehouse stock item updated successfully!');
+      setEditItemModal(null);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Failed to update warehouse item');
+    } finally {
+      setEditItemLoading(false);
+    }
+  };
+
   const handleDeleteItem = async (id) => {
     if (!confirm('Are you sure you want to delete this item? This will also delete any allocations.')) return;
     try {
@@ -78,6 +108,26 @@ const Inventory = () => {
     } catch (err) {
       console.error(err);
       alert(err.message || 'Failed to allocate inventory');
+    }
+  };
+
+  const handleUpdateAllocationSubmit = async (e) => {
+    e.preventDefault();
+    if (!editAllocationModal) return;
+    setEditAllocationLoading(true);
+    try {
+      await updateAllocation(editAllocationModal.id, {
+        quantity: Number(editAllocationModal.quantity),
+        washesUsed: Number(editAllocationModal.washesUsed)
+      });
+      alert('Stock allocation updated successfully! Warehouse inventory automatically adjusted.');
+      setEditAllocationModal(null);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Failed to update allocation');
+    } finally {
+      setEditAllocationLoading(false);
     }
   };
 
@@ -303,16 +353,30 @@ const Inventory = () => {
                       </div>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                    <div style={{ textAlign: 'right' }}>
+                  <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                    <div style={{ textAlign: 'right', marginRight: '0.25rem' }}>
                       <div style={{ fontWeight: 700, fontSize: '1.1rem', color: item.totalQuantity > 5 ? 'var(--text-dark)' : 'var(--danger)' }}>
                         {item.totalQuantity}
                       </div>
                       <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Units Available</div>
                     </div>
                     <button 
+                      onClick={() => setEditItemModal({
+                        id: item.id,
+                        name: item.name,
+                        type: item.type,
+                        totalQuantity: item.totalQuantity,
+                        washesPerUnit: item.washesPerUnit
+                      })}
+                      style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', color: '#1D4ED8', cursor: 'pointer', padding: '0.35rem 0.65rem', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.78rem', fontWeight: 600 }}
+                      title="Edit Item Details & Stock"
+                    >
+                      <Edit2 size={13} /> Edit
+                    </button>
+                    <button 
                       onClick={() => handleDeleteItem(item.id)}
                       style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.25rem' }}
+                      title="Delete Item"
                     >
                       <Trash2 size={16} color="var(--danger)" />
                     </button>
@@ -375,13 +439,29 @@ const Inventory = () => {
                           </div>
                         </td>
                         <td style={{ padding: '1rem', textAlign: 'center' }}>
-                          <button 
-                            onClick={() => handleReturnAllocation(alloc.id)}
-                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.25rem' }}
-                            title="Return stock to warehouse"
-                          >
-                            <Trash2 size={16} color="var(--danger)" />
-                          </button>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <button 
+                              onClick={() => setEditAllocationModal({
+                                id: alloc.id,
+                                employeeName: alloc.employee?.name || 'Employee',
+                                itemName: alloc.item?.name || 'Item',
+                                quantity: alloc.quantity,
+                                washesUsed: alloc.washesUsed,
+                                warehouseStock: alloc.item?.totalQuantity || 0
+                              })}
+                              style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', color: '#1D4ED8', cursor: 'pointer', padding: '0.3rem 0.55rem', borderRadius: '5px', fontSize: '0.75rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
+                              title="Edit Handed Out Quantity & Washes Used"
+                            >
+                              <Edit2 size={13} /> Edit
+                            </button>
+                            <button 
+                              onClick={() => handleReturnAllocation(alloc.id)}
+                              style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.3rem' }}
+                              title="Return stock to warehouse"
+                            >
+                              <Trash2 size={16} color="var(--danger)" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -400,6 +480,227 @@ const Inventory = () => {
 
         </div>
       </div>
+
+      {/* Edit Warehouse Stock Item Modal */}
+      {editItemModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1100,
+          padding: '1rem'
+        }}>
+          <div className="admin-modal-content" style={{
+            background: 'white',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '500px',
+            padding: '1.75rem',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            boxSizing: 'border-box'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h3 style={{ margin: 0, color: 'var(--primary-navy)', fontSize: '1.2rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Edit2 size={20} color="var(--primary-blue)" /> Edit Warehouse Stock Item
+              </h3>
+              <button
+                type="button"
+                onClick={() => setEditItemModal(null)}
+                style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <X size={18} color="#64748B" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateItemSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Item Name</label>
+                <input
+                  required
+                  type="text"
+                  className="form-input"
+                  value={editItemModal.name}
+                  onChange={e => setEditItemModal({ ...editItemModal, name: e.target.value })}
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Category</label>
+                <select
+                  className="form-input"
+                  value={editItemModal.type}
+                  onChange={e => setEditItemModal({ ...editItemModal, type: e.target.value })}
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                >
+                  <option value="CHEMICAL">Chemical / Liquid Consumables</option>
+                  <option value="EQUIPMENT">Equipment / Tools</option>
+                  <option value="OTHER">Other / Miscellaneous</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Warehouse Stock (Units)</label>
+                  <input
+                    required
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    className="form-input"
+                    value={editItemModal.totalQuantity}
+                    onChange={e => setEditItemModal({ ...editItemModal, totalQuantity: e.target.value })}
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Washes / Unit</label>
+                  <input
+                    required
+                    type="number"
+                    min="1"
+                    className="form-input"
+                    value={editItemModal.washesPerUnit}
+                    onChange={e => setEditItemModal({ ...editItemModal, washesPerUnit: e.target.value })}
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '0.65rem 0.85rem', fontSize: '0.8rem', color: '#64748B' }}>
+                💡 <strong>Warehouse Stock</strong> indicates current available inventory ready to be distributed to field technicians.
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setEditItemModal(null)}
+                  disabled={editItemLoading}
+                  className="btn btn-outline"
+                  style={{ borderRadius: '8px', padding: '0.55rem 1.2rem' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editItemLoading}
+                  className="btn btn-primary"
+                  style={{ borderRadius: '8px', padding: '0.55rem 1.4rem' }}
+                >
+                  {editItemLoading ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Allocation (Handed Out to Employee) Modal */}
+      {editAllocationModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1100,
+          padding: '1rem'
+        }}>
+          <div className="admin-modal-content" style={{
+            background: 'white',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '500px',
+            padding: '1.75rem',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            boxSizing: 'border-box'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <div>
+                <h3 style={{ margin: 0, color: 'var(--primary-navy)', fontSize: '1.2rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Edit2 size={20} color="var(--accent-teal)" /> Edit Employee Allocation
+                </h3>
+                <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                  Technician: <strong>{editAllocationModal.employeeName}</strong> &bull; Item: <strong>{editAllocationModal.itemName}</strong>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditAllocationModal(null)}
+                style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <X size={18} color="#64748B" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateAllocationSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                  <label className="form-label" style={{ margin: 0 }}>Quantity Handed Out to Employee</label>
+                  <span style={{ fontSize: '0.74rem', color: '#0369A1', background: '#E0F2FE', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: 600 }}>
+                    Warehouse Stock: {editAllocationModal.warehouseStock} avail
+                  </span>
+                </div>
+                <input
+                  required
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  className="form-input"
+                  value={editAllocationModal.quantity}
+                  onChange={e => setEditAllocationModal({ ...editAllocationModal, quantity: e.target.value })}
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Washes Used / Consumed Counter</label>
+                <input
+                  required
+                  type="number"
+                  min="0"
+                  step="1"
+                  className="form-input"
+                  value={editAllocationModal.washesUsed}
+                  onChange={e => setEditAllocationModal({ ...editAllocationModal, washesUsed: e.target.value })}
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '8px', padding: '0.75rem 0.9rem', fontSize: '0.8rem', color: '#1E40AF', lineHeight: 1.45 }}>
+                <div style={{ fontWeight: 700, marginBottom: '0.2rem' }}>⚡ Automatic Warehouse Inventory Sync:</div>
+                When you increase given quantity, the difference is deducted from warehouse stock. When you decrease given quantity, the difference is returned back into the warehouse stock.
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setEditAllocationModal(null)}
+                  disabled={editAllocationLoading}
+                  className="btn btn-outline"
+                  style={{ borderRadius: '8px', padding: '0.55rem 1.2rem' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editAllocationLoading}
+                  className="btn btn-teal"
+                  style={{ borderRadius: '8px', padding: '0.55rem 1.4rem' }}
+                >
+                  {editAllocationLoading ? 'Updating...' : 'Update Allocation'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -15,6 +15,14 @@ import {
   getSettings,
   getCars
 } from '../api';
+import SearchableDropdown from '../components/SearchableDropdown';
+import { INDIAN_CAR_BRANDS } from '../data/indianCars';
+import { 
+  formatIndianCarNumber, 
+  validateIndianCarNumber, 
+  getCarNumberMetadata, 
+  findSavedCarByNumber 
+} from '../utils/indianVehicle';
 
 const DEFAULT_TERMS = `1. Non-Refundable Policy: Once subscribed, the subscription pass amount is strictly non-refundable under any circumstances.
 2. Single Vehicle Binding: This VIP Pass is exclusively linked and valid for the single registered vehicle (Registration number, make & model) chosen during purchase. Benefits cannot be shared or transferred to any other vehicle.
@@ -42,6 +50,10 @@ const Subscriptions = () => {
   const [carNumber, setCarNumber] = useState('');
   const [carMake, setCarMake] = useState('');
   const [carModel, setCarModel] = useState('');
+  const [selectedBrand, setSelectedBrand] = useState('');
+  const [customBrand, setCustomBrand] = useState('');
+  const [selectedModel, setSelectedModel] = useState('');
+  const [customModel, setCustomModel] = useState('');
   const [saveCar, setSaveCar] = useState(true);
   const [vehicleError, setVehicleError] = useState('');
 
@@ -85,9 +97,11 @@ const Subscriptions = () => {
         setCarSource('saved');
         setSelectedSavedCarId(loadedCars[0].id.toString());
         setSelectedCarTypeId(loadedCars[0].carTypeId);
-        setCarNumber(loadedCars[0].carNumber || '');
+        setCarNumber(formatIndianCarNumber(loadedCars[0].carNumber || ''));
         setCarMake(loadedCars[0].make || '');
         setCarModel(loadedCars[0].model || '');
+        setSelectedBrand(loadedCars[0].make || '');
+        setSelectedModel(loadedCars[0].model || '');
       } else {
         setCarSource('new');
         if (validCarTypes.length > 0) {
@@ -109,15 +123,56 @@ const Subscriptions = () => {
   const handleSelectSavedCar = (car) => {
     setSelectedSavedCarId(car.id.toString());
     setSelectedCarTypeId(car.carTypeId);
-    setCarNumber(car.carNumber || '');
+    setCarNumber(formatIndianCarNumber(car.carNumber || ''));
     setCarMake(car.make || '');
     setCarModel(car.model || '');
+    setSelectedBrand(car.make || '');
+    setSelectedModel(car.model || '');
     setVehicleError('');
   };
 
   const handleSelectCarType = (ctId) => {
     setSelectedCarTypeId(ctId);
     setVehicleError('');
+  };
+
+  // Indian car brands and models dropdown options
+  const brandOptions = INDIAN_CAR_BRANDS.map(b => b.name);
+  const currentBrandObj = INDIAN_CAR_BRANDS.find(b => b.name === selectedBrand);
+  const modelOptions = currentBrandObj ? currentBrandObj.models.map(m => m.name) : [];
+
+  // When a model is chosen from Indian cars list, auto-match car category class
+  useEffect(() => {
+    if (carSource === 'new' && selectedBrand && selectedBrand !== '__OTHER__' && selectedModel && selectedModel !== '__OTHER__') {
+      const brandData = INDIAN_CAR_BRANDS.find(b => b.name === selectedBrand);
+      if (brandData) {
+        const modelData = brandData.models.find(m => m.name === selectedModel);
+        if (modelData && modelData.type && carTypes.length > 0) {
+          const match = carTypes.find(ct => ct.name.toLowerCase().includes(modelData.type.toLowerCase()) || modelData.type.toLowerCase().includes(ct.name.toLowerCase()));
+          if (match) {
+            setSelectedCarTypeId(match.id);
+          }
+        }
+      }
+    }
+  }, [carSource, selectedBrand, selectedModel, carTypes]);
+
+  // Car Registration Number change with auto-dashing & garage matching
+  const handleCarNumberChange = (e) => {
+    const raw = e.target.value;
+    const formatted = formatIndianCarNumber(raw);
+    setCarNumber(formatted);
+    if (vehicleError) setVehicleError('');
+
+    // If typing in new car mode, check if this car already exists in user's saved garage
+    if (carSource === 'new' && savedCars.length > 0) {
+      const matchedSaved = findSavedCarByNumber(formatted, savedCars);
+      if (matchedSaved) {
+        if (!selectedBrand) setSelectedBrand(matchedSaved.make || '');
+        if (!selectedModel) setSelectedModel(matchedSaved.model || '');
+        if (matchedSaved.carTypeId) setSelectedCarTypeId(matchedSaved.carTypeId);
+      }
+    }
   };
 
   const handleInitiateSubscribe = (plan) => {
@@ -136,20 +191,35 @@ const Subscriptions = () => {
       }
       const car = savedCars.find(c => c.id.toString() === selectedSavedCarId);
       effectiveCarNumber = car?.carNumber || carNumber;
-      if (!effectiveCarNumber || effectiveCarNumber.trim().length < 4) {
-        setVehicleError('Please ensure a valid registration number is entered for this car.');
+      const numVal = validateIndianCarNumber(effectiveCarNumber);
+      if (!numVal.isValid) {
+        setVehicleError(numVal.message || 'Please ensure a valid Indian registration number is entered for this car.');
         return;
       }
     } else {
-      effectiveCarNumber = carNumber.trim();
-      if (!effectiveCarNumber || effectiveCarNumber.length < 4) {
-        setVehicleError('Please enter a valid vehicle registration number (e.g. TS 09 AB 1234).');
+      const makeName = selectedBrand === '__OTHER__' ? customBrand.trim() : (selectedBrand || carMake).trim();
+      const modelName = selectedModel === '__OTHER__' ? customModel.trim() : (selectedModel || carModel).trim();
+      if (!makeName) {
+        setVehicleError('Please select or enter the car manufacturer/brand.');
+        const el = document.getElementById('vehicle-binding-section');
+        if (el) el.scrollIntoView({ behavior: 'smooth' });
+        return;
+      }
+      if (!modelName) {
+        setVehicleError('Please select or enter the car model.');
         const el = document.getElementById('vehicle-binding-section');
         if (el) el.scrollIntoView({ behavior: 'smooth' });
         return;
       }
       if (!effectiveCarTypeId) {
         setVehicleError('Please select a vehicle category type.');
+        const el = document.getElementById('vehicle-binding-section');
+        if (el) el.scrollIntoView({ behavior: 'smooth' });
+        return;
+      }
+      const numVal = validateIndianCarNumber(carNumber);
+      if (!numVal.isValid) {
+        setVehicleError(numVal.message || 'Please enter a valid Indian car registration number (e.g. AP-31-EA-1234 or 22-BH-1234-AA).');
         const el = document.getElementById('vehicle-binding-section');
         if (el) el.scrollIntoView({ behavior: 'smooth' });
         return;
@@ -173,12 +243,24 @@ const Subscriptions = () => {
     setSuccessMsg(null);
 
     try {
+      const finalMake = carSource === 'saved'
+        ? (savedCars.find(c => c.id.toString() === selectedSavedCarId)?.make || carMake)
+        : (selectedBrand === '__OTHER__' ? customBrand.trim() : (selectedBrand || carMake)).trim();
+
+      const finalModel = carSource === 'saved'
+        ? (savedCars.find(c => c.id.toString() === selectedSavedCarId)?.model || carModel)
+        : (selectedModel === '__OTHER__' ? customModel.trim() : (selectedModel || carModel)).trim();
+
+      const finalNumber = carSource === 'saved'
+        ? (savedCars.find(c => c.id.toString() === selectedSavedCarId)?.carNumber || carNumber)
+        : carNumber;
+
       const payload = {
         planId: plan.id,
         carId: carSource === 'saved' ? Number(selectedSavedCarId) : null,
-        carMake: carMake ? carMake.trim() : null,
-        carModel: carModel ? carModel.trim() : null,
-        carNumber: carNumber ? carNumber.trim().toUpperCase() : null,
+        carMake: finalMake || null,
+        carModel: finalModel || null,
+        carNumber: finalNumber ? formatIndianCarNumber(finalNumber) : null,
         saveCar: carSource === 'new' ? saveCar : false
       };
 
@@ -313,12 +395,18 @@ const Subscriptions = () => {
   });
 
   const selectedCarTypeObj = carTypes.find(ct => Number(ct.id) === Number(selectedCarTypeId));
+  const effectiveActiveMake = carSource === 'saved'
+    ? (savedCars.find(c => c.id.toString() === selectedSavedCarId)?.make || carMake)
+    : (selectedBrand === '__OTHER__' ? customBrand.trim() : (selectedBrand || carMake)).trim();
+
+  const effectiveActiveModel = carSource === 'saved'
+    ? (savedCars.find(c => c.id.toString() === selectedSavedCarId)?.model || carModel)
+    : (selectedModel === '__OTHER__' ? customModel.trim() : (selectedModel || carModel)).trim();
+
   const currentActiveCarNumber = carSource === 'saved' 
     ? (savedCars.find(c => c.id.toString() === selectedSavedCarId)?.carNumber || carNumber)
     : carNumber;
-  const currentActiveCarTitle = carSource === 'saved'
-    ? `${savedCars.find(c => c.id.toString() === selectedSavedCarId)?.make || ''} ${savedCars.find(c => c.id.toString() === selectedSavedCarId)?.model || ''}`.trim()
-    : `${carMake} ${carModel}`.trim();
+  const currentActiveCarTitle = `${effectiveActiveMake} ${effectiveActiveModel}`.trim();
 
   return (
     <div style={{ maxWidth: '1100px', margin: '0 auto', paddingBottom: '3.5rem' }}>
@@ -886,69 +974,156 @@ const Subscriptions = () => {
             {/* Inputs: Car Number, Make, Model */}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-              gap: '0.85rem'
+              gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+              gap: '1rem',
+              alignItems: 'start'
             }}>
+              {/* Registration Number */}
               <div>
                 <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
                   2. Registration Number *
+                  <span style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 500, marginLeft: '6px' }}>
+                    (Auto dashes)
+                  </span>
                 </label>
-                <input
-                  type="text"
-                  placeholder="e.g. TS 09 AB 1234"
-                  value={carNumber}
-                  onChange={(e) => setCarNumber(e.target.value.toUpperCase())}
-                  style={{
-                    width: '100%',
-                    padding: '0.65rem 0.85rem',
-                    borderRadius: '10px',
-                    border: '1.5px solid #CBD5E1',
-                    fontSize: '0.95rem',
-                    fontWeight: 700,
-                    letterSpacing: '0.04em',
-                    boxSizing: 'border-box'
-                  }}
-                />
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    maxLength={14}
+                    placeholder="e.g. AP-31-EA-1234 or 22-BH-1234-AA"
+                    value={carNumber}
+                    onChange={handleCarNumberChange}
+                    style={{
+                      width: '100%',
+                      padding: '0.65rem 3.2rem 0.65rem 0.85rem',
+                      borderRadius: '10px',
+                      border: '1.5px solid #CBD5E1',
+                      fontSize: '0.95rem',
+                      fontWeight: 700,
+                      letterSpacing: '0.06em',
+                      boxSizing: 'border-box',
+                      color: '#0F172A',
+                      outline: 'none'
+                    }}
+                    onFocus={e => e.target.style.borderColor = '#D97706'}
+                    onBlur={e => e.target.style.borderColor = '#CBD5E1'}
+                  />
+                  <span style={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    fontSize: '0.68rem',
+                    background: '#F1F5F9',
+                    border: '1px solid #E2E8F0',
+                    padding: '0.15rem 0.45rem',
+                    borderRadius: '4px',
+                    color: '#64748B',
+                    fontWeight: 800,
+                    pointerEvents: 'none'
+                  }}>
+                    IND
+                  </span>
+                </div>
+
+                {/* Real-time RTO / State Recognition */}
+                {carNumber && (() => {
+                  const meta = getCarNumberMetadata(carNumber);
+                  if (!meta) return null;
+                  return (
+                    <div style={{
+                      marginTop: '0.45rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      padding: '0.2rem 0.55rem',
+                      borderRadius: '6px',
+                      fontSize: '0.74rem',
+                      fontWeight: 700,
+                      background: meta.isBh ? '#FEF3C7' : '#EFF6FF',
+                      color: meta.isBh ? '#92400E' : '#1E40AF',
+                      border: meta.isBh ? '1px solid #FDE68A' : '1px solid #BFDBFE'
+                    }}>
+                      <span>🇮🇳</span>
+                      <span>{meta.displayName}</span>
+                      <span style={{ fontSize: '0.68rem', opacity: 0.85 }}>({meta.seriesType})</span>
+                    </div>
+                  );
+                })()}
               </div>
 
+              {/* Brand Searchable Dropdown */}
               <div>
                 <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-                  Car Brand / Manufacturer
+                  3. Car Brand / Manufacturer *
                 </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Hyundai, Maruti, Honda"
-                  value={carMake}
-                  onChange={(e) => setCarMake(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.65rem 0.85rem',
-                    borderRadius: '10px',
-                    border: '1.5px solid #CBD5E1',
-                    fontSize: '0.9rem',
-                    boxSizing: 'border-box'
+                <SearchableDropdown
+                  options={brandOptions}
+                  value={selectedBrand}
+                  onChange={(val) => {
+                    setSelectedBrand(val);
+                    setSelectedModel('');
+                    if (vehicleError) setVehicleError('');
                   }}
+                  placeholder="Search brand (e.g. Maruti, Tata)"
+                  searchPlaceholder="Type company name..."
+                  allowOther={true}
+                  otherLabel="+ Other Brand (Manual)"
                 />
+                {selectedBrand === '__OTHER__' && (
+                  <input
+                    type="text"
+                    placeholder="Type custom brand name..."
+                    value={customBrand}
+                    onChange={e => setCustomBrand(e.target.value)}
+                    style={{
+                      width: '100%',
+                      marginTop: '0.5rem',
+                      padding: '0.55rem 0.85rem',
+                      borderRadius: '8px',
+                      border: '1.5px solid #CBD5E1',
+                      fontSize: '0.88rem',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                )}
               </div>
 
+              {/* Model Searchable Dropdown */}
               <div>
                 <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-                  Car Model Name
+                  4. Car Model Name *
                 </label>
-                <input
-                  type="text"
-                  placeholder="e.g. i20, Swift, City, Creta"
-                  value={carModel}
-                  onChange={(e) => setCarModel(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.65rem 0.85rem',
-                    borderRadius: '10px',
-                    border: '1.5px solid #CBD5E1',
-                    fontSize: '0.9rem',
-                    boxSizing: 'border-box'
+                <SearchableDropdown
+                  options={modelOptions}
+                  value={selectedModel}
+                  onChange={(val) => {
+                    setSelectedModel(val);
+                    if (vehicleError) setVehicleError('');
                   }}
+                  placeholder={selectedBrand ? "Search model (e.g. Swift, Nexon)..." : "Select brand first"}
+                  searchPlaceholder="Type model name..."
+                  allowOther={true}
+                  otherLabel="+ Other Model (Manual)"
+                  disabled={!selectedBrand}
                 />
+                {selectedModel === '__OTHER__' && (
+                  <input
+                    type="text"
+                    placeholder="Type custom car model..."
+                    value={customModel}
+                    onChange={e => setCustomModel(e.target.value)}
+                    style={{
+                      width: '100%',
+                      marginTop: '0.5rem',
+                      padding: '0.55rem 0.85rem',
+                      borderRadius: '8px',
+                      border: '1.5px solid #CBD5E1',
+                      fontSize: '0.88rem',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                )}
               </div>
             </div>
 

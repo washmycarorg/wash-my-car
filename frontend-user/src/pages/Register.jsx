@@ -43,6 +43,7 @@ const Register = ({ setAuth }) => {
   const [googlePromptName, setGooglePromptName] = useState('');
 
   const googleBtnContainerRef = useRef(null);
+  const gsiInitializedRef = useRef(false);
   const navigate = useNavigate();
 
   // SEO Page Title and Meta Description
@@ -85,6 +86,7 @@ const Register = ({ setAuth }) => {
   // Initialize Google Identity Services
   useEffect(() => {
     const initGoogleGSI = () => {
+      if (gsiInitializedRef.current) return;
       if (window.google?.accounts?.id && GOOGLE_CLIENT_ID) {
         try {
           window.google.accounts.id.initialize({
@@ -92,7 +94,9 @@ const Register = ({ setAuth }) => {
             callback: handleGoogleCredentialResponse,
             auto_select: false,
             cancel_on_tap_outside: true,
+            use_fedcm_for_prompt: true,
           });
+          gsiInitializedRef.current = true;
 
           if (googleBtnContainerRef.current) {
             window.google.accounts.id.renderButton(googleBtnContainerRef.current, {
@@ -152,10 +156,12 @@ const Register = ({ setAuth }) => {
     if (window.google?.accounts?.id && GOOGLE_CLIENT_ID) {
       try {
         window.google.accounts.id.prompt((notification) => {
-          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            console.warn('Google GSI prompt not displayed or skipped:', 
-              notification.getNotDisplayedReason?.() || notification.getSkippedReason?.()
-            );
+          if (notification.isNotDisplayed?.() || notification.isSkippedMoment?.()) {
+            const reason = (notification.getNotDisplayedReason && notification.getNotDisplayedReason()) || 
+              (notification.getSkippedReason && notification.getSkippedReason()) || '';
+            if (reason && reason !== 'unknown_reason') {
+              console.info('Google GSI prompt info:', reason);
+            }
             setShowGooglePrompt(true);
           }
         });

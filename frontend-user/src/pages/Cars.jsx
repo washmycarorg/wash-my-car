@@ -3,6 +3,7 @@ import { Trash2, Car as CarIcon, Plus, Check, Shield } from 'lucide-react';
 import { getCars, addCar, deleteCar, getCarTypes } from '../api';
 import SearchableDropdown from '../components/SearchableDropdown';
 import { INDIAN_CAR_BRANDS } from '../data/indianCars';
+import { formatIndianCarNumber, validateIndianCarNumber, getCarNumberMetadata } from '../utils/indianVehicle';
 
 const Cars = () => {
   const [cars, setCars] = useState([]);
@@ -58,8 +59,9 @@ const Cars = () => {
       return alert('Please select a car brand, model, and body type.');
     }
 
-    if (!carNumber || carNumber.trim().length < 4) {
-      return alert('Please enter a valid car registration number (e.g. MH-02-AB-1234).');
+    const valRes = validateIndianCarNumber(carNumber);
+    if (!valRes.isValid) {
+      return alert(valRes.message);
     }
 
     try {
@@ -263,21 +265,62 @@ const Cars = () => {
 
           {/* Registration Number */}
           <div className="form-group" style={{ margin: 0 }}>
-            <label className="form-label">
-              Car Registration Plate Number
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
-                (Only uppercase letters, digits, and hyphens)
+            <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem' }}>
+              <span>
+                Car Registration Plate Number <span style={{ color: '#EF4444' }}>*</span>
+              </span>
+              <span style={{ fontSize: '0.74rem', color: '#0284C7', fontWeight: 600 }}>
+                Formats: AP-31-EA-1234, AP-31-E-1234, or 22-BH-1234-AA
               </span>
             </label>
-            <input
-              type="text"
-              maxLength={14}
-              className="form-input"
-              placeholder="e.g. MH-02-AB-1234 or DL01AB1234"
-              value={carNumber}
-              onChange={e => setCarNumber(e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ''))}
-              style={{ fontWeight: 700, letterSpacing: '0.08em', fontSize: '0.95rem' }}
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                type="text"
+                maxLength={14}
+                className="form-input"
+                placeholder="e.g. AP-31-EA-1234 or 22-BH-1234-AA"
+                value={carNumber}
+                onChange={e => setCarNumber(formatIndianCarNumber(e.target.value))}
+                style={{ fontWeight: 700, letterSpacing: '0.08em', fontSize: '0.98rem', paddingRight: '50px' }}
+              />
+              <span style={{
+                position: 'absolute',
+                right: '10px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                fontSize: '0.7rem',
+                background: '#F1F5F9',
+                padding: '0.2rem 0.5rem',
+                borderRadius: '4px',
+                color: '#64748B',
+                fontWeight: 800,
+                letterSpacing: '0.05em'
+              }}>
+                IND
+              </span>
+            </div>
+
+            {carNumber && (() => {
+              const meta = getCarNumberMetadata(carNumber);
+              return meta ? (
+                <div style={{
+                  marginTop: '0.4rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  fontSize: '0.74rem',
+                  color: '#047857',
+                  background: '#ECFDF5',
+                  border: '1px solid #A7F3D0',
+                  padding: '0.2rem 0.6rem',
+                  borderRadius: '6px',
+                  fontWeight: 700
+                }}>
+                  <span>🚗 Recognized:</span>
+                  <span>{meta.badge}</span>
+                </div>
+              ) : null;
+            })()}
           </div>
 
           <button

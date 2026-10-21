@@ -13,7 +13,8 @@ export const getProfile = async (req, res) => {
       where: { id: req.user.id },
       include: { 
         cars: { include: { carType: true } }, 
-        savedAddresses: { include: { serviceArea: true } } 
+        savedAddresses: { include: { serviceArea: true } },
+        pointTransactions: { orderBy: { createdAt: 'desc' } }
       }
     });
     
@@ -973,6 +974,11 @@ export const verifyBookingPayment = async (req, res) => {
       return res.status(400).json({ error: 'This booking was cancelled or the payment session expired.' });
     }
 
+    // Idempotency: If booking is already verified and marked as PAID, do not credit points again
+    if (booking.paymentStatus === 'PAID') {
+      return res.json({ message: 'Payment already verified and booking confirmed', booking });
+    }
+
     // Verify HMAC signature
     if (process.env.RAZORPAY_KEY_SECRET) {
       const isValid = verifyRazorpaySignature(razorpayOrderId, razorpayPaymentId, razorpaySignature);
@@ -991,7 +997,7 @@ export const verifyBookingPayment = async (req, res) => {
     };
 
     const user = await prisma.user.findUnique({ where: { id: req.user.id } });
-    if (booking.pointsRedeemed > 0 || booking.pointsEarned > 0) {
+    if (user && (booking.pointsRedeemed > 0 || booking.pointsEarned > 0)) {
       await prisma.user.update({
         where: { id: req.user.id },
         data: {
@@ -1248,24 +1254,26 @@ export const cancelBooking = async (req, res) => {
       }
     }
 
-    // Refund redeemed loyalty points back to customer
-    if (booking.pointsRedeemed > 0) {
-      await prisma.user.update({
-        where: { id: booking.userId },
-        data: {
-          points: { increment: booking.pointsRedeemed }
-        }
-      });
-    }
-
-    // Revert earned points
-    if (booking.pointsEarned > 0) {
-      await prisma.user.update({
-        where: { id: booking.userId },
-        data: {
-          points: { decrement: Math.min(booking.user.points, booking.pointsEarned) }
-        }
-      });
+    // Update loyalty points: restore redeemed points and deduct given reward points if booking was paid
+    const freshUser = await prisma.user.findUnique({ where: { id: booking.userId } });
+    if (freshUser) {
+      let netPointsChange = 0;
+      // 1. Refund redeemed loyalty points back to customer
+      if (booking.pointsRedeemed > 0) {
+        netPointsChange += booking.pointsRedeemed;
+      }
+      // 2. Revert earned reward points if the booking was paid and reward points were credited
+      if (booking.paymentStatus === 'PAID' && booking.pointsEarned > 0) {
+        netPointsChange -= booking.pointsEarned;
+      }
+      if (netPointsChange !== 0) {
+        await prisma.user.update({
+          where: { id: booking.userId },
+          data: {
+            points: Math.max(0, freshUser.points + netPointsChange)
+          }
+        });
+      }
     }
 
     const updatedBooking = await prisma.booking.update({

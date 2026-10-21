@@ -4,7 +4,7 @@ import { initPushNotifications } from '../utils/pushManager';
 import { 
   Calendar, Car, Filter, ChevronDown, CheckCircle, Clock, 
   AlertCircle, XCircle, Star, Tag, Gift, Sparkles,
-  Shield, Bike, Droplets, Feather, Flame, X, RefreshCw
+  Shield, Bike, Droplets, Feather, Flame, X, RefreshCw, RotateCcw
 } from 'lucide-react';
 
 
@@ -514,14 +514,27 @@ const Bookings = () => {
               </div>
             </div>
 
-            {/* Points Earned */}
+            {/* Points Earned & Cancellation Reversal Status */}
             {booking.pointsEarned > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '8px', padding: '0.6rem 0.75rem' }}>
-                <Gift size={14} color="#16A34A" />
-                <span style={{ fontSize: '0.85rem', color: '#15803D', fontWeight: 600 }}>
-                  +{booking.pointsEarned} loyalty points earned on this booking
-                </span>
-              </div>
+              booking.status === 'CANCELLED' ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '8px', padding: '0.6rem 0.75rem' }}>
+                  <RotateCcw size={14} color="#DC2626" />
+                  <span style={{ fontSize: '0.85rem', color: '#991B1B', fontWeight: 600 }}>
+                    {booking.paymentStatus === 'REFUNDED' || booking.paymentStatus === 'PAID'
+                      ? `-${booking.pointsEarned} reward points deducted (reversed due to booking cancellation)`
+                      : `Reward points not awarded (booking cancelled before payment)`}
+                  </span>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '8px', padding: '0.6rem 0.75rem' }}>
+                  <Gift size={14} color="#16A34A" />
+                  <span style={{ fontSize: '0.85rem', color: '#15803D', fontWeight: 600 }}>
+                    {booking.paymentStatus === 'PAID'
+                      ? `+${booking.pointsEarned} loyalty reward points earned on successful payment`
+                      : `+${booking.pointsEarned} loyalty reward points will be credited on successful payment`}
+                  </span>
+                </div>
+              )
             )}
 
             {/* Cancelled Details & Automatic Refund Status */}
@@ -1015,6 +1028,11 @@ const Bookings = () => {
                 <div>
                   A refund of <strong>₹{cancellingBooking.price}</strong> will be initiated automatically to your original payment account. Any redeemed loyalty points will also be restored.
                 </div>
+                {cancellingBooking.pointsEarned > 0 && cancellingBooking.paymentStatus === 'PAID' && (
+                  <div style={{ marginTop: '0.45rem', padding: '0.45rem 0.65rem', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '8px', color: '#991B1B', fontSize: '0.8rem' }}>
+                    ⚠️ <strong>Reward Points Reversal:</strong> The <strong>{cancellingBooking.pointsEarned} reward points</strong> credited for this booking will be deducted automatically from your account balance.
+                  </div>
+                )}
                 <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px dashed #A7F3D0', fontSize: '0.8rem', color: '#047857' }}>
                   ⏱️ <strong>Refund Timeline Note:</strong> Refund will be credited to your bank account within <strong>7 business days</strong>. If not credited within 7 days, please email us on <a href="mailto:washmycarorg@gmail.com" style={{ color: '#047857', fontWeight: 700, textDecoration: 'underline' }}>washmycarorg@gmail.com</a> or contact us through our <a href="/#contact" target="_blank" rel="noopener noreferrer" style={{ color: '#047857', fontWeight: 700, textDecoration: 'underline' }}>Home page Contact section</a>.
                 </div>

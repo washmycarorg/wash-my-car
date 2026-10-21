@@ -21,6 +21,7 @@ model User {
   offers         Offer[]         @relation("UserEligibleOffers")
   subscriptions  UserSubscription[]
   reviews        Review[]
+  pointTransactions PointTransaction[]
   createdAt      DateTime        @default(now())
 }
 
@@ -554,5 +555,17 @@ model Review {
   tags       String?   // Optional compliment tags
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt @default(now())
+}
+
+model PointTransaction {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  points    Int
+  type      String   @default("CREDIT") // CREDIT, DEBIT
+  reason    String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 

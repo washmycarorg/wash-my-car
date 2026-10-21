@@ -5,8 +5,9 @@ import {
   Search, Compass, AlertCircle, Tag, Sparkles, Plus, Check,
   Shield, Bike, Droplets, Feather, Flame, Info, ArrowRight,
   ArrowLeft, ArrowDown, X, Gift, CheckSquare, Square, ChevronRight, ChevronLeft, ChevronDown, HelpCircle,
-  Clock, Users, Navigation, CalendarX, Crown, RefreshCw, ShieldCheck
+  Clock, Users, Navigation, CalendarX, Crown, RefreshCw, ShieldCheck, Phone
 } from 'lucide-react';
+import { loadGoogleMaps } from '../utils/googleMapsLoader';
 import { 
   createBooking,
   verifyBookingPayment,
@@ -27,6 +28,7 @@ import {
 } from '../api';
 import SearchableDropdown from '../components/SearchableDropdown';
 import { INDIAN_CAR_BRANDS } from '../data/indianCars';
+import { formatIndianCarNumber, validateIndianCarNumber, getCarNumberMetadata, findSavedCarByNumber } from '../utils/indianVehicle';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
@@ -707,30 +709,33 @@ const BookSlot = () => {
     }
   };
 
-  // Format Car Number input: only uppercase letters, numbers, and hyphens (-)
+  // Format Car Number input: auto-fill dashes based on Indian registration standards (BH or State series)
   const handleCarNumberChange = (e) => {
-    const raw = e.target.value;
-    const formatted = raw.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+    const formatted = formatIndianCarNumber(e.target.value);
     setCarNumber(formatted);
+
+    // Auto-detect if matching car is already saved in user garage
+    if (formatted && formatted.length >= 6 && carSource === 'new') {
+      const matchedSaved = findSavedCarByNumber(formatted, savedCars);
+      if (matchedSaved) {
+        if (!selectedBrand && matchedSaved.make) setSelectedBrand(matchedSaved.make);
+        if (!selectedModel && matchedSaved.model) setSelectedModel(matchedSaved.model);
+        if (matchedSaved.carTypeId) setSelectedCarTypeId(matchedSaved.carTypeId.toString());
+      }
+    }
   };
 
   // Google Maps initialization on Step 5 if adding new address
   useEffect(() => {
     if (currentStep === 5 && addressSource === 'new') {
-      if (window.google && window.google.maps) {
-        setMapsLoaded(true);
-        setTimeout(initMap, 200);
-      } else {
-        const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places`;
-        script.async = true;
-        script.defer = true;
-        script.onload = () => {
+      loadGoogleMaps()
+        .then(() => {
           setMapsLoaded(true);
-          initMap();
-        };
-        document.head.appendChild(script);
-      }
+          setTimeout(initMap, 200);
+        })
+        .catch((err) => {
+          console.warn('Google Maps loading error:', err);
+        });
     }
   }, [currentStep, addressSource]);
 
@@ -1246,6 +1251,10 @@ const BookSlot = () => {
 
   const finalPayable = Math.max(0, subtotalAfterDiscounts - pointsDiscount);
   const totalSavings = Math.round((planDiscount + totalSubDiscount + couponDiscount + pointsDiscount) * 100) / 100;
+  const rewardPointsRatio = Number(systemSettings?.rewardPointsRatio) || 0.1;
+  const pointsEarnedOnPayment = (systemSettings?.pointsReward !== false && finalPayable > 0)
+    ? Math.floor(finalPayable * rewardPointsRatio)
+    : 0;
 
   // Stepper Validations & Navigation
   const handleNextFromStep1 = () => {
@@ -1270,8 +1279,9 @@ const BookSlot = () => {
         setVehicleError('Please select the vehicle category type.');
         return;
       }
-      if (!carNumber || carNumber.trim().length < 4) {
-        setVehicleError('Please enter a valid car registration number (letters, digits, and hyphens only).');
+      const valRes = validateIndianCarNumber(carNumber);
+      if (!valRes.isValid) {
+        setVehicleError(valRes.message);
         return;
       }
     }
@@ -1641,6 +1651,26 @@ const BookSlot = () => {
               <span style={{ color: 'var(--text-muted)', fontWeight: 700 }}>Total Amount Paid</span>
               <span style={{ fontWeight: 800, color: '#16A34A', fontSize: '1.15rem' }}>₹{finalPayable}</span>
             </div>
+
+            {(bookingSuccess?.pointsEarned > 0 || pointsEarnedOnPayment > 0) && (
+              <div style={{
+                marginTop: '0.65rem',
+                background: '#EFF6FF',
+                border: '1px solid #BFDBFE',
+                borderRadius: '10px',
+                padding: '0.6rem 0.85rem',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <span style={{ color: '#1E40AF', fontWeight: 700, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Gift size={16} color="#2563EB" /> Reward Points Credited (Successful Payment)
+                </span>
+                <span style={{ color: '#1D4ED8', fontWeight: 900, fontSize: '1rem' }}>
+                  +{bookingSuccess?.pointsEarned || pointsEarnedOnPayment} pts
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Celebratory Total Savings Banner */}
@@ -1998,12 +2028,14 @@ const BookSlot = () => {
 
               {/* Car Registration Number Input */}
               <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label" style={{ fontWeight: 600 }}>
-                  Car Registration Number <span style={{ color: '#EF4444' }}>*</span>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400, marginLeft: '0.5rem' }}>
-                    (Only letters, digits & hyphens allowed, auto-capitalized)
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '0.35rem' }}>
+                  <label className="form-label" style={{ fontWeight: 600, margin: 0 }}>
+                    Car Registration Number <span style={{ color: '#EF4444' }}>*</span>
+                  </label>
+                  <span style={{ fontSize: '0.74rem', color: '#0284C7', fontWeight: 600 }}>
+                    Formats: AP-31-EA-1234, AP-31-E-1234, or 22-BH-1234-AA
                   </span>
-                </label>
+                </div>
                 <div style={{ position: 'relative' }}>
                   <input
                     type="text"
@@ -2011,13 +2043,14 @@ const BookSlot = () => {
                     maxLength={14}
                     value={carNumber}
                     onChange={handleCarNumberChange}
-                    placeholder="e.g. TS-09-EA-1234 or MH02AB1234"
+                    placeholder="e.g. AP-31-EA-1234 or 22-BH-1234-AA"
                     className="form-input"
                     style={{
                       letterSpacing: '0.1em',
                       fontWeight: 700,
                       fontSize: '1rem',
-                      color: 'var(--primary-navy)'
+                      color: 'var(--primary-navy)',
+                      paddingRight: '52px'
                     }}
                   />
                   <span style={{
@@ -2030,11 +2063,34 @@ const BookSlot = () => {
                     padding: '0.2rem 0.5rem',
                     borderRadius: '4px',
                     color: '#64748B',
-                    fontWeight: 700
+                    fontWeight: 800,
+                    letterSpacing: '0.05em'
                   }}>
                     IND
                   </span>
                 </div>
+
+                {carNumber && (() => {
+                  const meta = getCarNumberMetadata(carNumber);
+                  return meta ? (
+                    <div style={{
+                      marginTop: '0.4rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      fontSize: '0.74rem',
+                      color: '#047857',
+                      background: '#ECFDF5',
+                      border: '1px solid #A7F3D0',
+                      padding: '0.2rem 0.6rem',
+                      borderRadius: '6px',
+                      fontWeight: 700
+                    }}>
+                      <span>🚗 Recognized:</span>
+                      <span>{meta.badge}</span>
+                    </div>
+                  ) : null;
+                })()}
               </div>
 
               {/* Save Car Details Checkbox */}
@@ -2556,6 +2612,12 @@ const BookSlot = () => {
                   </div>
                 </div>
               </div>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                <span style={{ color: '#2563EB', fontWeight: 800, marginTop: '2px' }}>•</span>
+                <div>
+                  <strong style={{ color: '#1E40AF' }}>Reward Points Policy:</strong> Reward points are awarded on successful payment only. If this booking is cancelled (prior to 9 hours or upon doorstep rejection), any reward points awarded for this booking will be deducted automatically from your account balance, and any redeemed points will be restored.
+                </div>
+              </div>
             </div>
           </div>
 
@@ -2615,7 +2677,7 @@ const BookSlot = () => {
                 I agree to the service terms, 9-hour cancellation & reschedule policy, and ₹99 doorstep rejection fee
               </span>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                I confirm water/power tap access and understand that 100% refund & free rescheduling apply only up to 9 hours before slot time. If customer rejects service or is unavailable upon technician arrival/contact, ₹99 visit fee is deducted (or 99 reward points, or 1 subscription wash limit) with no compensation.
+                I confirm water/power tap access and understand that 100% refund & free rescheduling apply only up to 9 hours before slot time. Reward points are credited on successful payment only and deducted if booking is cancelled. If customer rejects service or is unavailable upon technician arrival/contact, ₹99 visit fee is deducted (or 99 reward points, or 1 subscription wash limit) with no compensation.
               </span>
             </div>
           </div>
@@ -5200,6 +5262,28 @@ const BookSlot = () => {
                     <span style={{ color: '#047857', fontWeight: 900, fontSize: '1.05rem' }}>
                       ₹{totalSavings.toFixed(2)}
                     </span>
+                  </div>
+                )}
+
+                {pointsEarnedOnPayment > 0 && (
+                  <div style={{
+                    marginTop: '0.65rem',
+                    background: '#EFF6FF',
+                    border: '1px solid #BFDBFE',
+                    borderRadius: '10px',
+                    padding: '0.65rem 0.85rem'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#1E40AF', fontWeight: 700, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <Gift size={15} color="#2563EB" /> Reward Points on Successful Payment
+                      </span>
+                      <span style={{ color: '#1D4ED8', fontWeight: 800, fontSize: '0.92rem' }}>
+                        +{pointsEarnedOnPayment} pts
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#64748B', marginTop: '0.25rem', lineHeight: 1.35 }}>
+                      * Points will be credited to your account upon successful payment only. If this booking is cancelled later, awarded points will be deducted.
+                    </div>
                   </div>
                 )}
               </div>

@@ -111,13 +111,41 @@ const Rewards = () => {
     }
   };
 
-  // Build history from bookings
-  const rewardHistory = bookings
-    .filter(b => (b.pointsEarned > 0 || b.pointsRedeemed > 0))
-    .sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date));
+  // Build unified history from bookings and direct point transactions (admin added points, etc.)
+  const directTransactions = (profile?.pointTransactions || []).map(pt => ({
+    isPointTransaction: true,
+    id: `pt-${pt.id}`,
+    points: pt.points,
+    type: pt.type,
+    reason: pt.reason,
+    date: pt.createdAt
+  }));
 
-  const totalEarned = bookings.reduce((sum, b) => sum + (b.pointsEarned || 0), 0);
-  const totalRedeemed = bookings.reduce((sum, b) => sum + (b.pointsRedeemed || 0), 0);
+  const bookingEntries = bookings
+    .filter(b => (b.pointsEarned > 0 || b.pointsRedeemed > 0))
+    .map(b => ({
+      isBooking: true,
+      ...b,
+      date: b.createdAt || b.date
+    }));
+
+  const combinedHistory = [...directTransactions, ...bookingEntries]
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  const directEarned = directTransactions
+    .filter(pt => pt.points > 0)
+    .reduce((sum, pt) => sum + pt.points, 0);
+  const directRedeemed = directTransactions
+    .filter(pt => pt.points < 0)
+    .reduce((sum, pt) => sum + Math.abs(pt.points), 0);
+
+  const totalEarned = bookings
+    .filter(b => b.status !== 'CANCELLED' && b.paymentStatus === 'PAID')
+    .reduce((sum, b) => sum + (b.pointsEarned || 0), 0) + directEarned;
+
+  const totalRedeemed = bookings
+    .filter(b => b.status !== 'CANCELLED')
+    .reduce((sum, b) => sum + (b.pointsRedeemed || 0), 0) + directRedeemed;
 
   // Tier logic
   const getTier = (pts) => {
@@ -630,7 +658,7 @@ const Rewards = () => {
           <h3 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--primary-navy)', fontWeight: 800 }}>Points Transaction History</h3>
         </div>
 
-        {rewardHistory.length === 0 ? (
+        {combinedHistory.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '3.5rem 2rem', color: 'var(--text-muted)' }}>
             <Gift size={44} color="#CBD5E1" style={{ marginBottom: '0.85rem' }} />
             <p style={{ margin: 0, fontWeight: 600, fontSize: '0.95rem' }}>No points activity yet.</p>
@@ -640,39 +668,102 @@ const Rewards = () => {
           </div>
         ) : (
           <div style={{ padding: '0.25rem 0' }}>
-            {rewardHistory.map(b => {
+            {combinedHistory.map(item => {
+              if (item.isPointTransaction) {
+                const dateStr = new Date(item.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                const isCredit = item.points >= 0;
+                return (
+                  <div key={item.id} style={{ padding: '1rem 1.35rem', borderBottom: '1px solid #F8FAFC', display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: isCredit ? '#FEF3C7' : '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      {isCredit ? <Gift size={18} color="#D97706" /> : <TrendingDown size={18} color="#DC2626" />}
+                    </div>
+                    <div style={{ flex: 1, minWidth: '240px' }}>
+                      <div style={{ fontSize: '0.9rem', color: 'var(--primary-navy)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <span>{isCredit ? 'Admin Reward Points Credit' : 'Admin Points Adjustment'}</span>
+                        <span style={{ fontSize: '0.68rem', background: '#EFF6FF', color: '#1D4ED8', padding: '0.1rem 0.45rem', borderRadius: '4px', fontWeight: 800 }}>ADMIN REWARD</span>
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: '#64748B', marginTop: '2px' }}>
+                        <span style={{ fontWeight: 600, color: '#1E293B' }}>Reason:</span> {item.reason} &bull; {dateStr}
+                      </div>
+                    </div>
+                    <div style={{ fontWeight: 900, color: isCredit ? '#16A34A' : '#DC2626', fontSize: '1.1rem' }}>
+                      {isCredit ? `+${item.points}` : `${item.points}`}
+                    </div>
+                  </div>
+                );
+              }
+
+              const b = item;
               const dateStr = new Date(b.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
               const washLabel = b.washType?.name || 'Wash Service';
               const carLabel = b.car ? `${b.car.make} ${b.car.model}` : b.carType?.name || 'Vehicle';
 
               return (
-                <div key={b.id} style={{ padding: '1rem 1.35rem', borderBottom: '1px solid #F8FAFC', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  {/* Earned Entry */}
-                  {b.pointsEarned > 0 && (
-                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#D1FAE5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <TrendingUp size={16} color="#16A34A" />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '0.9rem', color: 'var(--primary-navy)', fontWeight: 700 }}>Earned — {washLabel}</div>
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{carLabel} &bull; {dateStr}</div>
-                      </div>
-                      <div style={{ fontWeight: 900, color: '#16A34A', fontSize: '1.05rem' }}>+{b.pointsEarned}</div>
-                    </div>
-                  )}
-                  {b.pointsEarned > 0 && b.pointsRedeemed > 0 && <div style={{ width: '1px', background: '#F1F5F9', alignSelf: 'stretch' }} />}
-                  {/* Redeemed Entry */}
-                  {b.pointsRedeemed > 0 && (
-                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <TrendingDown size={16} color="#D97706" />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '0.9rem', color: 'var(--primary-navy)', fontWeight: 700 }}>Redeemed — {washLabel}</div>
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{carLabel} &bull; {dateStr}</div>
-                      </div>
-                      <div style={{ fontWeight: 900, color: '#D97706', fontSize: '1.05rem' }}>-{b.pointsRedeemed}</div>
-                    </div>
+                <div key={b.id} style={{ padding: '1rem 1.35rem', borderBottom: '1px solid #F8FAFC', display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  {b.status === 'CANCELLED' ? (
+                    <>
+                      {/* Cancelled Booking: Reversal of earned points */}
+                      {b.pointsEarned > 0 && (b.paymentStatus === 'REFUNDED' || b.paymentStatus === 'PAID') && (
+                        <div style={{ flex: 1, minWidth: '240px', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <TrendingDown size={16} color="#DC2626" />
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '0.9rem', color: '#991B1B', fontWeight: 700 }}>Reversed (Cancelled) — {washLabel}</div>
+                            <div style={{ fontSize: '0.76rem', color: '#B91C1C' }}>Reward points deducted on cancellation &bull; {carLabel} &bull; {dateStr}</div>
+                          </div>
+                          <div style={{ fontWeight: 900, color: '#DC2626', fontSize: '1.05rem' }}>-{b.pointsEarned}</div>
+                        </div>
+                      )}
+
+                      {/* Cancelled Booking: Restored redeemed points */}
+                      {b.pointsRedeemed > 0 && (
+                        <div style={{ flex: 1, minWidth: '240px', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#DCFCE7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <TrendingUp size={16} color="#16A34A" />
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '0.9rem', color: '#166534', fontWeight: 700 }}>Restored (Cancelled) — {washLabel}</div>
+                            <div style={{ fontSize: '0.76rem', color: '#15803D' }}>Redeemed points returned to balance &bull; {carLabel} &bull; {dateStr}</div>
+                          </div>
+                          <div style={{ fontWeight: 900, color: '#16A34A', fontSize: '1.05rem' }}>+{b.pointsRedeemed}</div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {/* Active / Confirmed Booking: Earned Entry */}
+                      {b.pointsEarned > 0 && (
+                        <div style={{ flex: 1, minWidth: '240px', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: b.paymentStatus === 'PAID' ? '#D1FAE5' : '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <TrendingUp size={16} color={b.paymentStatus === 'PAID' ? '#16A34A' : '#D97706'} />
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '0.9rem', color: 'var(--primary-navy)', fontWeight: 700 }}>
+                              {b.paymentStatus === 'PAID' ? `Earned on Payment — ${washLabel}` : `Pending Payment — ${washLabel}`}
+                            </div>
+                            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{carLabel} &bull; {dateStr}</div>
+                          </div>
+                          <div style={{ fontWeight: 900, color: b.paymentStatus === 'PAID' ? '#16A34A' : '#D97706', fontSize: '1.05rem' }}>
+                            +{b.pointsEarned}{b.paymentStatus !== 'PAID' && <span style={{ fontSize: '0.75rem', fontWeight: 600 }}> (pending)</span>}
+                          </div>
+                        </div>
+                      )}
+                      {b.pointsEarned > 0 && b.pointsRedeemed > 0 && <div style={{ width: '1px', background: '#F1F5F9', alignSelf: 'stretch' }} />}
+                      {/* Active Booking: Redeemed Entry */}
+                      {b.pointsRedeemed > 0 && (
+                        <div style={{ flex: 1, minWidth: '240px', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <TrendingDown size={16} color="#D97706" />
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '0.9rem', color: 'var(--primary-navy)', fontWeight: 700 }}>Redeemed — {washLabel}</div>
+                            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{carLabel} &bull; {dateStr}</div>
+                          </div>
+                          <div style={{ fontWeight: 900, color: '#D97706', fontSize: '1.05rem' }}>-{b.pointsRedeemed}</div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               );

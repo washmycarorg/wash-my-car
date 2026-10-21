@@ -541,23 +541,27 @@ export const markDoorstepRejectionByEmployee = async (req, res) => {
       }
     }
 
-    // 2. Reward points payment deduction:
-    let pointsRestored = 0;
-    if (booking.pointsRedeemed > 0) {
-      pointsRestored = Math.max(0, booking.pointsRedeemed - 99);
-      if (pointsRestored > 0) {
+    // 2. Reward points adjustment & reversal of points earned
+    const freshUserRejection = await prisma.user.findUnique({ where: { id: booking.userId } });
+    if (freshUserRejection) {
+      let netPointsChange = 0;
+      // If customer paid through reward points: deduct 99 points doorstep visit fee, restore remaining points
+      if (booking.pointsRedeemed > 0) {
+        const pointsRestored = Math.max(0, booking.pointsRedeemed - 99);
+        netPointsChange += pointsRestored;
+      }
+      // Revert reward points earned on successful payment if any
+      if (booking.paymentStatus === 'PAID' && booking.pointsEarned > 0) {
+        netPointsChange -= booking.pointsEarned;
+      }
+      if (netPointsChange !== 0) {
         await prisma.user.update({
           where: { id: booking.userId },
-          data: { points: { increment: pointsRestored } }
+          data: {
+            points: Math.max(0, freshUserRejection.points + netPointsChange)
+          }
         });
       }
-    }
-
-    if (booking.pointsEarned > 0) {
-      await prisma.user.update({
-        where: { id: booking.userId },
-        data: { points: { decrement: Math.min(booking.user.points, booking.pointsEarned) } }
-      });
     }
 
     // 3. Subscription booking: 1 wash quota burned, zero refund/compensation

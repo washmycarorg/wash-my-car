@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getBookings, assignSlot, autoAssignSlot, cancelBookingByAdmin, rescheduleBookingByAdmin, markDoorstepRejectionByAdmin, getAvailableSlotsForAdmin, getEmployees, getEmployeesWorkload, getCarTypes, getWashTypes, getSettings, updateSettings } from '../api';
-import { Calendar, User, Car, MapPin, Compass, Image, Eye, RefreshCw, CheckCircle, Navigation, AlertCircle, Search, X, Zap, Sparkles, ChevronDown, CreditCard, Clock, RotateCcw, Star } from 'lucide-react';
+import { getBookings, updateBooking, deleteBooking, assignSlot, autoAssignSlot, cancelBookingByAdmin, rescheduleBookingByAdmin, markDoorstepRejectionByAdmin, getAvailableSlotsForAdmin, getEmployees, getEmployeesWorkload, getCarTypes, getWashTypes, getServiceAreas, getSettings, updateSettings } from '../api';
+import { Calendar, User, Car, MapPin, Compass, Image, Eye, RefreshCw, CheckCircle, Navigation, AlertCircle, Search, X, Zap, Sparkles, ChevronDown, CreditCard, Clock, RotateCcw, Star, Edit2, Trash2, ExternalLink } from 'lucide-react';
 
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
@@ -293,10 +293,149 @@ const Bookings = () => {
   const [employees, setEmployees] = useState([]);
   const [carTypes, setCarTypes] = useState([]);
   const [washTypes, setWashTypes] = useState([]);
+  const [serviceAreas, setServiceAreas] = useState([]);
   const [workloads, setWorkloads] = useState({});
   const [loading, setLoading] = useState(true);
   const [autoAssignMode, setAutoAssignMode] = useState(true);
   const [updatingMode, setUpdatingMode] = useState(false);
+
+  // Admin Edit Booking Modal State
+  const [adminEditModal, setAdminEditModal] = useState(null);
+  const [editCarNumber, setEditCarNumber] = useState('');
+  const [editCarMake, setEditCarMake] = useState('');
+  const [editCarModel, setEditCarModel] = useState('');
+  const [editCarTypeId, setEditCarTypeId] = useState('');
+  const [editAddress, setEditAddress] = useState('');
+  const [editMapsUrl, setEditMapsUrl] = useState('');
+  const [editLatitude, setEditLatitude] = useState('');
+  const [editLongitude, setEditLongitude] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editAlternatePhone, setEditAlternatePhone] = useState('');
+  const [editWashTypeId, setEditWashTypeId] = useState('');
+  const [editServiceAreaId, setEditServiceAreaId] = useState('');
+  const [editBookingLoading, setEditBookingLoading] = useState(false);
+  const [resolvingMaps, setResolvingMaps] = useState(false);
+
+  // Admin Delete Booking Modal State
+  const [adminDeleteModal, setAdminDeleteModal] = useState(null);
+  const [adminDeleteLoading, setAdminDeleteLoading] = useState(false);
+
+  const openEditBookingModal = (b) => {
+    setAdminEditModal(b);
+    setEditCarNumber(b.carNumber || b.car?.carNumber || '');
+    setEditCarMake(b.carMake || b.car?.make || '');
+    setEditCarModel(b.carModel || b.car?.model || '');
+    setEditCarTypeId(b.carTypeId || b.car?.carTypeId || '');
+    setEditAddress(b.address || '');
+    setEditLatitude(b.latitude != null ? b.latitude : '');
+    setEditLongitude(b.longitude != null ? b.longitude : '');
+    setEditMapsUrl(b.latitude != null && b.longitude != null ? `https://www.google.com/maps/search/?api=1&query=${b.latitude},${b.longitude}` : '');
+    setEditPhone(b.alternatePhone || b.user?.phone || '');
+    setEditAlternatePhone(b.alternatePhone || '');
+    setEditWashTypeId(b.washTypeId || '');
+    setEditServiceAreaId(b.serviceAreaId || '');
+  };
+
+  const handleResolveMapsLink = async () => {
+    if (!editMapsUrl.trim()) {
+      alert('Please enter or paste a Google Maps link first.');
+      return;
+    }
+    setResolvingMaps(true);
+    try {
+      // 1. Direct Regex extraction
+      const atMatch = editMapsUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+      if (atMatch) {
+        setEditLatitude(atMatch[1]);
+        setEditLongitude(atMatch[2]);
+        setResolvingMaps(false);
+        return;
+      }
+      const dMatch = editMapsUrl.match(/!3d(-?\d+\.\d+).*?!4d(-?\d+\.\d+)/);
+      if (dMatch) {
+        setEditLatitude(dMatch[1]);
+        setEditLongitude(dMatch[2]);
+        setResolvingMaps(false);
+        return;
+      }
+      const qMatch = editMapsUrl.match(/[?&](?:q|query|ll|destination|daddr|origin|center)=loc:?(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/i) ||
+                     editMapsUrl.match(/[?&](?:q|query|ll|destination|daddr|origin|center)=(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/i);
+      if (qMatch) {
+        setEditLatitude(qMatch[1]);
+        setEditLongitude(qMatch[2]);
+        setResolvingMaps(false);
+        return;
+      }
+
+      // Shortened link resolution via backend
+      const RAW_URL = import.meta.env.VITE_API_URL || (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'http://localhost:5001/api' : 'https://api.washmycar.org.in/api');
+      const API_URL = RAW_URL.endsWith('/api') ? RAW_URL : `${RAW_URL.replace(/\/$/, '')}/api`;
+      const res = await fetch(`${API_URL}/users/resolve-maps-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: editMapsUrl.trim() })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.lat && data.lng) {
+          setEditLatitude(data.lat);
+          setEditLongitude(data.lng);
+          return;
+        }
+      }
+      alert('Could not auto-extract GPS coordinates from link. Please verify the URL or enter Latitude and Longitude manually.');
+    } catch (err) {
+      alert('Failed to resolve Google Maps link: ' + err.message);
+    } finally {
+      setResolvingMaps(false);
+    }
+  };
+
+  const handleEditBookingSubmit = async (e) => {
+    e.preventDefault();
+    if (!adminEditModal) return;
+    setEditBookingLoading(true);
+    try {
+      const payload = {
+        carNumber: editCarNumber.trim(),
+        carMake: editCarMake.trim(),
+        carModel: editCarModel.trim(),
+        carTypeId: editCarTypeId ? Number(editCarTypeId) : undefined,
+        address: editAddress.trim(),
+        mapsUrl: editMapsUrl.trim(),
+        latitude: editLatitude !== '' ? parseFloat(editLatitude) : undefined,
+        longitude: editLongitude !== '' ? parseFloat(editLongitude) : undefined,
+        phone: editPhone.trim(),
+        alternatePhone: editAlternatePhone.trim(),
+        washTypeId: editWashTypeId ? Number(editWashTypeId) : undefined,
+        serviceAreaId: editServiceAreaId ? Number(editServiceAreaId) : undefined
+      };
+
+      const res = await updateBooking(adminEditModal.id, payload);
+      alert(res.message || 'Booking updated successfully!');
+      setAdminEditModal(null);
+      fetchData();
+    } catch (err) {
+      alert('Failed to update booking: ' + (err.message || 'Unknown error'));
+    } finally {
+      setEditBookingLoading(false);
+    }
+  };
+
+  const handleDeleteBookingSubmit = async () => {
+    if (!adminDeleteModal) return;
+    setAdminDeleteLoading(true);
+    try {
+      const res = await deleteBooking(adminDeleteModal.id);
+      alert(res.message || 'Booking deleted successfully.');
+      setAdminDeleteModal(null);
+      fetchData();
+    } catch (err) {
+      alert('Failed to delete booking: ' + (err.message || 'Unknown error'));
+    } finally {
+      setAdminDeleteLoading(false);
+    }
+  };
 
   // Admin Cancellation Modal State
   const [adminCancelModal, setAdminCancelModal] = useState(null);
@@ -436,17 +575,19 @@ const Bookings = () => {
 
   const fetchData = async () => {
     try {
-      const [bRes, eRes, ctRes, wtRes, setRes] = await Promise.all([
+      const [bRes, eRes, ctRes, wtRes, saRes, setRes] = await Promise.all([
         getBookings(),
         getEmployees(),
         getCarTypes().catch(() => []),
         getWashTypes().catch(() => []),
+        getServiceAreas().catch(() => []),
         getSettings().catch(() => null)
       ]);
       setBookings(bRes);
       setEmployees(eRes);
       setCarTypes(ctRes);
       setWashTypes(wtRes);
+      setServiceAreas(saRes);
       if (setRes && setRes.autoAssignment !== undefined) {
         setAutoAssignMode(setRes.autoAssignment);
       }
@@ -888,7 +1029,7 @@ const Bookings = () => {
               <th style={{ padding: '1rem 1.25rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.82rem', textTransform: 'uppercase' }}>Payment Details</th>
               <th style={{ padding: '1rem 1.25rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.82rem', textTransform: 'uppercase' }}>Status</th>
               <th style={{ padding: '1rem 1.25rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.82rem', textTransform: 'uppercase' }}>Assignment Actions</th>
-              <th style={{ padding: '1rem 1.25rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.82rem', textTransform: 'uppercase' }}>Service Pics</th>
+              <th style={{ padding: '1rem 1.25rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.82rem', textTransform: 'uppercase' }}>Manage & Pics</th>
           </tr>
         </thead>
         <tbody>
@@ -1322,19 +1463,62 @@ const Bookings = () => {
                 </td>
 
 
-                {/* Service Pics Button */}
-                <td style={{ padding: '1.25rem 1.5rem' }}>
-                  {b.status === 'STARTED' || b.status === 'COMPLETED' ? (
+                {/* Actions & Service Pics */}
+                <td style={{ padding: '1rem 1.25rem', verticalAlign: 'middle' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', minWidth: '135px' }}>
                     <button 
-                      onClick={() => openVerificationModal(b)}
-                      className="btn btn-outline"
-                      style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem', borderRadius: '4px' }}
+                      type="button"
+                      onClick={() => openEditBookingModal(b)}
+                      className="btn"
+                      style={{ 
+                        padding: '0.35rem 0.6rem', 
+                        fontSize: '0.75rem', 
+                        fontWeight: 700, 
+                        display: 'inline-flex', 
+                        alignItems: 'center', 
+                        gap: '0.35rem', 
+                        borderRadius: '6px', 
+                        background: '#EFF6FF', 
+                        color: '#1D4ED8', 
+                        border: '1px solid #BFDBFE' 
+                      }}
+                      title="Edit car details, address, maps link, phone number, etc."
                     >
-                      <Eye size={14} /> Verify Pics
+                      <Edit2 size={13} /> Edit Booking
                     </button>
-                  ) : (
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Not started</span>
-                  )}
+                    
+                    <button 
+                      type="button"
+                      onClick={() => setAdminDeleteModal(b)}
+                      className="btn"
+                      style={{ 
+                        padding: '0.35rem 0.6rem', 
+                        fontSize: '0.75rem', 
+                        fontWeight: 700, 
+                        display: 'inline-flex', 
+                        alignItems: 'center', 
+                        gap: '0.35rem', 
+                        borderRadius: '6px', 
+                        background: '#FEF2F2', 
+                        color: '#DC2626', 
+                        border: '1px solid #FECACA' 
+                      }}
+                      title="Permanently delete booking"
+                    >
+                      <Trash2 size={13} /> Delete
+                    </button>
+
+                    {b.status === 'STARTED' || b.status === 'COMPLETED' ? (
+                      <button 
+                        type="button"
+                        onClick={() => openVerificationModal(b)}
+                        className="btn btn-outline"
+                        style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem', borderRadius: '6px' }}
+                      >
+                        <Eye size={13} /> Verify Pics
+                      </button>
+                    ) : null}
+                  </div>
                 </td>
 
               </tr>
@@ -2135,6 +2319,362 @@ const Bookings = () => {
                 }}
               >
                 {doorstepRejectionLoading ? 'Processing...' : 'Confirm Rejection (Deduct ₹99)'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Edit Booking Modal */}
+      {adminEditModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1100,
+          padding: '1rem'
+        }}>
+          <div className="admin-modal-content" style={{
+            background: 'white',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '680px',
+            maxHeight: '92vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            boxSizing: 'border-box',
+            overflow: 'hidden'
+          }}>
+            {/* Header */}
+            <div style={{ padding: '1.25rem 1.5rem', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ margin: 0, color: 'var(--primary-navy)', fontSize: '1.15rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Edit2 size={18} color="var(--primary-blue)" /> Edit Booking Details #{adminEditModal.bookingId || adminEditModal.id}
+                </h3>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                  Customer: <strong>{adminEditModal.user?.name || 'Customer'}</strong> &bull; Scheduled: {formatDateDMY(adminEditModal.date)} ({adminEditModal.timeSlot})
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAdminEditModal(null)}
+                style={{ background: '#E2E8F0', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <X size={18} color="#64748B" />
+              </button>
+            </div>
+
+            {/* Form Body */}
+            <form onSubmit={handleEditBookingSubmit} style={{ padding: '1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.25rem', flex: 1 }}>
+              
+              {/* 1. Vehicle Details */}
+              <div style={{ background: '#F8FAFC', padding: '1rem', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0369A1', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.75rem' }}>
+                  <Car size={14} /> Vehicle Information
+                </span>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 600 }}>Car Number / Plate</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="e.g. AP 39 AB 1234"
+                      value={editCarNumber}
+                      onChange={e => setEditCarNumber(e.target.value.toUpperCase())}
+                      style={{ marginTop: '0.2rem', textTransform: 'uppercase', fontWeight: 700 }}
+                    />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 600 }}>Company / Make</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="e.g. Maruti, Tata, Hyundai"
+                      value={editCarMake}
+                      onChange={e => setEditCarMake(e.target.value)}
+                      style={{ marginTop: '0.2rem' }}
+                    />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 600 }}>Car Model</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="e.g. Swift, Nexon, Creta"
+                      value={editCarModel}
+                      onChange={e => setEditCarModel(e.target.value)}
+                      style={{ marginTop: '0.2rem' }}
+                    />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 600 }}>Car Type</label>
+                    <select
+                      className="form-input"
+                      value={editCarTypeId}
+                      onChange={e => setEditCarTypeId(e.target.value)}
+                      style={{ marginTop: '0.2rem' }}
+                    >
+                      <option value="">-- Choose Car Type --</option>
+                      {carTypes.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Customer Phone & Contact */}
+              <div style={{ background: '#F8FAFC', padding: '1rem', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#15803D', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.75rem' }}>
+                  <User size={14} /> Contact Information
+                </span>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 600 }}>Primary Phone Number</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="10-digit mobile number"
+                      value={editPhone}
+                      onChange={e => setEditPhone(e.target.value)}
+                      style={{ marginTop: '0.2rem' }}
+                    />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 600 }}>Alternate Phone Number (Optional)</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Secondary contact for technician"
+                      value={editAlternatePhone}
+                      onChange={e => setEditAlternatePhone(e.target.value)}
+                      style={{ marginTop: '0.2rem' }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Address & Google Maps Location Link */}
+              <div style={{ background: '#F8FAFC', padding: '1rem', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#B45309', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.75rem' }}>
+                  <MapPin size={14} /> Service Address & Google Maps Location
+                </span>
+                
+                <div className="form-group" style={{ marginBottom: '0.75rem' }}>
+                  <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 600 }}>Typed Doorstep Address</label>
+                  <textarea
+                    rows={2}
+                    className="form-input"
+                    placeholder="Enter street, apartment/house no, landmark..."
+                    value={editAddress}
+                    onChange={e => setEditAddress(e.target.value)}
+                    style={{ marginTop: '0.2rem', width: '100%', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '0.75rem' }}>
+                  <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 600 }}>Google Maps Link / URL</label>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.2rem' }}>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Paste Google Maps URL (e.g. https://maps.app.goo.gl/... or google.com/maps)"
+                      value={editMapsUrl}
+                      onChange={e => setEditMapsUrl(e.target.value)}
+                      style={{ margin: 0, flex: 1 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleResolveMapsLink}
+                      disabled={resolvingMaps || !editMapsUrl.trim()}
+                      className="btn btn-outline"
+                      style={{ whiteSpace: 'nowrap', padding: '0.45rem 0.85rem', fontSize: '0.78rem', fontWeight: 700 }}
+                    >
+                      {resolvingMaps ? 'Resolving...' : 'Auto-Extract GPS'}
+                    </button>
+                  </div>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.25rem', display: 'block' }}>
+                    Paste customer's Google Maps link or WhatsApp shared location link to auto-fill latitude & longitude pins below.
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 600 }}>Latitude</label>
+                    <input
+                      type="number"
+                      step="any"
+                      className="form-input"
+                      placeholder="e.g. 17.7289"
+                      value={editLatitude}
+                      onChange={e => setEditLatitude(e.target.value)}
+                      style={{ marginTop: '0.2rem', fontFamily: 'monospace' }}
+                    />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 600 }}>Longitude</label>
+                    <input
+                      type="number"
+                      step="any"
+                      className="form-input"
+                      placeholder="e.g. 83.3031"
+                      value={editLongitude}
+                      onChange={e => setEditLongitude(e.target.value)}
+                      style={{ marginTop: '0.2rem', fontFamily: 'monospace' }}
+                    />
+                  </div>
+                </div>
+
+                {editLatitude && editLongitude && (
+                  <div style={{ marginTop: '0.5rem', textAlign: 'right' }}>
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${editLatitude},${editLongitude}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ fontSize: '0.75rem', color: 'var(--primary-blue)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem', textDecoration: 'none' }}
+                    >
+                      <ExternalLink size={12} /> Test GPS in Google Maps ↗
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              {/* 4. Wash Package & Service Region */}
+              <div style={{ background: '#F8FAFC', padding: '1rem', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#7E22CE', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.75rem' }}>
+                  <Sparkles size={14} /> Service Details
+                </span>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 600 }}>Wash Package</label>
+                    <select
+                      className="form-input"
+                      value={editWashTypeId}
+                      onChange={e => setEditWashTypeId(e.target.value)}
+                      style={{ marginTop: '0.2rem' }}
+                    >
+                      <option value="">-- Choose Wash Package --</option>
+                      {washTypes.map(w => (
+                        <option key={w.id} value={w.id}>{w.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 600 }}>Service Region</label>
+                    <select
+                      className="form-input"
+                      value={editServiceAreaId}
+                      onChange={e => setEditServiceAreaId(e.target.value)}
+                      style={{ marginTop: '0.2rem' }}
+                    >
+                      <option value="">-- Choose Region --</option>
+                      {serviceAreas.map(sa => (
+                        <option key={sa.id} value={sa.id}>{sa.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Actions */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setAdminEditModal(null)}
+                  disabled={editBookingLoading}
+                  className="btn btn-outline"
+                  style={{ borderRadius: '8px', padding: '0.55rem 1.25rem' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editBookingLoading}
+                  className="btn btn-primary"
+                  style={{ borderRadius: '8px', padding: '0.55rem 1.4rem', fontWeight: 700 }}
+                >
+                  {editBookingLoading ? 'Saving Changes...' : 'Save Booking Changes'}
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Delete Booking Modal */}
+      {adminDeleteModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1100,
+          padding: '1rem'
+        }}>
+          <div className="admin-modal-content" style={{
+            background: 'white',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '480px',
+            padding: '1.75rem',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            boxSizing: 'border-box'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0, color: '#DC2626', fontSize: '1.2rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Trash2 size={20} color="#DC2626" /> Delete Booking #{adminDeleteModal.bookingId || adminDeleteModal.id}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setAdminDeleteModal(null)}
+                style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <X size={18} color="#64748B" />
+              </button>
+            </div>
+
+            <p style={{ color: '#475569', fontSize: '0.9rem', lineHeight: 1.5, margin: '0 0 1rem' }}>
+              Are you sure you want to permanently delete this booking for <strong>{adminDeleteModal.user?.name || adminDeleteModal.user?.phone}</strong> ({adminDeleteModal.carMake || ''} {adminDeleteModal.carModel || ''} {adminDeleteModal.carNumber ? `• ${adminDeleteModal.carNumber}` : ''})?
+            </p>
+
+            <div style={{ background: '#FEF2F2', border: '1.5px solid #FECACA', borderRadius: '10px', padding: '0.85rem 1rem', marginBottom: '1.25rem', color: '#991B1B', fontSize: '0.82rem', lineHeight: 1.45 }}>
+              <strong>⚠️ Permanent Database Deletion:</strong> This action will permanently remove the booking record, any attached add-ons, technician allocations, and service verification photos from the system. This cannot be undone.
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button
+                type="button"
+                onClick={() => setAdminDeleteModal(null)}
+                disabled={adminDeleteLoading}
+                className="btn btn-outline"
+                style={{ borderRadius: '8px', padding: '0.6rem 1.25rem' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteBookingSubmit}
+                disabled={adminDeleteLoading}
+                style={{
+                  background: '#DC2626',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0.6rem 1.25rem',
+                  fontWeight: 700,
+                  cursor: adminDeleteLoading ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {adminDeleteLoading ? 'Deleting...' : 'Confirm Permanent Delete'}
               </button>
             </div>
           </div>

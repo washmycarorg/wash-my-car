@@ -9,6 +9,7 @@ import {
   RefreshCw, AlertCircle, Search, Navigation, ShieldCheck
 } from 'lucide-react';
 import { getHomeContent, getServiceAreas, getWashTypes, getAllWashPrices, getCarTypes, getAddons, getActiveCoupons, submitInquiry, getSettings } from '../api';
+import { loadGoogleMaps } from '../utils/googleMapsLoader';
 
 import logo from '../assets/wash my car.png';
 
@@ -646,22 +647,9 @@ const Home = () => {
       });
     };
 
-    const loadGoogleMaps = () => {
-      if (window.google && window.google.maps) {
-        initMap();
-        return;
-      }
-
-      if (!GOOGLE_MAPS_API_KEY) return;
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}`;
-      script.async = true;
-      script.defer = true;
-      script.onload = () => initMap();
-      document.head.appendChild(script);
-    };
-
-    loadGoogleMaps();
+    loadGoogleMaps()
+      .then(() => initMap())
+      .catch((err) => console.warn('Home map load warning:', err));
   }, [areas]);
 
   const cleanWhatsappNumber = (cms?.whatsappNumber || '+919876543210').replace(/\D/g, '');

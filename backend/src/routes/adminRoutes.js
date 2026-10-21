@@ -15,6 +15,9 @@ router.get('/employees/workload', adminController.getEmployeesWorkload);
 router.put('/employees/:id', adminController.updateEmployee);
 router.put('/employees/:id/status', adminController.toggleEmployeeStatus);
 router.get('/users', adminController.getUsers);
+router.put('/users/:id', adminController.updateUser);
+router.post('/users/:id/points', adminController.addUserPoints);
+router.post('/users/:id/grant-subscription', adminController.grantFreeSubscription);
 
 router.get('/leaves', adminController.getLeaves);
 router.put('/leaves/:id/status', adminController.updateLeaveStatus);
@@ -54,6 +57,8 @@ router.post('/wash-prices', adminController.saveWashPrice);
 
 // Bookings
 router.get('/bookings', adminController.getBookings);
+router.put('/bookings/:id', adminController.updateBooking);
+router.delete('/bookings/:id', adminController.deleteBooking);
 router.put('/bookings/:id/assign', adminController.assignSlot);
 router.put('/bookings/:id/auto-assign', adminController.autoAssignSlot);
 router.put('/bookings/:id/reschedule', adminController.rescheduleBookingByAdmin);
@@ -64,8 +69,10 @@ router.post('/bookings/:id/doorstep-rejection', adminController.markDoorstepReje
 // Inventory
 router.get('/inventory', adminController.getInventoryItems);
 router.post('/inventory', adminController.createInventoryItem);
+router.put('/inventory/:id', adminController.updateInventoryItem);
 router.delete('/inventory/:id', adminController.deleteInventoryItem);
 router.post('/inventory/allocate', adminController.allocateInventory);
+router.put('/inventory/allocate/:id', adminController.updateAllocation);
 router.delete('/inventory/allocate/:id', adminController.deleteAllocation);
 
 // Addons
