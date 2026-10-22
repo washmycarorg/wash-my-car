@@ -262,19 +262,13 @@ const Login = ({ setAuth }) => {
   };
 
   return (
-    <div className="flex flex-col md:flex-row" style={{ minHeight: '100vh', background: 'var(--bg-main)' }}>
-      {/* MOBILE INTERACTIVE BRANDED HEADER (< 768px) */}
-      <div className="md:hidden" style={{
-        background: 'linear-gradient(135deg, #0A0F1D 0%, #0F172A 50%, #0369A1 100%)',
-        color: 'white',
-        padding: '0.85rem 1rem 1.85rem',
-        position: 'relative',
-        overflow: 'hidden'
-      }}>
-        <div style={{ position: 'absolute', top: '-50px', right: '-50px', width: '180px', height: '180px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(56, 189, 248, 0.35) 0%, transparent 70%)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', bottom: '10px', left: '-30px', width: '140px', height: '140px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(14, 165, 233, 0.3) 0%, transparent 70%)', pointerEvents: 'none' }} />
+    <div className="auth-page-root">
+      {/* MOBILE INTERACTIVE BRANDED HEADER (< 900px) */}
+      <div className="md:hidden auth-mobile-hero">
+        <div className="hero-orb-1" />
+        <div className="hero-orb-2" />
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', position: 'relative', zIndex: 2 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.15rem', position: 'relative', zIndex: 2 }}>
           <Link 
             to="/" 
             style={{ 
@@ -287,7 +281,7 @@ const Login = ({ setAuth }) => {
               border: '1px solid rgba(255, 255, 255, 0.22)',
               color: '#FFFFFF', 
               textDecoration: 'none', 
-              padding: '0.4rem 0.8rem', 
+              padding: '0.38rem 0.8rem', 
               borderRadius: '20px',
               fontSize: '0.78rem', 
               fontWeight: 700 
@@ -303,59 +297,66 @@ const Login = ({ setAuth }) => {
             background: 'rgba(16, 185, 129, 0.18)',
             border: '1px solid rgba(52, 211, 153, 0.4)',
             color: '#34D399',
-            padding: '0.25rem 0.6rem',
+            padding: '0.25rem 0.65rem',
             borderRadius: '14px',
-            fontSize: '0.68rem',
+            fontSize: '0.7rem',
             fontWeight: 800,
             letterSpacing: '0.02em'
           }}>
-            <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#34D399' }} />
-            <span>VIZAG</span>
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34D399', boxShadow: '0 0 6px #34D399' }} />
+            <span>VIZAG LIVE</span>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.65rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', position: 'relative', zIndex: 2 }}>
           <div style={{
             background: '#FFFFFF',
-            width: '36px',
-            height: '36px',
-            borderRadius: '10px',
+            width: '46px',
+            height: '46px',
+            borderRadius: '13px',
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '2px',
+            padding: '4px',
             overflow: 'hidden',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+            boxShadow: '0 8px 20px rgba(0,0,0,0.25)',
+            marginBottom: '0.45rem'
           }}>
-            <img src={logo} alt="Wash My Car Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', transform: 'scale(1.3)' }} />
+            <img src={logo} alt="Wash My Car Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', transform: 'scale(1.2)' }} />
           </div>
-          <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#FFFFFF', letterSpacing: '-0.02em' }}>
+          <span style={{ fontSize: '1.15rem', fontWeight: 900, color: '#FFFFFF', letterSpacing: '-0.02em' }}>
             WASH <span style={{ color: '#38BDF8' }}>MY CAR</span> ORG
+          </span>
+          <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.8)', fontWeight: 500, marginTop: '2px' }}>
+            Doorstep Car Care & Detailing
           </span>
         </div>
       </div>
 
-      {/* Desktop Left side branding (>= 768px) */}
-      <div className="hidden md:flex flex-col items-center justify-center p-10" style={{ flex: 1, background: 'linear-gradient(135deg, var(--primary-navy), var(--primary-blue))', color: 'white', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'relative', zIndex: 2, textAlign: 'center' }}>
+      {/* Desktop Left side branding (>= 900px) */}
+      <div className="hidden md:flex flex-col items-center justify-center p-12" style={{ flex: 1, background: 'linear-gradient(135deg, var(--primary-navy), var(--primary-blue))', color: 'white', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'relative', zIndex: 2, textAlign: 'center', maxWidth: '420px' }}>
           <div style={{
             background: 'white',
-            width: '120px',
-            height: '120px',
+            width: '110px',
+            height: '110px',
             borderRadius: '1.5rem',
-            boxShadow: '0 0 30px rgba(56, 189, 248, 0.65), 0 10px 20px rgba(0,0,0,0.2)',
+            boxShadow: '0 0 35px rgba(56, 189, 248, 0.65), 0 10px 20px rgba(0,0,0,0.2)',
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
-            marginBottom: '2rem',
+            marginBottom: '1.75rem',
             overflow: 'hidden',
             padding: '8px'
           }}>
-            <img src={logo} alt="Wash My Car Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', transform: 'scale(1.4)' }} />
+            <img src={logo} alt="Wash My Car Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', transform: 'scale(1.35)' }} />
           </div>
-          <p style={{ fontSize: '1.25rem', marginTop: '0.5rem', opacity: 0.9, fontWeight: 600 }}>Your Car, Cleaned At Your Door.</p>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginTop: '1.5rem', opacity: 0.85, fontSize: '0.95rem' }}>
-            <ShieldCheck size={20} /> Secure Google OAuth & Email Authentication
+          <h2 style={{ fontSize: '1.85rem', fontWeight: 800, color: '#FFFFFF', margin: '0 0 0.5rem' }}>Your Car, Cleaned At Your Door.</h2>
+          <p style={{ fontSize: '0.95rem', opacity: 0.9, fontWeight: 500, lineHeight: 1.5 }}>
+            Doorstep car detailing & bike wash across Visakhapatnam. Track your technician live.
+          </p>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', marginTop: '1.75rem', background: 'rgba(255,255,255,0.1)', padding: '0.5rem 1rem', borderRadius: '20px', backdropFilter: 'blur(10px)', fontSize: '0.85rem' }}>
+            <ShieldCheck size={18} color="#34D399" /> <span>Secure Google OAuth & Email Authentication</span>
           </div>
         </div>
         <div style={{ position: 'absolute', bottom: '-10%', right: '-10%', width: '300px', height: '300px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
@@ -363,66 +364,15 @@ const Login = ({ setAuth }) => {
       </div>
 
       {/* Right side form */}
-      <div className="flex flex-col justify-center p-5 md:p-14 auth-card-container" style={{
-        flex: 1, 
-        background: 'white',
-        borderTopLeftRadius: '24px',
-        borderTopRightRadius: '24px',
-        marginTop: '-1rem',
-        position: 'relative',
-        zIndex: 10,
-        boxShadow: '0 -10px 30px rgba(0,0,0,0.08)'
-      }}>
-        <div style={{ maxWidth: '420px', width: '100%', margin: '0 auto' }}>
+      <div className="auth-form-wrapper">
+        <div className="auth-floating-card">
           
           {/* TAB SWITCHER: SIGN IN / CREATE ACCOUNT */}
-          <div style={{
-            display: 'flex',
-            background: '#F1F5F9',
-            padding: '4px',
-            borderRadius: '12px',
-            marginBottom: '1rem',
-            border: '1px solid #E2E8F0'
-          }}>
-            <Link
-              to="/login"
-              style={{
-                flex: 1,
-                textAlign: 'center',
-                padding: '0.6rem 0.5rem',
-                borderRadius: '8px',
-                fontSize: '0.88rem',
-                fontWeight: 800,
-                background: '#FFFFFF',
-                color: '#0284C7',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
-                textDecoration: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.35rem'
-              }}
-            >
+          <div className="auth-pill-switch">
+            <Link to="/login" className="auth-pill-tab active">
               <span>Sign In</span>
             </Link>
-            <Link
-              to="/register"
-              style={{
-                flex: 1,
-                textAlign: 'center',
-                padding: '0.6rem 0.5rem',
-                borderRadius: '8px',
-                fontSize: '0.88rem',
-                fontWeight: 600,
-                background: 'transparent',
-                color: '#64748B',
-                textDecoration: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.35rem'
-              }}
-            >
+            <Link to="/register" className="auth-pill-tab inactive">
               <span>Create Account</span>
             </Link>
           </div>
@@ -431,8 +381,8 @@ const Login = ({ setAuth }) => {
           <div style={{
             background: 'linear-gradient(135deg, #ECFDF5 0%, #F0FDF4 100%)',
             border: '1px solid #A7F3D0',
-            borderRadius: '10px',
-            padding: '0.45rem 0.75rem',
+            borderRadius: '11px',
+            padding: '0.5rem 0.75rem',
             marginBottom: '1rem',
             display: 'flex',
             alignItems: 'center',
@@ -448,7 +398,7 @@ const Login = ({ setAuth }) => {
             <span style={{ 
               background: '#059669', 
               color: 'white', 
-              fontSize: '0.66rem', 
+              fontSize: '0.65rem', 
               fontWeight: 800, 
               padding: '2px 7px', 
               borderRadius: '6px',
@@ -459,48 +409,58 @@ const Login = ({ setAuth }) => {
           </div>
 
           <div style={{ marginBottom: '1rem' }}>
-            <h1 style={{ margin: 0, fontWeight: 900, fontSize: '1.45rem', color: 'var(--primary-navy)', letterSpacing: '-0.02em' }}>
+            <h1 style={{ margin: 0, fontWeight: 900, fontSize: '1.35rem', color: '#0F172A', letterSpacing: '-0.02em' }}>
               Welcome Back
             </h1>
-            <p style={{ margin: '0.2rem 0 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+            <p style={{ margin: '0.2rem 0 0', color: '#64748B', fontSize: '0.82rem', lineHeight: 1.4 }}>
               Sign in to manage doorstep washes and track your technician.
             </p>
           </div>
 
+          {error && (
+            <div style={{
+              background: '#FEF2F2',
+              border: '1px solid #FECACA',
+              borderRadius: '10px',
+              padding: '0.65rem 0.85rem',
+              color: '#991B1B',
+              fontSize: '0.84rem',
+              marginBottom: '1rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.45rem'
+            }}>
+              <AlertCircle size={15} style={{ flexShrink: 0 }} /> <span>{error}</span>
+            </div>
+          )}
+
+          {successMsg && (
+            <div style={{
+              background: '#ECFDF5',
+              border: '1px solid #A7F3D0',
+              borderRadius: '10px',
+              padding: '0.65rem 0.85rem',
+              color: '#065F46',
+              fontSize: '0.84rem',
+              marginBottom: '1rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.45rem'
+            }}>
+              <CheckCircle2 size={15} style={{ flexShrink: 0 }} /> <span>{successMsg}</span>
+            </div>
+          )}
+
           {/* PRIMARY: CONTINUE WITH GOOGLE BUTTON */}
-          <div style={{ marginBottom: '1.25rem' }}>
+          <div style={{ marginBottom: '1.15rem' }}>
             <button
               type="button"
               disabled={googleLoading || loading}
               onClick={triggerGoogleSignIn}
-              style={{
-                width: '100%',
-                padding: '0.75rem 1rem',
-                background: '#FFFFFF',
-                border: '1.5px solid #CBD5E1',
-                borderRadius: '12px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.75rem',
-                fontSize: '0.95rem',
-                fontWeight: 700,
-                color: '#1E293B',
-                cursor: (googleLoading || loading) ? 'not-allowed' : 'pointer',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.borderColor = '#0284C7';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(2, 132, 199, 0.15)';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.borderColor = '#CBD5E1';
-                e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.06)';
-              }}
+              className="auth-google-button"
             >
               {/* Official Google 4-Color SVG Icon */}
-              <svg width="20" height="20" viewBox="0 0 24 24">
+              <svg width="19" height="19" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
                 <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
                 <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
@@ -512,9 +472,9 @@ const Login = ({ setAuth }) => {
           </div>
 
           {/* DIVIDER: OR CONTINUE WITH EMAIL */}
-          <div style={{ display: 'flex', alignItems: 'center', margin: '1.25rem 0', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', margin: '1.15rem 0', gap: '0.75rem' }}>
             <div style={{ flex: 1, height: '1px', background: '#E2E8F0' }} />
-            <span style={{ fontSize: '0.74rem', color: '#64748B', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <span style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               {otpSent ? 'Verify Email Code' : 'Or Continue with Email'}
             </span>
             <div style={{ flex: 1, height: '1px', background: '#E2E8F0' }} />
@@ -522,19 +482,20 @@ const Login = ({ setAuth }) => {
 
           {!otpSent ? (
             /* STEP 1: ENTER EMAIL & REQUEST OTP */
-            <form onSubmit={handleSendEmailOtp} className="flex-col flex gap-3.5">
-              <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.86rem' }}>
-                  Email Address <span style={{ color: '#EF4444' }}>*</span>
+            <form onSubmit={handleSendEmailOtp} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div className="auth-field-box">
+                <label className="auth-field-label">
+                  <span>Email Address</span>
+                  <span style={{ color: '#EF4444' }}>*</span>
                 </label>
                 <div style={{ position: 'relative' }}>
-                  <Mail size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <Mail size={17} style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
                   <input 
                     type="email" 
                     required 
                     disabled={otpSending || googleLoading} 
-                    className="form-input" 
-                    style={{ paddingLeft: '2.5rem', fontWeight: 600 }} 
+                    className="auth-text-input" 
+                    style={{ paddingLeft: '2.5rem' }} 
                     placeholder="name@example.com" 
                     value={email} 
                     onChange={e => {
@@ -543,33 +504,20 @@ const Login = ({ setAuth }) => {
                     }} 
                   />
                 </div>
-                <small style={{ fontSize: '0.74rem', color: '#64748B', marginTop: '0.25rem', display: 'block' }}>
-                  We'll send a 6-digit one-time passcode to your email. Password-free secure sign in!
+                <small style={{ fontSize: '0.73rem', color: '#64748B', marginTop: '0.3rem', display: 'block' }}>
+                  We'll send a 6-digit one-time passcode. Password-free sign in!
                 </small>
               </div>
 
               <button 
                 type="submit" 
                 disabled={otpSending || googleLoading} 
-                className="btn btn-primary w-full" 
-                style={{
-                  padding: '0.85rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.65rem',
-                  borderRadius: '0.65rem',
-                  opacity: otpSending ? 0.8 : 1,
-                  cursor: otpSending ? 'not-allowed' : 'pointer',
-                  fontWeight: 700,
-                  fontSize: '1rem',
-                  marginTop: '0.25rem'
-                }}
+                className="auth-primary-btn"
               >
                 {otpSending ? (
                   <>
                     <span className="spinner" />
-                    <span>Sending Verification Code...</span>
+                    <span>Sending Code...</span>
                   </>
                 ) : (
                   <span>Send Verification Code to Email →</span>
@@ -578,21 +526,21 @@ const Login = ({ setAuth }) => {
             </form>
           ) : (
             /* STEP 2: ENTER OTP & SIGN IN */
-            <form onSubmit={handleVerifyAndLogin} className="flex-col flex gap-3.5">
+            <form onSubmit={handleVerifyAndLogin} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               {/* Account Details Summary */}
               <div style={{
                 background: '#F8FAFC',
                 border: '1px solid #E2E8F0',
-                borderRadius: '12px',
-                padding: '0.85rem 1rem',
+                borderRadius: '11px',
+                padding: '0.75rem 0.9rem',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 gap: '0.75rem'
               }}>
                 <div>
-                  <div style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: 600 }}>Login code sent to:</div>
-                  <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0F172A' }}>{email}</div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>Login code sent to:</div>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0F172A' }}>{email}</div>
                 </div>
                 <button
                   type="button"
@@ -606,27 +554,28 @@ const Login = ({ setAuth }) => {
                     background: 'white',
                     border: '1px solid #CBD5E1',
                     borderRadius: '8px',
-                    padding: '0.35rem 0.65rem',
-                    fontSize: '0.76rem',
+                    padding: '0.3rem 0.6rem',
+                    fontSize: '0.74rem',
                     fontWeight: 700,
                     color: '#0284C7',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '0.3rem',
+                    gap: '0.25rem',
                     cursor: 'pointer'
                   }}
                 >
-                  <Edit2 size={13} />
-                  <span>Change Email</span>
+                  <Edit2 size={12} />
+                  <span>Edit</span>
                 </button>
               </div>
 
-              <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.86rem' }}>
-                  Enter 6-Digit Email Code <span style={{ color: '#EF4444' }}>*</span>
+              <div className="auth-field-box">
+                <label className="auth-field-label">
+                  <span>Enter 6-Digit Verification Code</span>
+                  <span style={{ color: '#EF4444' }}>*</span>
                 </label>
                 <div style={{ position: 'relative' }}>
-                  <Key size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#0284C7' }} />
+                  <Key size={17} style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: '#0284C7' }} />
                   <input 
                     type="text" 
                     inputMode="numeric"
@@ -634,11 +583,11 @@ const Login = ({ setAuth }) => {
                     autoFocus
                     maxLength={6}
                     disabled={loading} 
-                    className="form-input" 
+                    className="auth-text-input" 
                     style={{
                       paddingLeft: '2.5rem',
                       fontWeight: 800,
-                      fontSize: '1.35rem',
+                      fontSize: '1.25rem',
                       letterSpacing: '0.35em',
                       textAlign: 'center',
                       fontFamily: 'monospace'
@@ -652,11 +601,11 @@ const Login = ({ setAuth }) => {
                   />
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.35rem' }}>
-                  <small style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    Valid for 10 minutes. Check spam folder if needed.
+                  <small style={{ fontSize: '0.73rem', color: '#64748B' }}>
+                    Valid for 10 minutes. Check spam if needed.
                   </small>
                   {resendTimer > 0 ? (
-                    <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>
+                    <span style={{ fontSize: '0.73rem', color: '#64748B', fontWeight: 600 }}>
                       Resend in {resendTimer}s
                     </span>
                   ) : (
@@ -669,7 +618,7 @@ const Login = ({ setAuth }) => {
                         border: 'none',
                         color: '#0284C7',
                         fontWeight: 700,
-                        fontSize: '0.75rem',
+                        fontSize: '0.73rem',
                         cursor: 'pointer',
                         padding: 0,
                         textDecoration: 'underline'
@@ -684,19 +633,10 @@ const Login = ({ setAuth }) => {
               <button 
                 type="submit" 
                 disabled={loading || emailOtp.trim().length < 6} 
-                className="btn btn-primary w-full" 
+                className="auth-primary-btn"
                 style={{
-                  padding: '0.85rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.65rem',
-                  borderRadius: '0.65rem',
                   opacity: (loading || emailOtp.trim().length < 6) ? 0.75 : 1,
-                  cursor: (loading || emailOtp.trim().length < 6) ? 'not-allowed' : 'pointer',
-                  fontWeight: 700,
-                  fontSize: '1rem',
-                  marginTop: '0.25rem'
+                  cursor: (loading || emailOtp.trim().length < 6) ? 'not-allowed' : 'pointer'
                 }}
               >
                 {loading ? (
@@ -713,24 +653,24 @@ const Login = ({ setAuth }) => {
 
           {/* Privacy Guarantee Note */}
           <div style={{
-            marginTop: '1.25rem',
-            padding: '0.75rem',
+            marginTop: '1.15rem',
+            padding: '0.65rem 0.8rem',
             background: '#F8FAFC',
-            borderRadius: '12px',
+            borderRadius: '11px',
             border: '1px solid #E2E8F0',
             display: 'flex',
             alignItems: 'center',
-            gap: '0.6rem',
-            fontSize: '0.76rem',
+            gap: '0.55rem',
+            fontSize: '0.75rem',
             color: '#64748B'
           }}>
-            <ShieldCheck size={18} color="#059669" style={{ flexShrink: 0 }} />
-            <span><strong>100% Privacy Protected:</strong> We never share your contact information with 3rd parties or send unsolicited spam.</span>
+            <ShieldCheck size={16} color="#059669" style={{ flexShrink: 0 }} />
+            <span><strong>100% Privacy Protected:</strong> We never share your contact details or send unsolicited spam.</span>
           </div>
 
-          <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.92rem', color: '#475569' }}>
+          <div style={{ marginTop: '1.25rem', textAlign: 'center', fontSize: '0.88rem', color: '#475569' }}>
             <span>Don't have an account? </span>
-            <Link to="/register?offer=welcome" className="text-blue" style={{ fontWeight: 800 }}>
+            <Link to="/register?offer=welcome" style={{ color: '#0284C7', fontWeight: 800 }}>
               Claim Welcome Offer & Register →
             </Link>
           </div>
