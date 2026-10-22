@@ -115,7 +115,6 @@
           }
         }
       ],
-      "paymentAccepted": "Cash, Credit Card, Debit Card, UPI, Net Banking, Razorpay",
       "address": {
         "@type": "PostalAddress",
         "streetAddress": "Doorstep Service Across Visakhapatnam",
@@ -218,7 +217,10 @@
       },
       "potentialAction": {
         "@type": "SearchAction",
-        "target": "https://washmycar.org.in/?q={search_term_string}#packages",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://washmycar.org.in/?q={search_term_string}#packages"
+        },
         "query-input": "required name=search_term_string"
       }
     }
@@ -273,6 +275,7 @@
       "name": "First Doorstep Car Wash Welcome Offer",
       "description": "Special welcome offer for users in Visakhapatnam: Flat ₹199 worth Bike Wash FREE with any car wash booking using coupon code WELCOME.",
       "url": "https://washmycar.org.in/register?offer=welcome",
+      "price": "0",
       "priceCurrency": "INR",
       "availability": "https://schema.org/InStock",
       "validFrom": "2026-01-01",
