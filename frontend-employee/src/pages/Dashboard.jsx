@@ -4,7 +4,7 @@ import {
   Navigation, Clock, Sparkles, CheckCircle2, Shield, Bike, 
   Droplets, Feather, Flame, ArrowRight, AlertCircle 
 } from 'lucide-react';
-import { toggleDuty, getAssignedBookings } from '../api';
+import { toggleDuty, getAssignedBookings, getProfile } from '../api';
 import { useNavigate } from 'react-router-dom';
 
 const renderAddonIcon = (iconName, size = 14) => {
@@ -21,6 +21,34 @@ const renderAddonIcon = (iconName, size = 14) => {
   return <Sparkles size={size} color="#059669" />;
 };
 
+const LoadingDots = ({ color = 'currentColor', size = 8, gap = 4 }) => (
+  <span 
+    style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: `${gap}px`,
+      verticalAlign: 'middle',
+      lineHeight: 1
+    }}
+    aria-label="Loading..."
+  >
+    {[0, 0.18, 0.36].map((delay, idx) => (
+      <span 
+        key={idx}
+        style={{
+          width: `${size}px`,
+          height: `${size}px`,
+          backgroundColor: color,
+          borderRadius: '50%',
+          display: 'inline-block',
+          animation: 'wmcDotPulse 1.1s infinite ease-in-out both',
+          animationDelay: `${delay}s`
+        }} 
+      />
+    ))}
+  </span>
+);
+
 const Dashboard = ({ profile, setProfile }) => {
   const navigate = useNavigate();
   const [activeJobs, setActiveJobs] = useState([]);
@@ -36,26 +64,37 @@ const Dashboard = ({ profile, setProfile }) => {
       .finally(() => setLoadingJobs(false));
   }, []);
 
+  useEffect(() => {
+    if (!profile && setProfile) {
+      getProfile()
+        .then(res => setProfile(res))
+        .catch(err => console.error('Error fetching profile in Dashboard:', err));
+    }
+  }, [profile, setProfile]);
+
   const handleToggle = async () => {
+    if (!profile) return;
     try {
       const updated = await toggleDuty(!onDuty);
-      setProfile({...profile, onDuty: updated.onDuty});
+      setProfile({ ...profile, onDuty: updated.onDuty });
     } catch (err) {
       console.error(err);
       alert('Failed to update status');
     }
   };
 
-  const name = profile?.name || 'Suresh Kumar';
+  const name = profile?.name;
   const onDuty = profile?.onDuty || false;
   const stats = profile?.stats || { assignedToday: 0, completedJobs: 0, pendingJobs: 0 };
-  const earnings = profile?.earnings !== undefined ? profile.earnings : (profile?.salary || 0);
-  const payType = profile?.payType || 'COMMISSION_ONLY';
+  const earnings = profile?.earnings !== undefined ? profile.earnings : (profile?.salary !== undefined ? profile.salary : 0);
+  const payType = profile?.payType;
 
   const getPayTypeLabel = () => {
+    if (!payType) return 'Standard Plan';
     if (payType === 'FIXED_SALARY') return 'Fixed Monthly Salary';
     if (payType === 'HYBRID') return 'Hybrid (Base + Commission)';
-    return 'Full Commission';
+    if (payType === 'COMMISSION_ONLY') return 'Full Commission';
+    return payType.replace(/_/g, ' ');
   };
 
   const nextJob = activeJobs[0] || profile?.nextJob || null;
@@ -79,7 +118,9 @@ const Dashboard = ({ profile, setProfile }) => {
         <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem'}}>
           <div>
             <p style={{margin: '0 0 0.25rem 0', opacity: 0.9, fontSize: '0.9rem'}}>Welcome back,</p>
-            <h1 style={{margin: 0, fontSize: '2rem', fontWeight: 800}}>{name}</h1>
+            <h1 style={{margin: 0, fontSize: '2rem', fontWeight: 800, minHeight: '2.5rem', display: 'flex', alignItems: 'center'}}>
+              {profile ? (name || 'Employee') : <LoadingDots color="white" size={9} gap={5} />}
+            </h1>
           </div>
           {profile?.employeeId && (
             <div style={{
@@ -104,20 +145,27 @@ const Dashboard = ({ profile, setProfile }) => {
         </div>
         <p style={{margin: '0 0 1.5rem 0', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
           Duty Status: 
-          <span style={{
-            background: onDuty ? '#DCFCE7' : '#FEE2E2',
-            color: onDuty ? '#166534' : '#991B1B',
-            padding: '0.2rem 0.6rem',
-            borderRadius: '12px',
-            fontSize: '0.82rem',
-            fontWeight: 800
-          }}>
-            {onDuty ? '● ON DUTY' : '○ OFF DUTY'}
-          </span>
+          {!profile ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', background: 'rgba(255, 255, 255, 0.2)', padding: '0.2rem 0.65rem', borderRadius: '12px' }}>
+              <LoadingDots color="white" size={6} gap={4} />
+            </span>
+          ) : (
+            <span style={{
+              background: onDuty ? '#DCFCE7' : '#FEE2E2',
+              color: onDuty ? '#166534' : '#991B1B',
+              padding: '0.2rem 0.6rem',
+              borderRadius: '12px',
+              fontSize: '0.82rem',
+              fontWeight: 800
+            }}>
+              {onDuty ? '● ON DUTY' : '○ OFF DUTY'}
+            </span>
+          )}
         </p>
         
         <button 
           onClick={handleToggle}
+          disabled={!profile}
           style={{
             background: 'white',
             color: 'var(--primary-blue)',
@@ -126,12 +174,19 @@ const Dashboard = ({ profile, setProfile }) => {
             borderRadius: 'var(--radius-md)',
             fontWeight: 700,
             display: 'flex', alignItems: 'center', gap: '0.5rem',
-            cursor: 'pointer',
+            cursor: !profile ? 'not-allowed' : 'pointer',
+            opacity: !profile ? 0.75 : 1,
             boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
           }}
         >
           <Power size={18} />
-          {onDuty ? 'Go Off Duty' : 'Go On Duty'}
+          {!profile ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+              Updating <LoadingDots color="var(--primary-blue)" size={5} gap={3} />
+            </span>
+          ) : (
+            onDuty ? 'Go Off Duty' : 'Go On Duty'
+          )}
         </button>
       </div>
 
@@ -160,8 +215,12 @@ const Dashboard = ({ profile, setProfile }) => {
             <span style={{color: '#0369A1', fontSize: '0.8rem', fontWeight: 800}}>ACTIVE JOBS</span>
             <ClipboardList size={20} color="var(--primary-blue)" />
           </div>
-          <h2 style={{margin: 0, fontSize: '1.85rem', fontWeight: 800, color: 'var(--primary-navy)'}}>
-            {activeJobs.length || stats.pendingJobs || 0}
+          <h2 style={{margin: 0, fontSize: '1.85rem', fontWeight: 800, color: 'var(--primary-navy)', minHeight: '2.4rem', display: 'flex', alignItems: 'center'}}>
+            {loadingJobs ? (
+              <LoadingDots color="var(--primary-blue)" size={8} gap={4} />
+            ) : (
+              activeJobs.length
+            )}
           </h2>
           <span style={{ fontSize: '0.74rem', color: 'var(--primary-blue)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.35rem' }}>
             Go to Assigned Slots <ArrowRight size={12} />
@@ -173,10 +232,22 @@ const Dashboard = ({ profile, setProfile }) => {
             <span style={{color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 700}}>EARNINGS</span>
             <Wallet size={20} color="var(--primary-blue)" />
           </div>
-          <h2 style={{margin: 0, fontSize: '1.85rem', fontWeight: 800, color: 'var(--primary-navy)'}}>₹{earnings}</h2>
-          <span style={{ fontSize: '0.72rem', color: 'var(--primary-blue)', background: '#EFF6FF', padding: '0.15rem 0.5rem', borderRadius: '4px', fontWeight: 700, display: 'inline-block', marginTop: '0.35rem' }}>
-            {getPayTypeLabel()}
-          </span>
+          <h2 style={{margin: 0, fontSize: '1.85rem', fontWeight: 800, color: 'var(--primary-navy)', minHeight: '2.4rem', display: 'flex', alignItems: 'center'}}>
+            {!profile ? (
+              <LoadingDots color="var(--primary-blue)" size={8} gap={4} />
+            ) : (
+              `₹${earnings}`
+            )}
+          </h2>
+          <div style={{ minHeight: '1.3rem', display: 'flex', alignItems: 'center', marginTop: '0.35rem' }}>
+            {!profile ? (
+              <LoadingDots color="var(--text-muted)" size={5} gap={3} />
+            ) : (
+              <span style={{ fontSize: '0.72rem', color: 'var(--primary-blue)', background: '#EFF6FF', padding: '0.15rem 0.5rem', borderRadius: '4px', fontWeight: 700, display: 'inline-block' }}>
+                {getPayTypeLabel()}
+              </span>
+            )}
+          </div>
         </div>
 
         <div 
@@ -202,8 +273,12 @@ const Dashboard = ({ profile, setProfile }) => {
             <span style={{color: '#15803D', fontSize: '0.8rem', fontWeight: 800}}>COMPLETED</span>
             <CheckCircle2 size={20} color="#16A34A" />
           </div>
-          <h2 style={{margin: 0, fontSize: '1.85rem', fontWeight: 800, color: '#166534'}}>
-            {stats.completedJobs || 0}
+          <h2 style={{margin: 0, fontSize: '1.85rem', fontWeight: 800, color: '#166534', minHeight: '2.4rem', display: 'flex', alignItems: 'center'}}>
+            {!profile ? (
+              <LoadingDots color="#16A34A" size={8} gap={4} />
+            ) : (
+              stats.completedJobs ?? 0
+            )}
           </h2>
           <span style={{ fontSize: '0.74rem', color: '#15803D', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.35rem' }}>
             View Finished Slots <ArrowRight size={12} />
@@ -215,12 +290,29 @@ const Dashboard = ({ profile, setProfile }) => {
             <span style={{color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 700}}>RATING</span>
             <Star size={20} color="#D97706" />
           </div>
-          <h2 style={{margin: 0, fontSize: '1.85rem', fontWeight: 800, color: 'var(--primary-navy)', display: 'flex', alignItems: 'center', gap: '0.4rem'}}>
-            {profile?.rating !== undefined && profile?.rating !== null ? Number(profile.rating).toFixed(1) : '5.0'} <Star size={18} fill="#F59E0B" color="#F59E0B" />
+          <h2 style={{margin: 0, fontSize: '1.85rem', fontWeight: 800, color: 'var(--primary-navy)', minHeight: '2.4rem', display: 'flex', alignItems: 'center', gap: '0.4rem'}}>
+            {!profile ? (
+              <LoadingDots color="#D97706" size={8} gap={4} />
+            ) : (
+              <>
+                {profile?.rating !== undefined && profile?.rating !== null && Number(profile.rating) > 0
+                  ? Number(profile.rating).toFixed(1)
+                  : (profile?.totalReviews > 0 ? Number(profile.rating || 0).toFixed(1) : 'New')}
+                <Star size={18} fill="#F59E0B" color="#F59E0B" />
+              </>
+            )}
           </h2>
-          <span style={{ fontSize: '0.72rem', color: '#059669', fontWeight: 600, display: 'block', marginTop: '0.35rem' }}>
-            {profile?.totalReviews ? `${profile.totalReviews} customer review${profile.totalReviews > 1 ? 's' : ''}` : 'Top Performer'}
-          </span>
+          <div style={{ minHeight: '1.1rem', display: 'flex', alignItems: 'center', marginTop: '0.35rem' }}>
+            {!profile ? (
+              <LoadingDots color="var(--text-muted)" size={5} gap={3} />
+            ) : (
+              <span style={{ fontSize: '0.72rem', color: profile?.totalReviews ? '#059669' : 'var(--text-muted)', fontWeight: 600, display: 'block' }}>
+                {profile?.totalReviews 
+                  ? `${profile.totalReviews} customer review${profile.totalReviews > 1 ? 's' : ''}` 
+                  : 'No customer reviews yet'}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -240,7 +332,17 @@ const Dashboard = ({ profile, setProfile }) => {
               Next Scheduled Job
             </h3>
           </div>
-          {nextJob && (
+          {loadingJobs ? (
+            <span style={{
+              background: 'rgba(255, 255, 255, 0.15)',
+              padding: '0.2rem 0.6rem',
+              borderRadius: '12px',
+              display: 'inline-flex',
+              alignItems: 'center'
+            }}>
+              <LoadingDots color="#38BDF8" size={5} gap={3} />
+            </span>
+          ) : nextJob ? (
             <span style={{
               background: nextJob.status === 'STARTED' ? '#FEF3C7' : '#E0F2FE',
               color: nextJob.status === 'STARTED' ? '#92400E' : '#0369A1',
@@ -251,10 +353,19 @@ const Dashboard = ({ profile, setProfile }) => {
             }}>
               {nextJob.status}
             </span>
-          )}
+          ) : null}
         </div>
 
-        {nextJob ? (
+        {loadingJobs ? (
+          <div style={{ padding: '3.5rem 1.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '0.85rem' }}>
+              <LoadingDots color="var(--primary-blue)" size={10} gap={6} />
+            </div>
+            <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+              Checking assigned slots...
+            </p>
+          </div>
+        ) : nextJob ? (
           <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             
             {/* Package & Car Details Row */}
