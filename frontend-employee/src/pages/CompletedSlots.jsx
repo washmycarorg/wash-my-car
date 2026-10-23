@@ -5,6 +5,25 @@ import {
   Search, ShieldCheck, Image as ImageIcon, Eye, Star
 } from 'lucide-react';
 
+const parseReviewTags = (rawTags) => {
+  if (!rawTags) return [];
+  if (Array.isArray(rawTags)) return rawTags;
+  if (typeof rawTags === 'string') {
+    try {
+      const parsed = JSON.parse(rawTags);
+      if (Array.isArray(parsed)) return parsed;
+      if (typeof parsed === 'string') return [parsed];
+      return [];
+    } catch {
+      return rawTags
+        .split(',')
+        .map(t => t.replace(/[\[\]"']/g, '').trim())
+        .filter(Boolean);
+    }
+  }
+  return [];
+};
+
 const CompletedSlots = () => {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -277,15 +296,19 @@ const CompletedSlots = () => {
                       "{b.review.comment}"
                     </p>
                   )}
-                  {b.review.tags && b.review.tags.length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.2rem' }}>
-                      {b.review.tags.map((tag, tIdx) => (
-                        <span key={tIdx} style={{ background: 'white', color: '#854D0E', fontSize: '0.72rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '4px', border: '1px solid #FDE047' }}>
-                          ✓ {tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                  {(() => {
+                    const reviewTags = parseReviewTags(b.review.tags);
+                    if (!reviewTags || reviewTags.length === 0) return null;
+                    return (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.2rem' }}>
+                        {reviewTags.map((tag, tIdx) => (
+                          <span key={tIdx} style={{ background: 'white', color: '#854D0E', fontSize: '0.72rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '4px', border: '1px solid #FDE047' }}>
+                            ✓ {tag}
+                          </span>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 
