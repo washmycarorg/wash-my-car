@@ -918,6 +918,7 @@ export const updateBooking = async (req, res) => {
       longitude,
       phone,
       alternatePhone,
+      email,
       washTypeId,
       serviceAreaId
     } = req.body;
@@ -959,17 +960,29 @@ export const updateBooking = async (req, res) => {
     if (washTypeId !== undefined) data.washTypeId = Number(washTypeId);
     if (serviceAreaId !== undefined) data.serviceAreaId = Number(serviceAreaId);
 
-    // If customer's main phone number was provided to update:
-    if (phone && String(phone).trim() && existingBooking.userId) {
-      const cleanPhone = String(phone).trim();
-      data.alternatePhone = data.alternatePhone || cleanPhone;
-      try {
-        await prisma.user.update({
-          where: { id: existingBooking.userId },
-          data: { phone: cleanPhone }
-        });
-      } catch (phoneErr) {
-        console.warn('Could not update user phone:', phoneErr.message);
+    // If customer's main phone or email was provided to update:
+    if (existingBooking.userId) {
+      const userUpdateData = {};
+      if (phone && String(phone).trim()) {
+        const cleanPhone = String(phone).trim();
+        data.alternatePhone = data.alternatePhone || cleanPhone;
+        userUpdateData.phone = cleanPhone;
+      }
+      if (email !== undefined) {
+        const cleanEmail = String(email).trim().toLowerCase();
+        if (cleanEmail) {
+          userUpdateData.email = cleanEmail;
+        }
+      }
+      if (Object.keys(userUpdateData).length > 0) {
+        try {
+          await prisma.user.update({
+            where: { id: existingBooking.userId },
+            data: userUpdateData
+          });
+        } catch (uErr) {
+          console.warn('Could not update user info:', uErr.message);
+        }
       }
     }
 
@@ -1185,7 +1198,7 @@ export const cancelBookingByAdmin = async (req, res) => {
 
     const booking = await prisma.booking.findUnique({
       where: { id: Number(id) },
-      include: { employee: true, user: true }
+      include: { employee: true, user: true, car: true, washType: true, carType: true, serviceArea: true, addons: { include: { addon: true } } }
     });
 
     if (!booking) {
@@ -1261,17 +1274,19 @@ export const cancelBookingByAdmin = async (req, res) => {
         refundAmount: refundDetails.refundAmount,
         refundStatus: refundDetails.refundStatus
       },
-      include: { employee: true, user: true, washType: true, carType: true }
+      include: { employee: true, user: true, washType: true, carType: true, car: true, serviceArea: true, addons: { include: { addon: true } } }
     });
 
     // Send cancellation and refund Email with super CSS styling to customer
-    if (booking.user?.email) {
+    const recipientEmail = booking.user?.email || freshUser?.email;
+    if (recipientEmail) {
       sendBookingCancelledEmail({
-        to: booking.user.email,
-        name: booking.user.name,
+        to: recipientEmail,
+        name: booking.user?.name || freshUser?.name,
         booking: updatedBooking,
         refundDetails,
-        reason
+        reason,
+        cancelledBy: 'ADMIN'
       }).catch(err => console.error('[Email Admin Cancel error]:', err));
     }
 
@@ -1318,7 +1333,7 @@ export const rescheduleBookingByAdmin = async (req, res) => {
 
     const booking = await prisma.booking.findUnique({
       where: { id: Number(id) },
-      include: { employee: true, user: true, washType: true, carType: true }
+      include: { employee: true, user: true, washType: true, carType: true, car: true, serviceArea: true, addons: { include: { addon: true } } }
     });
 
     if (!booking) {
@@ -1340,7 +1355,7 @@ export const rescheduleBookingByAdmin = async (req, res) => {
         rescheduledReason: String(reason).trim(),
         rescheduledBy: 'ADMIN'
       },
-      include: { employee: true, user: true, washType: true, carType: true, serviceArea: true }
+      include: { employee: true, user: true, washType: true, carType: true, car: true, serviceArea: true, addons: { include: { addon: true } } }
     });
 
     const formattedDate = new Date(newDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -1392,7 +1407,7 @@ export const markDoorstepRejectionByAdmin = async (req, res) => {
 
     const booking = await prisma.booking.findUnique({
       where: { id: Number(id) },
-      include: { employee: true, user: true, washType: true, carType: true }
+      include: { employee: true, user: true, washType: true, carType: true, car: true, serviceArea: true, addons: { include: { addon: true } } }
     });
 
     if (!booking) {
@@ -1403,66 +1418,91 @@ export const markDoorstepRejectionByAdmin = async (req, res) => {
       return res.status(400).json({ error: `Cannot mark doorstep rejection on a ${booking.status.toLowerCase()} booking.` });
     }
 
+    const isSubscription = Boolean(booking.userSubscriptionId || booking.subscriptionCovered);
+
+    // Fetch system settings to retrieve pointsToCashRatio
+    const settings = await prisma.systemSettings.findUnique({ where: { id: 1 } }) || {
+      pointsToCashRatio: 4.0
+    };
+    const ratio = Number(settings.pointsToCashRatio) || 4.0;
+
+    const DOORSTEP_FEE = 99.0;
+    const paidCash = (booking.paymentStatus === 'PAID' && booking.razorpayPaymentId && booking.price > 0)
+      ? Number(booking.price)
+      : 0;
+
+    let cashRefundAmt = 0;
+    let remainingFeeInRupees = DOORSTEP_FEE;
+
+    // 1. Deduct ₹99 fee from online cash paid via Razorpay first:
+    if (paidCash > 0) {
+      if (paidCash >= DOORSTEP_FEE) {
+        cashRefundAmt = paidCash - DOORSTEP_FEE;
+        remainingFeeInRupees = 0;
+      } else {
+        cashRefundAmt = 0;
+        remainingFeeInRupees = DOORSTEP_FEE - paidCash;
+      }
+    }
+
     let refundDetails = {
       refundId: null,
-      refundAmount: 0,
+      refundAmount: cashRefundAmt,
       refundStatus: 'NONE'
     };
 
-    const isSubscription = Boolean(booking.userSubscriptionId || booking.subscriptionCovered);
+    // Issue Razorpay partial refund strictly for cash paid to the customer's bank account
+    if (cashRefundAmt > 0 && booking.razorpayPaymentId) {
+      try {
+        const razorpay = getRazorpayInstance();
+        const refundResponse = await razorpay.payments.refund(booking.razorpayPaymentId, {
+          amount: Math.round(cashRefundAmt * 100), // in paise for Razorpay
+          notes: {
+            bookingId: String(booking.id),
+            reason: 'Customer Not Available / Doorstep Rejection (₹99 visit fee deducted)'
+          }
+        });
 
-    // 1. Physical online payment deduction:
-    // Deduct ₹99 technician dispatch fee; refund remaining if price > 99
-    if (booking.paymentStatus === 'PAID' && booking.razorpayPaymentId && booking.price > 0) {
-      const payableAmount = booking.price;
-      const refundAmt = Math.max(0, payableAmount - 99);
-
-      if (refundAmt > 0) {
-        try {
-          const razorpay = getRazorpayInstance();
-          const refundResponse = await razorpay.payments.refund(booking.razorpayPaymentId, {
-            amount: Math.round(refundAmt * 100),
-            notes: {
-              bookingId: booking.id,
-              reason: 'Customer Not Available / Doorstep Rejection (₹99 visit fee deducted)'
-            }
-          });
-
-          refundDetails = {
-            refundId: refundResponse.id,
-            refundAmount: refundAmt,
-            refundStatus: 'PROCESSED'
-          };
-        } catch (err) {
-          console.error('Razorpay refund error on doorstep rejection:', err);
-          refundDetails = {
-            refundId: null,
-            refundAmount: refundAmt,
-            refundStatus: 'FAILED'
-          };
-        }
-      } else {
+        refundDetails = {
+          refundId: refundResponse.id,
+          refundAmount: cashRefundAmt,
+          refundStatus: 'PROCESSED'
+        };
+      } catch (err) {
+        console.error('Razorpay partial refund error on doorstep rejection:', err);
         refundDetails = {
           refundId: null,
-          refundAmount: 0,
-          refundStatus: 'NONE'
+          refundAmount: cashRefundAmt,
+          refundStatus: 'FAILED'
         };
       }
     }
 
-    // 2. Reward points adjustment & reversal of points earned
+    // 2. Handle Loyalty Coins: Coins used are NEVER sent to bank! They are returned to user wallet balance.
+    let coinsRestored = 0;
+    let coinsDeducted = 0;
     const freshUserRejection = await prisma.user.findUnique({ where: { id: booking.userId } });
+
     if (freshUserRejection) {
-      let netPointsChange = 0;
-      // If customer paid through reward points: deduct 99 points doorstep visit fee, restore remaining points
       if (booking.pointsRedeemed > 0) {
-        const pointsRestored = Math.max(0, booking.pointsRedeemed - 99);
-        netPointsChange += pointsRestored;
+        if (remainingFeeInRupees > 0) {
+          // If cash was not enough to cover ₹99, deduct remaining fee from coins
+          const feeInCoins = Math.ceil(remainingFeeInRupees * ratio);
+          coinsDeducted = Math.min(booking.pointsRedeemed, feeInCoins);
+          coinsRestored = Math.max(0, booking.pointsRedeemed - feeInCoins);
+        } else {
+          // ₹99 fee was fully absorbed by online cash, so 100% of used coins are restored to user
+          coinsRestored = booking.pointsRedeemed;
+          coinsDeducted = 0;
+        }
       }
+
+      let netPointsChange = coinsRestored;
       // Revert reward points earned on successful payment if any
       if (booking.paymentStatus === 'PAID' && booking.pointsEarned > 0) {
         netPointsChange -= booking.pointsEarned;
       }
+
       if (netPointsChange !== 0) {
         await prisma.user.update({
           where: { id: booking.userId },
@@ -1490,7 +1530,7 @@ export const markDoorstepRejectionByAdmin = async (req, res) => {
         refundAmount: refundDetails.refundAmount,
         refundStatus: refundDetails.refundStatus
       },
-      include: { employee: true, user: true, washType: true, carType: true }
+      include: { employee: true, user: true, washType: true, carType: true, car: true, serviceArea: true, addons: { include: { addon: true } } }
     });
 
     // Notify customer via Web Push
@@ -1503,10 +1543,11 @@ export const markDoorstepRejectionByAdmin = async (req, res) => {
     }).catch(err => console.error('[Push Rejection Error]:', err));
 
     // Send Doorstep Rejection / Unavailability Notice Email with super CSS styling
-    if (booking.user?.email) {
+    const recipientEmail = booking.user?.email || freshUserRejection?.email;
+    if (recipientEmail) {
       sendDoorstepRejectionEmail({
-        to: booking.user.email,
-        name: booking.user.name,
+        to: recipientEmail,
+        name: booking.user?.name || freshUserRejection?.name,
         booking: updatedBooking,
         refundDetails,
         note

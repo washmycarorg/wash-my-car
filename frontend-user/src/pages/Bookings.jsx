@@ -571,11 +571,16 @@ const Bookings = () => {
                     <div style={{ background: '#DCFCE7', color: '#166534', padding: '0.65rem 0.85rem', borderRadius: '8px', fontSize: '0.82rem', lineHeight: 1.5 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}>
                         <CheckCircle size={15} color="#16A34A" />
-                        <span>Automatic Refund of <strong>₹{booking.refundAmount || booking.price}</strong> initiated via Razorpay</span>
+                        <span>Automatic {booking.doorstepFeeDeducted > 0 ? 'Partial ' : ''}Refund of <strong>₹{booking.refundAmount || booking.price}</strong> initiated via Razorpay to bank</span>
                       </div>
                       {booking.refundId && (
                         <div style={{ fontSize: '0.74rem', fontFamily: 'monospace', color: '#15803D', marginTop: '0.2rem' }}>
                           Refund ID: {booking.refundId}
+                        </div>
+                      )}
+                      {booking.pointsRedeemed > 0 && (
+                        <div style={{ fontSize: '0.76rem', color: '#14532D', marginTop: '0.25rem', fontWeight: 600 }}>
+                          🪙 Used loyalty coins ({booking.pointsRedeemed} coins) restored to your app wallet balance.
                         </div>
                       )}
                       <div style={{ marginTop: '0.45rem', fontSize: '0.8rem', color: '#14532D', background: '#F0FDF4', padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid #BBF7D0' }}>
@@ -1016,7 +1021,7 @@ const Bookings = () => {
               gap: '0.5rem'
             }}>
               <CheckCircle size={16} color="#16A34A" style={{ flexShrink: 0 }} />
-              <span><strong>9-Hour Full Refund Window Active:</strong> You are cancelling at least 9 hours before your slot time. A 100% full refund will be allocated. (Note: If not cancelled before 9 hours or if any doorstep rejection is found, no refund will be initiated).</span>
+              <span><strong>9-Hour Full Refund Window Active:</strong> You are cancelling at least 9 hours before your slot time. A 100% full refund will be allocated and an official cancellation & refund receipt will be sent to your email.</span>
             </div>
 
             {cancellingBooking.price > 0 && (
@@ -1131,7 +1136,7 @@ const Bookings = () => {
               gap: '0.5rem'
             }}>
               <CheckCircle size={16} color="#16A34A" style={{ flexShrink: 0 }} />
-              <span><strong>9-Hour Rescheduling Window Active:</strong> You are rescheduling at least 9 hours prior to slot time. Zero charges applied.</span>
+              <span><strong>9-Hour Rescheduling Window Active:</strong> You are rescheduling at least 9 hours prior to slot time. Zero charges applied. An updated booking pass will be dispatched to your email immediately.</span>
             </div>
 
             <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '0.75rem 1rem', marginBottom: '1rem', fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>

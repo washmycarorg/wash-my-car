@@ -281,20 +281,37 @@ export const createBooking = async (req, res) => {
       redeemPoints,
       customerPhone,
       alternatePhone,
+      customerEmail,
       addonIds = []
     } = req.body;
+
+    const currentUser = await prisma.user.findUnique({ where: { id: req.user.id } });
 
     // If customer provided mobile number and profile has no phone or invalid phone, update user profile
     if (customerPhone) {
       const cleanCustomerPhone = String(customerPhone).trim();
       if (cleanCustomerPhone.replace(/\D/g, '').length >= 10) {
         const formattedCustPhone = cleanCustomerPhone.startsWith('+91') ? cleanCustomerPhone : `+91${cleanCustomerPhone.replace(/\D/g, '').slice(-10)}`;
-        const currentUser = await prisma.user.findUnique({ where: { id: req.user.id } });
         if (currentUser && (!currentUser.phone || currentUser.phone.trim().length < 10)) {
           await prisma.user.update({
             where: { id: req.user.id },
             data: { phone: formattedCustPhone }
           }).catch(err => console.warn('Could not auto-update user phone:', err));
+          currentUser.phone = formattedCustPhone;
+        }
+      }
+    }
+
+    // If customer provided email and profile has no email, save it to user profile
+    if (customerEmail && String(customerEmail).trim()) {
+      const cleanEmail = String(customerEmail).trim().toLowerCase();
+      if (cleanEmail.includes('@') && cleanEmail.includes('.')) {
+        if (!currentUser?.email || currentUser.email.trim() === '') {
+          await prisma.user.update({
+            where: { id: req.user.id },
+            data: { email: cleanEmail }
+          }).catch(err => console.warn('Could not auto-update user email:', err));
+          if (currentUser) currentUser.email = cleanEmail;
         }
       }
     }
@@ -859,8 +876,11 @@ export const createBooking = async (req, res) => {
         },
         include: {
           addons: { include: { addon: true } },
+          car: true,
           carType: true,
-          washType: true
+          washType: true,
+          serviceArea: true,
+          user: true
         }
       });
 
@@ -909,18 +929,29 @@ export const createBooking = async (req, res) => {
               employeeId: chosenEmployee.id,
               status: 'ASSIGNED',
               employeePayout: calculatedPayout
+            },
+            include: {
+              addons: { include: { addon: true } },
+              car: true,
+              carType: true,
+              washType: true,
+              serviceArea: true,
+              user: true,
+              employee: true
             }
           });
           const confirmedBkg = updatedBooking;
-          if (user?.email) {
-            sendBookingConfirmationEmail({ to: user.email, name: user.name, booking: confirmedBkg }).catch(err => console.error('[Email Booking Confirmation error]:', err));
+          const userRecipientEmail = currentUser?.email || customerEmail || confirmedBkg.user?.email;
+          if (userRecipientEmail) {
+            sendBookingConfirmationEmail({ to: userRecipientEmail, name: currentUser?.name || confirmedBkg.user?.name, booking: confirmedBkg }).catch(err => console.error('[Email Booking Confirmation error]:', err));
           }
           return res.json({ requiresPayment: false, booking: confirmedBkg });
         }
       }
 
-      if (user?.email) {
-        sendBookingConfirmationEmail({ to: user.email, name: user.name, booking }).catch(err => console.error('[Email Booking Confirmation error]:', err));
+      const userRecipientEmail = currentUser?.email || customerEmail || booking.user?.email;
+      if (userRecipientEmail) {
+        sendBookingConfirmationEmail({ to: userRecipientEmail, name: currentUser?.name || booking.user?.name, booking }).catch(err => console.error('[Email Booking Confirmation error]:', err));
       }
       return res.json({ requiresPayment: false, booking });
     }
@@ -1002,7 +1033,10 @@ export const createBooking = async (req, res) => {
       include: {
         addons: { include: { addon: true } },
         washType: true,
-        carType: true
+        carType: true,
+        car: true,
+        serviceArea: true,
+        user: true
       }
     });
 
@@ -1188,13 +1222,16 @@ export const verifyBookingPayment = async (req, res) => {
         car: true,
         carType: true,
         washType: true,
-        employee: true
+        serviceArea: true,
+        employee: true,
+        user: true
       }
     });
 
     // Send Booking Confirmation Email with super CSS styling & booking details
-    if (user?.email) {
-      sendBookingConfirmationEmail({ to: user.email, name: user.name, booking: updatedBooking }).catch(err => console.error('[Email Booking Confirmation error]:', err));
+    const recipientEmail = user?.email || updatedBooking.user?.email;
+    if (recipientEmail) {
+      sendBookingConfirmationEmail({ to: recipientEmail, name: user?.name || updatedBooking.user?.name, booking: updatedBooking }).catch(err => console.error('[Email Booking Confirmation error]:', err));
     }
 
     res.json({ message: 'Payment verified and booking confirmed successfully', booking: updatedBooking });
@@ -1368,18 +1405,23 @@ export const cancelBooking = async (req, res) => {
         employee: true,
         car: true,
         washType: true,
-        carType: true
+        carType: true,
+        serviceArea: true,
+        addons: { include: { addon: true } },
+        user: true
       }
     });
 
     // Send Cancellation & Refund Email with super CSS styling to user
-    if (booking.user?.email) {
+    const recipientEmail = booking.user?.email || freshUser?.email;
+    if (recipientEmail) {
       sendBookingCancelledEmail({
-        to: booking.user.email,
-        name: booking.user.name,
+        to: recipientEmail,
+        name: booking.user?.name || freshUser?.name,
         booking: updatedBooking,
         refundDetails,
-        reason
+        reason,
+        cancelledBy: 'CUSTOMER'
       }).catch(err => console.error('[Email Cancel/Refund error]:', err));
     }
 
@@ -1482,7 +1524,10 @@ export const rescheduleBooking = async (req, res) => {
         employee: true,
         car: true,
         washType: true,
-        carType: true
+        carType: true,
+        serviceArea: true,
+        addons: { include: { addon: true } },
+        user: true
       }
     });
 

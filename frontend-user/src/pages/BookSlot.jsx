@@ -317,6 +317,7 @@ const BookSlot = () => {
   const [userSubscriptions, setUserSubscriptions] = useState([]);
   const [customerPrimaryPhone, setCustomerPrimaryPhone] = useState('');
   const [alternatePhone, setAlternatePhone] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
   const [phoneError, setPhoneError] = useState('');
 
   // Initial Data Fetch
@@ -345,6 +346,9 @@ const BookSlot = () => {
         setUserPoints(profileRes.points || 0);
         if (profileRes.phone) {
           setCustomerPrimaryPhone(profileRes.phone.replace(/^\+91/, '').trim());
+        }
+        if (profileRes.email) {
+          setCustomerEmail(profileRes.email.trim());
         }
       }
 
@@ -1410,7 +1414,8 @@ const BookSlot = () => {
         redeemPoints: redeemPoints,
         addonIds: selectedAddonIds,
         customerPhone: cleanPrimaryPhone,
-        alternatePhone: cleanAltPhone.length >= 10 ? cleanAltPhone : null
+        alternatePhone: cleanAltPhone.length >= 10 ? cleanAltPhone : null,
+        customerEmail: customerEmail.trim() || null
       };
 
       const res = await createBooking(payload);
@@ -1454,8 +1459,8 @@ const BookSlot = () => {
           order_id: orderId,
           prefill: {
             name: userProfile?.name || '',
-            email: userProfile?.email || '',
-            contact: userProfile?.phone || ''
+            email: customerEmail.trim() || userProfile?.email || '',
+            contact: cleanPrimaryPhone || userProfile?.phone || ''
           },
           theme: {
             color: '#0284C7'
@@ -5041,6 +5046,33 @@ const BookSlot = () => {
                   </div>
                   <small style={{ fontSize: '0.73rem', color: '#64748B', marginTop: '0.25rem', display: 'block' }}>
                     Technician will call this secondary contact if your primary phone is busy or has weak reception.
+                  </small>
+                </div>
+
+                {/* Email Address for Updates & Receipts */}
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>Email Address <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>(for booking & refund receipts)</span></span>
+                    {userProfile?.email ? (
+                      <span style={{ fontSize: '0.72rem', color: '#059669', background: '#ECFDF5', padding: '0.1rem 0.45rem', borderRadius: '6px', fontWeight: 700 }}>
+                        ✓ Account Email
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: '0.72rem', color: '#0284C7', background: '#E0F2FE', padding: '0.1rem 0.45rem', borderRadius: '6px', fontWeight: 700 }}>
+                        ✉️ Digital Receipt
+                      </span>
+                    )}
+                  </label>
+                  <input 
+                    type="email"
+                    className="form-input"
+                    style={{ width: '100%', fontWeight: 600, fontSize: '0.92rem' }}
+                    placeholder="Enter email (e.g. name@example.com)"
+                    value={customerEmail}
+                    onChange={e => setCustomerEmail(e.target.value)}
+                  />
+                  <small style={{ fontSize: '0.73rem', color: '#64748B', marginTop: '0.25rem', display: 'block' }}>
+                    You'll receive instant booking confirmations, reschedule notifications, and refund receipts here.
                   </small>
                 </div>
               </div>

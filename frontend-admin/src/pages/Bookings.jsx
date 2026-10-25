@@ -311,6 +311,7 @@ const Bookings = () => {
   const [editLongitude, setEditLongitude] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editAlternatePhone, setEditAlternatePhone] = useState('');
+  const [editEmail, setEditEmail] = useState('');
   const [editWashTypeId, setEditWashTypeId] = useState('');
   const [editServiceAreaId, setEditServiceAreaId] = useState('');
   const [editBookingLoading, setEditBookingLoading] = useState(false);
@@ -332,6 +333,7 @@ const Bookings = () => {
     setEditMapsUrl(b.latitude != null && b.longitude != null ? `https://www.google.com/maps/search/?api=1&query=${b.latitude},${b.longitude}` : '');
     setEditPhone(b.alternatePhone || b.user?.phone || '');
     setEditAlternatePhone(b.alternatePhone || '');
+    setEditEmail(b.user?.email || '');
     setEditWashTypeId(b.washTypeId || '');
     setEditServiceAreaId(b.serviceAreaId || '');
   };
@@ -407,6 +409,7 @@ const Bookings = () => {
         longitude: editLongitude !== '' ? parseFloat(editLongitude) : undefined,
         phone: editPhone.trim(),
         alternatePhone: editAlternatePhone.trim(),
+        email: editEmail.trim() || undefined,
         washTypeId: editWashTypeId ? Number(editWashTypeId) : undefined,
         serviceAreaId: editServiceAreaId ? Number(editServiceAreaId) : undefined
       };
@@ -2000,7 +2003,7 @@ const Bookings = () => {
             </div>
 
             <p style={{ color: '#475569', fontSize: '0.9rem', lineHeight: 1.5, margin: '0 0 1rem' }}>
-              Are you sure you want to cancel this booking for <strong>{adminCancelModal.user?.name || adminCancelModal.user?.phone}</strong> on <strong>{formatDateDMY(adminCancelModal.date)} ({adminCancelModal.timeSlot})</strong>?
+              Are you sure you want to cancel this booking for <strong>{adminCancelModal.user?.name || adminCancelModal.user?.phone}</strong> {adminCancelModal.user?.email && <span style={{ color: '#0284C7', fontSize: '0.82rem' }}>({adminCancelModal.user.email})</span>} on <strong>{formatDateDMY(adminCancelModal.date)} ({adminCancelModal.timeSlot})</strong>?
             </p>
 
             {adminCancelModal.price > 0 && (
@@ -2109,7 +2112,7 @@ const Bookings = () => {
             </div>
 
             <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '0.75rem 1rem', marginBottom: '1.1rem', fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-              <div><strong>Customer:</strong> {adminRescheduleModal.user?.name || 'Customer'} (+91 {adminRescheduleModal.user?.phone || 'N/A'})</div>
+              <div><strong>Customer:</strong> {adminRescheduleModal.user?.name || 'Customer'} (+91 {adminRescheduleModal.user?.phone || 'N/A'}) {adminRescheduleModal.user?.email && <span style={{ color: '#0369A1' }}>&bull; {adminRescheduleModal.user.email}</span>}</div>
               <div><strong>Vehicle:</strong> {adminRescheduleModal.carMake} {adminRescheduleModal.carModel} {adminRescheduleModal.carNumber && `(${adminRescheduleModal.carNumber})`}</div>
               <div><strong>Current Slot:</strong> {formatDateDMY(adminRescheduleModal.date)} &bull; {adminRescheduleModal.timeSlot}</div>
               {adminRescheduleModal.employee && (
@@ -2257,7 +2260,7 @@ const Bookings = () => {
             </div>
 
             <p style={{ color: '#475569', fontSize: '0.88rem', lineHeight: 1.5, margin: '0 0 1rem' }}>
-              Mark this service as <strong>Customer Not Available / Doorstep Rejection</strong> for <strong>{adminDoorstepModal.user?.name || 'Customer'}</strong> ({adminDoorstepModal.carMake} {adminDoorstepModal.carModel}).
+              Mark this service as <strong>Customer Not Available / Doorstep Rejection</strong> for <strong>{adminDoorstepModal.user?.name || 'Customer'}</strong> {adminDoorstepModal.user?.email && <span style={{ color: '#C2410C', fontSize: '0.82rem' }}>({adminDoorstepModal.user.email})</span>} ({adminDoorstepModal.carMake} {adminDoorstepModal.carModel}).
             </p>
 
             <div style={{
@@ -2274,9 +2277,9 @@ const Bookings = () => {
                 ⚖️ Doorstep Rejection & ₹99 Deduction Policy:
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                <div>• <strong>Physical Payment:</strong> ₹99 technician visit/dispatch fee will be deducted; {adminDoorstepModal.price > 99 ? `remaining ₹${adminDoorstepModal.price - 99} will be refunded via Razorpay.` : 'no refund as booking price is <= ₹99.'}</div>
-                <div>• <strong>Reward Coins:</strong> If paid by points, 99 points will be deducted and remaining restored.</div>
-                <div>• <strong>Subscription VIP Pass:</strong> 1 subscription wash limit will be deducted with zero refund or compensation.</div>
+                <div>• <strong>Online Paid Cash (Razorpay):</strong> ₹99 technician dispatch fee is deducted from paid cash; {adminDoorstepModal.price > 99 ? `remaining ₹${adminDoorstepModal.price - 99} is partially refunded to the customer's bank account via Razorpay.` : 'no cash refund as online paid amount is <= ₹99.'}</div>
+                <div>• <strong>Loyalty Coins (App Wallet):</strong> Redeemed reward coins are restored to the customer\'s app wallet balance (coins are NEVER sent as cash to the bank). If cash was less than ₹99, remaining fee is deducted in coins.</div>
+                <div>• <strong>Subscription VIP Pass:</strong> 1 subscription wash limit is deducted with zero refund or compensation.</div>
               </div>
             </div>
 
@@ -2453,6 +2456,17 @@ const Bookings = () => {
                       placeholder="Secondary contact for technician"
                       value={editAlternatePhone}
                       onChange={e => setEditAlternatePhone(e.target.value)}
+                      style={{ marginTop: '0.2rem' }}
+                    />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 600 }}>Customer Email (Receipts & Notifications)</label>
+                    <input
+                      type="email"
+                      className="form-input"
+                      placeholder="e.g. customer@example.com"
+                      value={editEmail}
+                      onChange={e => setEditEmail(e.target.value)}
                       style={{ marginTop: '0.2rem' }}
                     />
                   </div>
