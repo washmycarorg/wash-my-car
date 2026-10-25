@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } f
 import { LayoutDashboard, Users, Calendar, Settings, Bell, Search, DollarSign, Briefcase, FileText, Tag, Menu, X, MapPin, Package, Globe, MessageSquare, Compass, Crown, UserCheck } from 'lucide-react';
 import { loginAdmin, getStats, getEmployees, toggleEmployeeStatus, updateEmployee, getServiceAreas } from './api';
 
+import Dashboard from './pages/Dashboard';
 import Bookings from './pages/Bookings';
 import Financials from './pages/Financials';
 import LeaveApprovals from './pages/LeaveApprovals';
@@ -227,86 +228,7 @@ const AdminLogin = ({ setAuth }) => {
   );
 };
 
-const Dashboard = () => {
-  const [stats, setStats] = useState(null);
-  useEffect(() => { getStats().then(setStats).catch(console.error); }, []);
 
-  return (
-    <AdminLayout title="Overview Dashboard">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="card" style={{borderTop: '4px solid var(--primary-blue)'}}>
-           <div className="flex justify-between items-center mb-4">
-             <p className="text-muted text-sm font-semibold uppercase">Total Revenue</p>
-             <div style={{background: 'var(--accent-teal-light)', color: 'var(--accent-teal)', padding: '0.5rem', borderRadius: '50%'}}>
-               <DollarSign size={20} />
-             </div>
-           </div>
-           <h1>₹{stats?.totalRevenue || 0}</h1>
-           <p className="text-sm text-success flex items-center gap-1 mt-2">↑ 12% from last month</p>
-        </div>
-        
-        <div className="card" style={{borderTop: '4px solid var(--accent-teal)'}}>
-           <div className="flex justify-between items-center mb-4">
-             <p className="text-muted text-sm font-semibold uppercase">Active Bookings</p>
-             <div style={{background: '#E0E7FF', color: '#4F46E5', padding: '0.5rem', borderRadius: '50%'}}>
-               <Calendar size={20} />
-             </div>
-           </div>
-           <h1>{stats?.activeBookings || 0}</h1>
-           <p className="text-sm text-success flex items-center gap-1 mt-2">Needs Assignment</p>
-        </div>
-        
-        <div className="card" style={{borderTop: '4px solid var(--success)'}}>
-           <div className="flex justify-between items-center mb-4">
-             <p className="text-muted text-sm font-semibold uppercase">Employees Online</p>
-             <div style={{background: '#D1FAE5', color: '#059669', padding: '0.5rem', borderRadius: '50%'}}>
-               <Users size={20} />
-             </div>
-           </div>
-           <h1>{stats?.employeesOnline || 0}</h1>
-           <p className="text-sm text-muted mt-2">Available for duty</p>
-        </div>
-        
-        <div className="card" style={{borderTop: '4px solid var(--warning)'}}>
-           <div className="flex justify-between items-center mb-4">
-             <p className="text-muted text-sm font-semibold uppercase">Customer Satisfaction</p>
-             <div style={{background: '#FEF3C7', color: '#D97706', padding: '0.5rem', borderRadius: '50%'}}>
-               <Search size={20} />
-             </div>
-           </div>
-           <h1>4.8<span style={{fontSize: '1.25rem', color: 'var(--text-muted)'}}>/5</span></h1>
-           <p className="text-sm text-success mt-2">↑ 0.2 from last week</p>
-        </div>
-      </div>
-      
-      {/* Placeholder for charts or recent activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="card lg:col-span-2">
-          <h3>Revenue Overview</h3>
-          <div style={{height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F8FAFC', borderRadius: '0.5rem', marginTop: '1rem', border: '1px dashed #CBD5E1'}}>
-            <p className="text-muted">Chart visualization goes here</p>
-          </div>
-        </div>
-        <div className="card">
-          <h3>Recent Activity</h3>
-          <div className="flex-col gap-4 mt-4" style={{display: 'flex'}}>
-            {[1,2,3,4].map(i => (
-              <div key={i} className="flex gap-3 items-start pb-4 border-b border-gray-100 last:border-0 last:pb-0">
-                <div style={{width: 32, height: 32, borderRadius: '50%', background: 'var(--accent-teal-light)', color: 'var(--accent-teal)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0}}>
-                  <Bell size={16} />
-                </div>
-                <div>
-                  <p style={{fontWeight: 500, fontSize: '0.9rem'}}>New booking received</p>
-                  <p className="text-muted text-sm">2 minutes ago</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </AdminLayout>
-  );
-};
 
 const EmployeeManagement = () => {
   const [employees, setEmployees] = useState([]);
@@ -719,7 +641,7 @@ const App = () => {
     <Router>
       <Routes>
         <Route path="/" element={auth ? <Navigate to="/dashboard"/> : <AdminLogin setAuth={setAuth} />} />
-        <Route path="/dashboard" element={<ProtectedAdminRoute><Dashboard /></ProtectedAdminRoute>} />
+        <Route path="/dashboard" element={<ProtectedAdminRoute><AdminLayout title="Overview Dashboard"><Dashboard /></AdminLayout></ProtectedAdminRoute>} />
         <Route path="/employees" element={<ProtectedAdminRoute><EmployeeManagement /></ProtectedAdminRoute>} />
         <Route path="/users" element={<ProtectedAdminRoute><AdminLayout title="Users & Customer Directory"><UsersDirectory /></AdminLayout></ProtectedAdminRoute>} />
         <Route path="/bookings" element={<ProtectedAdminRoute><AdminLayout title="Slots Details & Assignment"><Bookings /></AdminLayout></ProtectedAdminRoute>} />

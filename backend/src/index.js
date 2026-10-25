@@ -26,8 +26,13 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin(origin, callback) {
-    // Allow requests without an Origin header, such as server-to-server calls.
-    if (!origin || allowedOrigins.includes(origin)) {
+    // Allow requests without an Origin header, such as server-to-server calls, and local development
+    if (
+      !origin || 
+      allowedOrigins.includes(origin) || 
+      origin.startsWith('http://localhost:') || 
+      origin.startsWith('http://127.0.0.1:')
+    ) {
       return callback(null, true);
     }
 
