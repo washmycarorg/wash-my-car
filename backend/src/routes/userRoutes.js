@@ -35,7 +35,7 @@ import {
 } from '../controllers/userController.js';
 
 import { submitInquiry } from '../controllers/inquiryController.js';
-import { getAvailableBookingSlots } from '../controllers/slotController.js';
+import { getAvailableBookingSlots, joinSlotQueue } from '../controllers/slotController.js';
 
 const router = express.Router();
 
@@ -54,6 +54,8 @@ router.get('/subscriptions/plans', getUserSubscriptionPlans);
 router.post('/resolve-maps-url', resolveMapsUrl);
 
 router.use(verifyToken);
+
+router.post('/slots/queue', joinSlotQueue);
 
 // User subscriptions
 router.get('/subscriptions/my', getMySubscriptions);

@@ -610,6 +610,26 @@ export const updateSlotsConfig = async (data) => {
   return res.json();
 };
 
+export const releaseWeekSlots = async (weekStartDate) => {
+  const res = await fetch(`${API_URL}/admin/slots/release-week`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ weekStartDate })
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const releaseMonthSlots = async (month) => {
+  const res = await fetch(`${API_URL}/admin/slots/release-month`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ month })
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
 // Subscriptions Management
 export const getSubscriptionPlans = async () => {
   const res = await fetch(`${API_URL}/admin/subscriptions/plans`, { headers: getHeaders() });

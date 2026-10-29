@@ -5,7 +5,7 @@ import {
   Search, Compass, AlertCircle, Tag, Sparkles, Plus, Check,
   Shield, Bike, Droplets, Feather, Flame, Info, ArrowRight,
   ArrowLeft, ArrowDown, X, Gift, CheckSquare, Square, ChevronRight, ChevronLeft, ChevronDown, HelpCircle,
-  Clock, Users, Navigation, CalendarX, Crown, RefreshCw, ShieldCheck, Phone
+  Clock, Users, Navigation, CalendarX, Crown, RefreshCw, ShieldCheck, Phone, Lock, ShieldAlert, Hourglass
 } from 'lucide-react';
 import { loadGoogleMaps } from '../utils/googleMapsLoader';
 import { 
@@ -23,6 +23,7 @@ import {
   getProfile,
   getAddons,
   getAvailableSlots,
+  joinSlotQueue,
   getMySubscriptions,
   resolveMapsUrl
 } from '../api';
@@ -304,6 +305,7 @@ const BookSlot = () => {
   const [timeSlot, setTimeSlot] = useState('10:00 AM');
   const [availableSlotsList, setAvailableSlotsList] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
+  const [isDateReleased, setIsDateReleased] = useState(true);
   const [dispatchCapacity, setDispatchCapacity] = useState(1);
   const [slotNotice, setSlotNotice] = useState('');
   const [selectedCouponCode, setSelectedCouponCode] = useState('');
@@ -311,6 +313,7 @@ const BookSlot = () => {
   const [couponError, setCouponError] = useState('');
   const [loadingCoupons, setLoadingCoupons] = useState(false);
   const [infoModalCoupon, setInfoModalCoupon] = useState(null);
+  const [lockedSlotModal, setLockedSlotModal] = useState(null);
   const [redeemPoints, setRedeemPoints] = useState(false);
   const [loading, setLoading] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(null);
@@ -386,12 +389,20 @@ const BookSlot = () => {
     }).catch(err => console.error('Error fetching dynamic lists:', err));
   }, []);
 
+
   // Fetch dynamically configured slots & distance validation
-  const refreshSlots = (targetDate = date, targetAreaId = selectedServiceAreaId, targetAddress = address) => {
+  const refreshSlots = (targetDate = date, targetAreaId = selectedServiceAreaId, targetAddress = address, silent = false) => {
     if (!targetDate) return Promise.resolve();
-    setLoadingSlots(true);
+    if (!silent) setLoadingSlots(true);
     return getAvailableSlots(targetDate, targetAreaId, targetAddress)
       .then(res => {
+        if (res && res.isReleased === false) {
+          setIsDateReleased(false);
+          setAvailableSlotsList([]);
+          setTimeSlot('');
+          return;
+        }
+        setIsDateReleased(true);
         if (res && Array.isArray(res.slots)) {
           setAvailableSlotsList(res.slots);
           if (res.activeWorkers !== undefined) {
@@ -400,9 +411,9 @@ const BookSlot = () => {
           if (res.targetZone) {
             setSlotNotice(`Assigned Service Hub: ${res.targetZone}`);
           }
-          const currentIsAvailable = res.slots.some(s => s.slot === timeSlot && s.available);
+          const currentIsAvailable = res.slots.some(s => s.slot === timeSlot && (s.available || s.isLockedByYou));
           if (!currentIsAvailable) {
-            const firstAvail = res.slots.find(s => s.available);
+            const firstAvail = res.slots.find(s => s.available || s.isLockedByYou);
             if (firstAvail) {
               setTimeSlot(firstAvail.slot);
             } else {
@@ -414,19 +425,27 @@ const BookSlot = () => {
           setTimeSlot('');
         }
       })
-      .catch(err => {
-        console.warn('Failed to load available slots:', err);
+      .catch(() => {
         setAvailableSlotsList([]);
         setTimeSlot('');
       })
       .finally(() => {
-        setLoadingSlots(false);
+        if (!silent) setLoadingSlots(false);
       });
   };
 
   useEffect(() => {
     refreshSlots();
   }, [date, selectedServiceAreaId, address, currentStep]);
+
+  // Live polling while on Step 6 (Slot Selection & Checkout) to reflect real-time locks and queue updates
+  useEffect(() => {
+    if (currentStep !== 6) return;
+    const interval = setInterval(() => {
+      refreshSlots(date, selectedServiceAreaId, address, true);
+    }, 7000);
+    return () => clearInterval(interval);
+  }, [currentStep, date, selectedServiceAreaId, address, timeSlot]);
 
   // Sync saved car selection
   useEffect(() => {
@@ -1518,8 +1537,8 @@ const BookSlot = () => {
       console.error(err);
       const errMsg = err.message || 'Please check your inputs';
       if (errMsg.toLowerCase().includes('reserved') || errMsg.toLowerCase().includes('locked') || errMsg.toLowerCase().includes('conflict')) {
-        alert('⚠️ Slot Concurrency Notice: ' + errMsg + '\nRefreshing available slots for you...');
-        refreshSlots();
+        setLockedSlotModal({ slot: timeSlot });
+        refreshSlots(date, selectedServiceAreaId, address, true);
       } else {
         alert('Failed to place booking: ' + errMsg);
       }
@@ -4147,7 +4166,18 @@ const BookSlot = () => {
               {/* Responsive Slot Selection Grid */}
               {loadingSlots ? (
                 <div style={{ padding: '2rem 1rem', textAlign: 'center', background: '#F8FAFC', borderRadius: '14px', border: '1.5px dashed #CBD5E1', color: 'var(--primary-blue)', fontSize: '0.88rem', fontWeight: 700 }}>
+                  <RefreshCw size={20} className="animate-spin" style={{ margin: '0 auto 0.5rem', display: 'block' }} />
                   Loading approved arrival windows for {date}...
+                </div>
+              ) : !isDateReleased ? (
+                <div style={{ padding: '1.75rem', textAlign: 'center', background: '#FFFBEB', borderRadius: '14px', border: '1.5px solid #FCD34D', color: '#92400E' }}>
+                  <CalendarX size={28} color="#D97706" style={{ margin: '0 auto 0.5rem', display: 'block' }} />
+                  <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: '0.25rem' }}>
+                    Date Not Yet Released by Administration
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: '#B45309', maxWidth: '480px', margin: '0 auto' }}>
+                    Doorstep arrival slots for <strong>{formatSelectedDate(date)}</strong> are not yet released by administration. Please select another approved date above.
+                  </div>
                 </div>
               ) : availableSlotsList.length === 0 ? (
                 <div style={{ padding: '1.5rem', textAlign: 'center', background: '#FEF2F2', borderRadius: '14px', border: '1.5px solid #FCA5A5', color: '#991B1B', fontSize: '0.88rem', fontWeight: 600 }}>
@@ -4155,103 +4185,174 @@ const BookSlot = () => {
                   No approved arrival windows configured by admin for this date. Please select another date.
                 </div>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.75rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.85rem' }}>
                   {availableSlotsList.map(item => {
                     const isSelected = timeSlot === item.slot;
                     const isAvail = item.available;
+                    const isLockedByMe = item.isLockedByYou;
+                    const isLockedOther = item.status === 'LOCKED' && !isLockedByMe;
+                    const isBooked = item.status === 'BOOKED';
+                    const isDistanceBlocked = item.status === 'DISTANCE_CONFLICT';
+
+                    let cardBorder = isSelected 
+                      ? '2px solid var(--primary-blue)' 
+                      : isLockedByMe
+                        ? '2px solid #0284C7'
+                        : isLockedOther
+                          ? '1.5px solid #FCD34D'
+                          : isAvail 
+                            ? '1.5px solid #E2E8F0' 
+                            : '1px solid #E2E8F0';
+
+                    let cardBg = isSelected 
+                      ? '#F0F9FF' 
+                      : isLockedByMe
+                        ? '#EFF6FF'
+                        : isLockedOther
+                          ? '#FFFDF5'
+                          : isAvail 
+                            ? '#FFFFFF' 
+                            : '#F8FAFC';
 
                     return (
                       <div
-                        key={item.slot}
+                        key={item.slotId || item.slot}
                         title={item.reason || ''}
                         onClick={() => {
-                          if (isAvail) {
+                          if (isAvail || isLockedByMe) {
                             setTimeSlot(item.slot);
+                          } else if (isLockedOther) {
+                            setLockedSlotModal({ slot: item.slot, slotId: item.slotId });
                           } else {
                             alert(item.reason || 'This arrival window is currently unavailable. Please choose an available window.');
                           }
                         }}
                         style={{
-                          padding: '0.85rem 1rem',
+                          padding: '0.9rem 1.1rem',
                           borderRadius: '14px',
-                          border: isSelected 
-                            ? '2px solid var(--primary-blue)' 
-                            : isAvail 
-                              ? '1.5px solid #E2E8F0' 
-                              : '1px solid #E2E8F0',
-                          background: isSelected 
-                            ? '#F0F9FF' 
-                            : isAvail 
-                              ? '#FFFFFF' 
-                              : '#F8FAFC',
+                          border: cardBorder,
+                          background: cardBg,
                           boxShadow: isSelected ? '0 4px 14px rgba(2, 132, 199, 0.18)' : '0 1px 3px rgba(0,0,0,0.03)',
-                          cursor: isAvail ? 'pointer' : 'not-allowed',
-                          opacity: isAvail ? 1 : 0.65,
+                          cursor: (isAvail || isLockedByMe) ? 'pointer' : isLockedOther ? 'pointer' : 'not-allowed',
+                          opacity: (isAvail || isLockedByMe || isLockedOther) ? 1 : 0.65,
                           transition: 'all 0.18s ease',
                           display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '0.65rem'
+                          flexDirection: 'column',
+                          gap: '0.5rem'
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', minWidth: 0 }}>
-                          <div style={{
-                            width: '32px',
-                            height: '32px',
-                            borderRadius: '8px',
-                            background: isSelected ? 'var(--primary-blue)' : isAvail ? '#E0F2FE' : '#E2E8F0',
-                            color: isSelected ? '#FFFFFF' : isAvail ? 'var(--primary-blue)' : '#94A3B8',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0
-                          }}>
-                            <Clock size={16} />
-                          </div>
-                          <div style={{ minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
                             <div style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '8px',
+                              background: isSelected 
+                                ? 'var(--primary-blue)' 
+                                : isLockedByMe
+                                  ? '#0284C7'
+                                  : isLockedOther
+                                    ? '#FEF3C7'
+                                    : isAvail 
+                                      ? '#E0F2FE' 
+                                      : '#E2E8F0',
+                              color: isSelected || isLockedByMe 
+                                ? '#FFFFFF' 
+                                : isLockedOther
+                                  ? '#D97706'
+                                  : isAvail 
+                                    ? 'var(--primary-blue)' 
+                                    : '#94A3B8',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0
+                            }}>
+                              {isLockedOther ? <CreditCard size={16} /> : isLockedByMe ? <Lock size={16} /> : <Clock size={16} />}
+                            </div>
+
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{
+                                fontWeight: 800,
+                                fontSize: '0.92rem',
+                                color: isSelected 
+                                  ? '#0369A1' 
+                                  : isLockedOther
+                                    ? '#92400E'
+                                    : isAvail 
+                                      ? 'var(--primary-navy)' 
+                                      : '#64748B',
+                                letterSpacing: '0.01em',
+                                whiteSpace: 'nowrap'
+                              }}>
+                                {item.slot}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Unique Slot ID Badge */}
+                          {item.slotId && (
+                            <span style={{
+                              fontFamily: 'monospace',
+                              fontSize: '0.68rem',
                               fontWeight: 800,
-                              fontSize: '0.9rem',
-                              color: isSelected ? '#0369A1' : isAvail ? 'var(--primary-navy)' : '#64748B',
-                              letterSpacing: '0.01em',
-                              whiteSpace: 'nowrap'
+                              color: isLockedOther ? '#B45309' : isAvail ? '#0369A1' : '#64748B',
+                              background: isLockedOther ? '#FEF3C7' : isAvail ? '#EFF6FF' : '#F1F5F9',
+                              border: isLockedOther ? '1px solid #FDE68A' : isAvail ? '1px solid #BFDBFE' : '1px solid #E2E8F0',
+                              padding: '0.15rem 0.45rem',
+                              borderRadius: '6px',
+                              flexShrink: 0
                             }}>
-                              {item.slot}
-                            </div>
-                            <div style={{
-                              fontSize: '0.74rem',
-                              color: isAvail ? '#16A34A' : '#DC2626',
-                              fontWeight: 700,
-                              marginTop: '0.1rem',
-                              textOverflow: 'ellipsis',
-                              overflow: 'hidden',
-                              whiteSpace: 'nowrap'
-                            }}>
-                              {isAvail 
-                                ? '✓ Available Window' 
-                                : (item.reason?.includes('passed') 
-                                    ? '⏳ Window Passed' 
-                                    : item.reason?.includes('progress') 
-                                      ? '⏳ In Progress' 
-                                      : item.reason?.includes('away') || item.reason?.includes('reach') || item.reason?.includes('Technician')
-                                        ? '🚫 Location Conflict'
-                                        : '🚫 Booked')}
-                            </div>
-                          </div>
+                              {item.slotId}
+                            </span>
+                          )}
                         </div>
 
-                        <div style={{
-                          width: '22px',
-                          height: '22px',
-                          borderRadius: '50%',
-                          border: isSelected ? 'none' : '2px solid #CBD5E1',
-                          background: isSelected ? 'var(--primary-blue)' : '#FFFFFF',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0
-                        }}>
-                          {isSelected && <Check size={13} color="#FFFFFF" strokeWidth={3} />}
+                        {/* Status Label */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(0,0,0,0.05)', paddingTop: '0.45rem', fontSize: '0.74rem' }}>
+                          {isLockedByMe ? (
+                            <span style={{ color: '#0284C7', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                              <Lock size={12} /> Locked for Your Checkout
+                            </span>
+                          ) : isLockedOther ? (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '0.4rem' }}>
+                              <span style={{ color: '#B45309', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                                <CreditCard size={12} color="#D97706" />
+                                <span>Proceeding to Payment Gateway...</span>
+                              </span>
+                              <span style={{ fontSize: '0.68rem', color: '#92400E', background: '#FEF3C7', padding: '0.15rem 0.5rem', borderRadius: '4px', border: '1px solid #FDE68A', fontWeight: 700 }}>
+                                Temporarily Held
+                              </span>
+                            </div>
+                          ) : isBooked ? (
+                            <span style={{ color: '#64748B', fontWeight: 700 }}>
+                              🚫 Booked & Confirmed
+                            </span>
+                          ) : isDistanceBlocked ? (
+                            <span style={{ color: '#DC2626', fontWeight: 700 }}>
+                              🚫 Beyond Transit Radius
+                            </span>
+                          ) : (
+                            <span style={{ color: '#16A34A', fontWeight: 800 }}>
+                              ✓ Available Window
+                            </span>
+                          )}
+
+                          {(isAvail || isLockedByMe) && (
+                            <div style={{
+                              width: '20px',
+                              height: '20px',
+                              borderRadius: '50%',
+                              border: isSelected ? 'none' : '2px solid #CBD5E1',
+                              background: isSelected ? 'var(--primary-blue)' : '#FFFFFF',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0
+                            }}>
+                              {isSelected && <Check size={12} color="#FFFFFF" strokeWidth={3} />}
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -4259,12 +4360,63 @@ const BookSlot = () => {
                 </div>
               )}
 
-              {!loadingSlots && availableSlotsList.length > 0 && !availableSlotsList.some(s => s.available) && (
-                <div style={{ marginTop: '0.85rem', padding: '0.75rem 1rem', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '10px', color: '#991B1B', fontSize: '0.84rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <AlertCircle size={16} color="#DC2626" style={{ flexShrink: 0 }} />
-                  <span>All arrival windows for {date === getTodayDateString() ? 'today have passed or are fully booked' : 'this date are currently unavailable'}. Please choose tomorrow or an upcoming date to schedule your wash!</span>
+              {/* Informative Payment Gateway Active Notice with Warning & Actions */}
+              {!loadingSlots && availableSlotsList.some(s => s.status === 'LOCKED' && !s.isLockedByYou) && (
+                <div style={{ marginTop: '0.85rem', padding: '0.85rem 1rem', background: '#FFFDF5', border: '1.5px solid #FCD34D', borderRadius: '12px', color: '#92400E', fontSize: '0.82rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', flex: 1, minWidth: '220px' }}>
+                    <AlertCircle size={18} color="#D97706" style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <div>
+                      <div style={{ fontWeight: 800, color: '#B45309' }}>
+                        ⚠️ Warning: Do NOT refresh or close this page!
+                      </div>
+                      <div style={{ fontSize: '0.76rem', color: '#78350F', marginTop: '2px', lineHeight: 1.4 }}>
+                        A customer is currently proceeding to the payment gateway. You can cancel and choose another available slot window below.
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const firstAvail = availableSlotsList.find(s => s.available && s.slot !== timeSlot);
+                        if (firstAvail) setTimeSlot(firstAvail.slot);
+                      }}
+                      className="btn btn-primary"
+                      style={{
+                        padding: '0.4rem 0.85rem',
+                        fontSize: '0.76rem',
+                        fontWeight: 800,
+                        borderRadius: '8px'
+                      }}
+                    >
+                      Choose Another Slot
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTimeSlot('')}
+                      className="btn btn-outline"
+                      style={{
+                        padding: '0.4rem 0.75rem',
+                        fontSize: '0.76rem',
+                        fontWeight: 700,
+                        borderRadius: '8px',
+                        borderColor: '#CBD5E1',
+                        color: '#475569'
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               )}
+
+              {!loadingSlots && availableSlotsList.length > 0 && !availableSlotsList.some(s => s.available || s.isLockedByYou) && (
+                <div style={{ marginTop: '0.85rem', padding: '0.75rem 1rem', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '10px', color: '#991B1B', fontSize: '0.84rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <AlertCircle size={16} color="#DC2626" style={{ flexShrink: 0 }} />
+                  <span>All arrival windows for this date are currently reserved or unavailable. Please choose another upcoming date to schedule your wash!</span>
+                </div>
+              )}
+
 
               {/* Informative Service Window Banner */}
               {timeSlot && availableSlotsList.some(s => s.slot === timeSlot && s.available) && (
@@ -5332,7 +5484,7 @@ const BookSlot = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || !isDateReleased || (availableSlotsList.length > 0 && !availableSlotsList.some(s => s.slot === timeSlot && (s.available || s.isLockedByYou)))}
                   className="btn btn-primary"
                   style={{
                     flex: 1,
@@ -5340,6 +5492,8 @@ const BookSlot = () => {
                     padding: '0.85rem',
                     fontSize: '1.05rem',
                     fontWeight: 800,
+                    opacity: (!isDateReleased || (availableSlotsList.length > 0 && !availableSlotsList.some(s => s.slot === timeSlot && (s.available || s.isLockedByYou)))) ? 0.6 : 1,
+                    cursor: (!isDateReleased || (availableSlotsList.length > 0 && !availableSlotsList.some(s => s.slot === timeSlot && (s.available || s.isLockedByYou)))) ? 'not-allowed' : 'pointer',
                     background: (finalPayable === 0 && (isWashCoveredBySub || totalVipAddonSavings > 0))
                       ? 'linear-gradient(135deg, #D97706 0%, #B45309 100%)'
                       : 'linear-gradient(135deg, #0284C7 0%, #06B6D4 100%)',
@@ -5350,11 +5504,13 @@ const BookSlot = () => {
                 >
                   {loading 
                     ? 'Processing Booking...' 
-                    : (finalPayable === 0 && (isWashCoveredBySub || totalVipAddonSavings > 0))
-                      ? '👑 Confirm VIP Booking (₹0 - Direct Slot Booking)'
-                      : finalPayable === 0 
-                        ? 'Confirm Booking (₹0)' 
-                        : `Pay & Confirm Booking (₹${finalPayable})`}
+                    : !isDateReleased
+                      ? '⚠️ Date Not Approved by Admin'
+                      : (finalPayable === 0 && (isWashCoveredBySub || totalVipAddonSavings > 0))
+                        ? '👑 Confirm VIP Booking (₹0 - Direct Slot Booking)'
+                        : finalPayable === 0 
+                          ? 'Confirm Booking (₹0)' 
+                          : `Pay & Confirm Booking (₹${finalPayable})`}
                 </button>
               </div>
             </div>
@@ -5572,6 +5728,121 @@ const BookSlot = () => {
                   Apply This Offer
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal for Slot In Payment Gateway: Warning + Cancel & Choose Another Slot */}
+      {lockedSlotModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.72)',
+          backdropFilter: 'blur(5px)',
+          zIndex: 99999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1.25rem'
+        }}>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: '20px',
+            maxWidth: '460px',
+            width: '100%',
+            padding: '2rem 1.75rem',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            textAlign: 'center',
+            border: '1.5px solid #FCD34D'
+          }}>
+            <div style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '50%',
+              background: '#FEF3C7',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1rem'
+            }}>
+              <CreditCard size={28} color="#D97706" />
+            </div>
+
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0F172A', margin: '0 0 0.4rem' }}>
+              Proceeding to Payment Gateway
+            </h3>
+
+            <p style={{ color: '#64748B', fontSize: '0.88rem', margin: '0 0 1.25rem', lineHeight: 1.5 }}>
+              Another customer is currently on the payment gateway for <strong>{lockedSlotModal.slot || timeSlot}</strong>.
+            </p>
+
+            {/* Warning Box */}
+            <div style={{
+              background: 'linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 100%)',
+              border: '1.5px solid #FCA5A5',
+              borderRadius: '12px',
+              padding: '0.9rem 1rem',
+              marginBottom: '1.5rem',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '0.65rem',
+              textAlign: 'left'
+            }}>
+              <AlertCircle size={22} color="#DC2626" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <div>
+                <div style={{ fontSize: '0.84rem', color: '#991B1B', fontWeight: 800 }}>
+                  ⚠️ WARNING: DO NOT REFRESH OR CLOSE THIS PAGE!
+                </div>
+                <div style={{ fontSize: '0.76rem', color: '#B91C1C', marginTop: '0.2rem', lineHeight: 1.4 }}>
+                  Do not reload or close your browser tab. Please choose another available slot or cancel.
+                </div>
+              </div>
+            </div>
+
+            {/* Actions: Cancel & Choose Another Slot */}
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setLockedSlotModal(null);
+                  const firstAvail = availableSlotsList.find(s => s.available && s.slot !== (lockedSlotModal.slot || timeSlot));
+                  if (firstAvail) {
+                    setTimeSlot(firstAvail.slot);
+                  } else {
+                    setTimeSlot('');
+                  }
+                  refreshSlots(date, selectedServiceAreaId, address, true);
+                }}
+                className="btn btn-primary"
+                style={{
+                  flex: 1,
+                  padding: '0.75rem 1rem',
+                  borderRadius: '12px',
+                  fontSize: '0.88rem',
+                  fontWeight: 800
+                }}
+              >
+                Choose Another Slot
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setLockedSlotModal(null);
+                }}
+                className="btn btn-outline"
+                style={{
+                  padding: '0.75rem 1.25rem',
+                  borderRadius: '12px',
+                  fontSize: '0.88rem',
+                  fontWeight: 700,
+                  borderColor: '#CBD5E1',
+                  color: '#475569'
+                }}
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>

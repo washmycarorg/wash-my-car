@@ -473,7 +473,19 @@ export const getAvailableSlots = async (date, serviceAreaId, address = '', zone 
   if (address) params.append('address', address);
   if (zone) params.append('zone', zone);
   
-  const res = await fetch(`${API_URL}/users/available-slots?${params.toString()}`);
+  const token = localStorage.getItem('userToken');
+  const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+  const res = await fetch(`${API_URL}/users/available-slots?${params.toString()}`, { headers });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const joinSlotQueue = async (slotId) => {
+  const res = await fetch(`${API_URL}/users/slots/queue`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ slotId })
+  });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 };

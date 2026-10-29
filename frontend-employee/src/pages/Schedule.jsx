@@ -559,6 +559,11 @@ const Schedule = () => {
                     <span style={{ color: '#0F172A', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.25rem', background: '#F1F5F9', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>
                       <Clock size={13} /> {booking.timeSlot}
                     </span>
+                    {booking.slotId && (
+                      <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: '0.72rem', background: '#E0F2FE', color: '#0369A1', padding: '0.15rem 0.45rem', borderRadius: '4px', border: '1px solid #BAE6FD' }}>
+                        {booking.slotId}
+                      </span>
+                    )}
                   </div>
 
                   {/* Location & Address */}

@@ -2,7 +2,12 @@ import express from 'express';
 import { verifyToken, requireAdmin } from '../middlewares/authMiddleware.js';
 import * as adminController from '../controllers/adminController.js';
 import { getAdminInquiries, updateInquiryStatus, deleteInquiry } from '../controllers/inquiryController.js';
-import { getAdminSlotsConfig, updateAdminSlotsConfig } from '../controllers/slotController.js';
+import { 
+  getAdminSlotsConfig, 
+  updateAdminSlotsConfig, 
+  adminReleaseWeek, 
+  adminReleaseMonth 
+} from '../controllers/slotController.js';
 
 const router = express.Router();
 
@@ -104,5 +109,7 @@ router.get('/subscriptions/subscribers', adminController.getAdminSubscribers);
 // Slot Configuration & Zone Dispatch
 router.get('/slots-config', getAdminSlotsConfig);
 router.put('/slots-config', updateAdminSlotsConfig);
+router.post('/slots/release-week', adminReleaseWeek);
+router.post('/slots/release-month', adminReleaseMonth);
 
 export default router;

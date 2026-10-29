@@ -207,6 +207,7 @@ model Booking {
   endAt          DateTime?
 
   // Razorpay Payment & Slot Lock details
+  slotId               String?
   razorpayOrderId      String?
   razorpayPaymentId    String?
   razorpaySignature    String?
@@ -360,6 +361,8 @@ model SystemSettings {
   maxTravelKm          Float   @default(15.0)  // Max allowed travel distance between consecutive slots (km)
   configuredSlots      String  @default("[\"08:00 AM\",\"10:00 AM\",\"12:00 PM\",\"02:00 PM\",\"04:00 PM\",\"06:00 PM\"]") // Up to 6 slots
   monthlySlotOverrides String? @default("{}")   // Date-specific overrides e.g. {"2026-10-15": ["08:00 AM", ...]}
+  weeklySlotTemplate   String? @default("{\"MONDAY\":{\"enabled\":true,\"slots\":[\"07:30 AM - 09:30 AM\",\"10:00 AM - 12:00 PM\",\"12:30 PM - 02:30 PM\",\"03:00 PM - 05:00 PM\",\"05:30 PM - 07:30 PM\",\"07:00 PM - 09:00 PM\"],\"capacity\":1},\"TUESDAY\":{\"enabled\":true,\"slots\":[\"07:30 AM - 09:30 AM\",\"10:00 AM - 12:00 PM\",\"12:30 PM - 02:30 PM\",\"03:00 PM - 05:00 PM\",\"05:30 PM - 07:30 PM\",\"07:00 PM - 09:00 PM\"],\"capacity\":1},\"WEDNESDAY\":{\"enabled\":true,\"slots\":[\"07:30 AM - 09:30 AM\",\"10:00 AM - 12:00 PM\",\"12:30 PM - 02:30 PM\",\"03:00 PM - 05:00 PM\",\"05:30 PM - 07:30 PM\",\"07:00 PM - 09:00 PM\"],\"capacity\":1},\"THURSDAY\":{\"enabled\":true,\"slots\":[\"07:30 AM - 09:30 AM\",\"10:00 AM - 12:00 PM\",\"12:30 PM - 02:30 PM\",\"03:00 PM - 05:00 PM\",\"05:30 PM - 07:30 PM\",\"07:00 PM - 09:00 PM\"],\"capacity\":1},\"FRIDAY\":{\"enabled\":true,\"slots\":[\"07:30 AM - 09:30 AM\",\"10:00 AM - 12:00 PM\",\"12:30 PM - 02:30 PM\",\"03:00 PM - 05:00 PM\",\"05:30 PM - 07:30 PM\",\"07:00 PM - 09:00 PM\"],\"capacity\":1},\"SATURDAY\":{\"enabled\":true,\"slots\":[\"07:30 AM - 09:30 AM\",\"10:00 AM - 12:00 PM\",\"12:30 PM - 02:30 PM\",\"03:00 PM - 05:00 PM\",\"05:30 PM - 07:30 PM\",\"07:00 PM - 09:00 PM\"],\"capacity\":1},\"SUNDAY\":{\"enabled\":true,\"slots\":[\"07:30 AM - 09:30 AM\",\"10:00 AM - 12:00 PM\",\"12:30 PM - 02:30 PM\",\"03:00 PM - 05:00 PM\",\"05:30 PM - 07:30 PM\",\"07:00 PM - 09:00 PM\"],\"capacity\":1}}")
+  releasedDates        String? @default("[]")   // JSON array of approved released dates
   zoneDistanceMatrix   String?                 // Custom distance matrix between zones
 
   // Social Media Links (Instagram, Facebook, WhatsApp, LinkedIn, Twitter/X)

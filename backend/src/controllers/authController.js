@@ -7,7 +7,7 @@ import { generateEmployeeId } from '../utils/idGenerator.js';
 // In-memory OTP storage for resilient, high-speed email OTP verification
 const emailOtpMemoryStore = new Map();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-for-mocking';
+const JWT_SECRET = process.env.JWT_SECRET || 'wmc-secure-production-jwt-key-2026-auth';
 
 const generateToken = (payload) => {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: '30d' });
@@ -118,23 +118,19 @@ export const userRegister = async (req, res) => {
     // Verify OTP if provided or required
     if (otp) {
       let isOtpValid = false;
-      if (String(otp).trim() === '1234') {
-        isOtpValid = true;
-      } else {
-        const otpRecord = await prisma.otpVerification.findFirst({
-          where: {
-            phone: { in: [cleanPhone, formattedPhone, rawDigits] },
-            purpose: 'REGISTER',
-            otp: String(otp).trim(),
-            expiresAt: { gte: new Date() }
-          },
-          orderBy: { createdAt: 'desc' }
-        });
+      const otpRecord = await prisma.otpVerification.findFirst({
+        where: {
+          phone: { in: [cleanPhone, formattedPhone, rawDigits] },
+          purpose: 'REGISTER',
+          otp: String(otp).trim(),
+          expiresAt: { gte: new Date() }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
 
-        if (otpRecord) {
-          isOtpValid = true;
-          await prisma.otpVerification.delete({ where: { id: otpRecord.id } }).catch(() => {});
-        }
+      if (otpRecord) {
+        isOtpValid = true;
+        await prisma.otpVerification.delete({ where: { id: otpRecord.id } }).catch(() => {});
       }
 
       if (!isOtpValid) {
@@ -214,26 +210,22 @@ export const userLogin = async (req, res) => {
       return res.status(404).json({ error: 'No user account found. Please register first.' });
     }
 
-    // Verify OTP against database or fallback
+    // Verify OTP against database strictly
     let isOtpValid = false;
-    if (cleanOtp === '1234') {
-      isOtpValid = true;
-    } else {
-      const otpRecord = await prisma.otpVerification.findFirst({
-        where: {
-          phone: { in: [cleanPhone, formattedPhone, rawDigits, user.phone] },
-          purpose: 'LOGIN',
-          otp: cleanOtp,
-          expiresAt: { gte: new Date() }
-        },
-        orderBy: { createdAt: 'desc' }
-      });
+    const otpRecord = await prisma.otpVerification.findFirst({
+      where: {
+        phone: { in: [cleanPhone, formattedPhone, rawDigits, user.phone] },
+        purpose: 'LOGIN',
+        otp: cleanOtp,
+        expiresAt: { gte: new Date() }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
 
-      if (otpRecord) {
-        isOtpValid = true;
-        // Delete used OTP
-        await prisma.otpVerification.delete({ where: { id: otpRecord.id } }).catch(() => {});
-      }
+    if (otpRecord) {
+      isOtpValid = true;
+      // Delete used OTP
+      await prisma.otpVerification.delete({ where: { id: otpRecord.id } }).catch(() => {});
     }
 
     if (!isOtpValid) {
@@ -959,29 +951,27 @@ export const employeeLogin = async (req, res) => {
           return res.status(401).json({ error: 'Incorrect password. Please try again.' });
         }
       } else {
-        // Fallback for legacy employee accounts created before password field existed
-        const legacyMatches = 
-          password === 'password' ||
-          password === employee.phone || 
-          password === rawDigits || 
-          password === '123456' || 
-          password === '1234';
-        
-        if (legacyMatches) {
-          // Auto-hash and save this password for them
-          const hashedPassword = await bcrypt.hash(password, 10);
-          await prisma.employee.update({
-            where: { id: employee.id },
-            data: { password: hashedPassword }
-          });
-        } else {
-          return res.status(401).json({ error: 'Incorrect password. If this is your first time logging in, please contact admin.' });
-        }
+        return res.status(401).json({ error: 'Password not set for this account. Please contact admin to configure your credentials.' });
       }
     } else if (otp) {
-      if (otp !== '1234') {
-        return res.status(401).json({ error: 'Invalid password or OTP' });
+      // Strict employee OTP check
+      const cleanEmpOtp = String(otp).trim();
+      const otpRecord = await prisma.otpVerification.findFirst({
+        where: {
+          phone: { in: [cleanPhone, formattedPhone, rawDigits, employee.phone] },
+          purpose: 'EMPLOYEE_LOGIN',
+          otp: cleanEmpOtp,
+          expiresAt: { gte: new Date() }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      if (!otpRecord) {
+        return res.status(401).json({ error: 'Invalid or expired OTP' });
       }
+      await prisma.otpVerification.delete({ where: { id: otpRecord.id } }).catch(() => {});
+    } else {
+      return res.status(400).json({ error: 'Password or OTP required for login' });
     }
 
     const token = generateToken({ id: employee.id, role: 'EMPLOYEE' });

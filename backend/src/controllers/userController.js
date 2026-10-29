@@ -1,5 +1,5 @@
 import prisma from '../config/db.js';
-import { parseSlotTimeWindow, cleanupExpiredSlotLocks } from './slotController.js';
+import { parseSlotTimeWindow, cleanupExpiredSlotLocks, addToSlotWaitQueue, clearSlotWaitQueue } from './slotController.js';
 import { getRazorpayInstance, verifyRazorpaySignature } from '../config/razorpay.js';
 import { computeEmployeePayout } from '../utils/payoutHelper.js';
 import { sendBookingConfirmationEmail, sendBookingRescheduledEmail, sendBookingCancelledEmail } from '../utils/mailer.js';
@@ -171,8 +171,16 @@ export const updateProfile = async (req, res) => {
 
 export const getBookings = async (req, res) => {
   try {
+    await cleanupExpiredSlotLocks();
     const bookings = await prisma.booking.findMany({ 
-      where: { userId: req.user.id },
+      where: { 
+        userId: req.user.id,
+        // Exclude abandoned ephemeral payment lock attempts
+        NOT: {
+          status: 'CANCELLED',
+          cancellationReason: { contains: 'Payment session expired' }
+        }
+      },
       include: { 
         carType: true, 
         washType: true, 
@@ -415,7 +423,7 @@ export const createBooking = async (req, res) => {
       });
     }
 
-    // Double-confirmation: Ensure the slot is currently available and not locked by another customer
+    // Concurrency Slot Locking & Queueing System
     await cleanupExpiredSlotLocks();
     const startOfDay = new Date(`${bookingDateStr}T00:00:00.000Z`);
     const endOfDay = new Date(`${bookingDateStr}T23:59:59.999Z`);
@@ -429,21 +437,41 @@ export const createBooking = async (req, res) => {
       }
     });
 
-    const activeInSlot = rawBookingsInSlot.filter(b => {
-      if (b.status === 'CANCELLED') return false;
-      if (b.paymentStatus === 'PAID') return true;
-      if (b.paymentStatus === 'PENDING') {
-        if (!b.paymentLockExpiresAt) return true;
-        return new Date(b.paymentLockExpiresAt) > nowTime;
+    const confirmedInSlot = rawBookingsInSlot.filter(b => b.paymentStatus === 'PAID');
+    const locksInSlot = rawBookingsInSlot.filter(b => {
+      if (b.paymentStatus === 'PENDING' && b.status === 'PENDING_PAYMENT') {
+        return b.paymentLockExpiresAt && new Date(b.paymentLockExpiresAt) > nowTime;
       }
       return false;
     });
 
     const maxCapacity = Math.max(1, sysSettings?.activeWorkers || 1);
-    if (activeInSlot.length >= maxCapacity) {
+    const slotIdx = configuredSlots.findIndex(s => norm(s) === norm(timeSlot));
+    const assignedSlotId = `SLOT_${bookingDateStr.replace(/-/g, '')}_${String((slotIdx >= 0 ? slotIdx : 0) + 1).padStart(2, '0')}`;
+
+    // Check if slot is already fully confirmed/paid
+    if (confirmedInSlot.length >= maxCapacity) {
       return res.status(409).json({
-        error: 'This arrival window has just been booked by another customer. Please select another time window to proceed.'
+        error: 'This arrival window has already been confirmed and booked by another customer. Please select another slot.',
+        status: 'BOOKED',
+        available: false
       });
+    }
+
+    // Check if slot is currently locked in checkout by another user
+    if (confirmedInSlot.length + locksInSlot.length >= maxCapacity) {
+      const myLock = locksInSlot.find(b => Number(b.userId) === Number(req.user.id));
+      if (!myLock) {
+        // Another customer is proceeding to payment
+        addToSlotWaitQueue(assignedSlotId, req.user.id);
+        const earliestExpiry = locksInSlot[0]?.paymentLockExpiresAt;
+        return res.status(409).json({
+          error: 'This slot is currently in payment gateway checkout by another customer. Please choose another slot or cancel. (Warning: Do NOT refresh or close the page)',
+          status: 'LOCKED',
+          slotId: assignedSlotId,
+          lockExpiresAt: earliestExpiry
+        });
+      }
     }
 
     // Resolve / Link Car early so vehicle binding for VIP subscriptions is verified
@@ -832,6 +860,7 @@ export const createBooking = async (req, res) => {
       const booking = await prisma.booking.create({
         data: {
           bookingId: newBookingId,
+          slotId: assignedSlotId,
           userId: req.user.id,
           carTypeId: Number(carTypeId),
           washTypeId: Number(washTypeId),
@@ -983,10 +1012,11 @@ export const createBooking = async (req, res) => {
     // Generate serial Booking ID: WMC-DDMMYY-XXX
     const newBookingId = await generateDailyBookingId(date);
 
-    // 2. Create provisional booking holding a 10-minute slot lock
+    // 2. Create provisional booking holding a 7-minute slot lock
     const booking = await prisma.booking.create({
       data: {
         bookingId: newBookingId,
+        slotId: assignedSlotId,
         userId: req.user.id,
         carTypeId: Number(carTypeId),
         washTypeId: Number(washTypeId),
@@ -1019,7 +1049,7 @@ export const createBooking = async (req, res) => {
         paymentStatus: 'PENDING',
         status: 'PENDING_PAYMENT',
         razorpayOrderId: rzpOrder.id,
-        paymentLockExpiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes lock
+        paymentLockExpiresAt: new Date(Date.now() + 7 * 60 * 1000), // 7 minutes lock
         ...(selectedAddons.length > 0 && {
           addons: {
             create: selectedAddons.map(addon => ({
@@ -1090,12 +1120,36 @@ export const verifyBookingPayment = async (req, res) => {
       return res.json({ message: 'Payment already verified and booking confirmed', booking });
     }
 
-    // Verify HMAC signature
-    if (process.env.RAZORPAY_KEY_SECRET) {
-      const isValid = verifyRazorpaySignature(razorpayOrderId, razorpayPaymentId, razorpaySignature);
-      if (!isValid) {
-        return res.status(400).json({ error: 'Invalid Razorpay payment signature' });
+    // Strictly verify Razorpay HMAC signature
+    if (!razorpaySignature || !razorpayOrderId || !razorpayPaymentId) {
+      return res.status(400).json({ error: 'Missing payment signature verification parameters' });
+    }
+
+    const isSigValid = verifyRazorpaySignature(razorpayOrderId, razorpayPaymentId, razorpaySignature);
+    if (!isSigValid) {
+      return res.status(400).json({ error: 'Cryptographic payment verification failed: Invalid Razorpay signature' });
+    }
+
+    // Double check with Razorpay API if live client is configured
+    try {
+      const rzp = getRazorpayInstance();
+      if (rzp && rzp.payments) {
+        const paymentData = await rzp.payments.fetch(razorpayPaymentId);
+        if (paymentData) {
+          if (paymentData.order_id && paymentData.order_id !== booking.razorpayOrderId) {
+            return res.status(400).json({ error: 'Security alert: Payment order mismatch' });
+          }
+          if (paymentData.status !== 'captured' && paymentData.status !== 'authorized') {
+            return res.status(400).json({ error: 'Security alert: Payment is not completed on gateway' });
+          }
+          const expectedPaise = Math.round(Number(booking.price) * 100);
+          if (Number(paymentData.amount) < expectedPaise) {
+            return res.status(400).json({ error: 'Security alert: Payment amount does not match booking price' });
+          }
+        }
       }
+    } catch (rzpErr) {
+      console.warn('Razorpay server-side fetch validation notice:', rzpErr?.message || rzpErr);
     }
 
     // Apply points redemption and rewards now that payment is confirmed
@@ -1227,6 +1281,11 @@ export const verifyBookingPayment = async (req, res) => {
         user: true
       }
     });
+
+    // Clear slot waiting queue now that slot is confirmed
+    if (booking.slotId) {
+      clearSlotWaitQueue(booking.slotId);
+    }
 
     // Send Booking Confirmation Email with super CSS styling & booking details
     const recipientEmail = user?.email || updatedBooking.user?.email;

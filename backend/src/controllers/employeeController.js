@@ -56,6 +56,7 @@ export const getProfile = async (req, res) => {
     const activeJobs = await prisma.booking.findMany({
       where: {
         employeeId: req.user.id,
+        paymentStatus: 'PAID',
         status: { in: ['ASSIGNED', 'STARTED'] }
       },
       include: {
@@ -204,7 +205,11 @@ export const toggleDuty = async (req, res) => {
 export const getAssignedBookings = async (req, res) => {
   try {
     const bookings = await prisma.booking.findMany({ 
-      where: { employeeId: req.user.id },
+      where: { 
+        employeeId: req.user.id,
+        paymentStatus: 'PAID',
+        status: { not: 'CANCELLED' }
+      },
       include: { 
         user: true, 
         car: true, 

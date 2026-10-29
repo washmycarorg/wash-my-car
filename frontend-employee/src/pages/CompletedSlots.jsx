@@ -177,8 +177,13 @@ const CompletedSlots = () => {
                   <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--primary-navy)', display: 'flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'flex-end' }}>
                     <Calendar size={13} color="var(--primary-blue)" /> {dateStr}
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.15rem', display: 'flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'flex-end' }}>
-                    <Clock size={12} /> {b.timeSlot}
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.15rem', display: 'flex', alignItems: 'center', gap: '0.35rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}><Clock size={12} /> {b.timeSlot}</span>
+                    {b.slotId && (
+                      <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: '0.68rem', background: '#E0F2FE', color: '#0369A1', padding: '0.1rem 0.35rem', borderRadius: '4px', border: '1px solid #BAE6FD' }}>
+                        {b.slotId}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>

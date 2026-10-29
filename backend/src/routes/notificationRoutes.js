@@ -3,7 +3,7 @@ import { getVapidKey, subscribePush, unsubscribePush } from '../controllers/noti
 import jwt from 'jsonwebtoken';
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-for-mocking';
+const JWT_SECRET = process.env.JWT_SECRET || 'wmc-secure-production-jwt-key-2026-auth';
 
 // Optional token extractor middleware
 const optionalAuth = (req, res, next) => {

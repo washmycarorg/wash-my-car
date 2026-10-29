@@ -1,6 +1,34 @@
 import prisma from '../config/db.js';
+import jwt from 'jsonwebtoken';
 
-// Clean up expired slot payment locks (>10 mins unpaid)
+const JWT_SECRET = process.env.JWT_SECRET || 'wmc-secure-production-jwt-key-2026-auth';
+
+// In-memory Waiting Queue for Slots currently locked in checkout
+// Map: slotId -> Array<{ userId: number, joinedAt: Date }>
+const slotWaitingQueue = new Map();
+
+export const addToSlotWaitQueue = (slotId, userId) => {
+  if (!slotId || !userId) return;
+  const list = slotWaitingQueue.get(slotId) || [];
+  if (!list.some(item => Number(item.userId) === Number(userId))) {
+    list.push({ userId: Number(userId), joinedAt: new Date() });
+    slotWaitingQueue.set(slotId, list);
+  }
+};
+
+export const getSlotWaitQueueCount = (slotId) => {
+  if (!slotId) return 0;
+  const list = slotWaitingQueue.get(slotId) || [];
+  return list.length;
+};
+
+export const clearSlotWaitQueue = (slotId) => {
+  if (slotId) {
+    slotWaitingQueue.delete(slotId);
+  }
+};
+
+// Clean up expired slot payment locks (>7 mins unpaid)
 export const cleanupExpiredSlotLocks = async () => {
   try {
     const now = new Date();
@@ -14,7 +42,8 @@ export const cleanupExpiredSlotLocks = async () => {
       },
       data: {
         status: 'CANCELLED',
-        cancellationReason: 'Payment session expired / timed out'
+        cancellationReason: 'Payment session expired / timed out (slot released to waiting customers)',
+        paymentLockExpiresAt: null
       }
     });
   } catch (err) {
@@ -32,13 +61,51 @@ export const DEFAULT_ZONE_DISTANCES = {
 };
 
 export const DEFAULT_SLOTS = [
-  '08:30 AM - 10:30 AM',
-  '10:30 AM - 12:30 PM',
+  '07:30 AM - 09:30 AM',
+  '10:00 AM - 12:00 PM',
   '12:30 PM - 02:30 PM',
-  '02:30 PM - 04:30 PM',
-  '04:30 PM - 06:30 PM',
-  '06:30 PM - 08:30 PM'
+  '03:00 PM - 05:00 PM',
+  '05:30 PM - 07:30 PM',
+  '07:00 PM - 09:00 PM'
 ];
+
+export const DEFAULT_WEEKLY_TEMPLATE = {
+  'MONDAY': {
+    enabled: true,
+    slots: DEFAULT_SLOTS,
+    capacity: 1
+  },
+  'TUESDAY': {
+    enabled: true,
+    slots: DEFAULT_SLOTS,
+    capacity: 1
+  },
+  'WEDNESDAY': {
+    enabled: true,
+    slots: DEFAULT_SLOTS,
+    capacity: 1
+  },
+  'THURSDAY': {
+    enabled: true,
+    slots: DEFAULT_SLOTS,
+    capacity: 1
+  },
+  'FRIDAY': {
+    enabled: true,
+    slots: DEFAULT_SLOTS,
+    capacity: 1
+  },
+  'SATURDAY': {
+    enabled: true,
+    slots: DEFAULT_SLOTS,
+    capacity: 1
+  },
+  'SUNDAY': {
+    enabled: true,
+    slots: DEFAULT_SLOTS,
+    capacity: 1
+  }
+};
 
 // Helper to parse time window string into minute values from midnight
 export const parseSlotTimeWindow = (slotStr) => {
@@ -140,7 +207,7 @@ export const buildDynamicDistanceMatrix = (serviceAreas, customMatrix = null) =>
   return matrix;
 };
 
-// Public: Get dynamically available slots for booking date with distance constraint
+// Public: Get dynamically available slots for booking date with strict locking and queue status
 export const getAvailableBookingSlots = async (req, res) => {
   try {
     const { date, serviceAreaId, address = '', zone = '' } = req.query;
@@ -149,52 +216,132 @@ export const getAvailableBookingSlots = async (req, res) => {
       return res.status(400).json({ error: 'Date parameter (YYYY-MM-DD) is required' });
     }
 
+    const reqDateStr = String(date).split('T')[0];
+
+    // Optional user identification from token
+    let requestingUserId = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader) {
+      try {
+        const token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : authHeader.split(' ')[1];
+        if (token) {
+          const decoded = jwt.verify(token, JWT_SECRET);
+          if (decoded && decoded.id) requestingUserId = decoded.id;
+        }
+      } catch (e) {}
+    }
+
     const settings = await prisma.systemSettings.findUnique({ where: { id: 1 } });
     
     if (settings && settings.bookingsEnabled === false) {
       return res.json({
-        date,
+        date: reqDateStr,
         zone: 'NAD',
         activeWorkers: 0,
         configuredSlots: [],
-        availableSlots: [],
-        distanceConstraintKm: 0,
+        slots: [],
+        isReleased: false,
         bookingsEnabled: false,
         message: 'Doorstep car wash bookings are currently paused by administration. Please check back later.'
       });
     }
 
-    const allAreas = await prisma.serviceArea.findMany();
-    
-    // Configured slots (max 6)
-    let configuredSlots = DEFAULT_SLOTS;
-    if (settings?.configuredSlots) {
+    // 1. Check if the date is approved and released by admin
+    let releasedDatesList = [];
+    if (settings?.releasedDates) {
       try {
-        const parsed = JSON.parse(settings.configuredSlots);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          configuredSlots = parsed.slice(0, 6);
-        }
-      } catch (e) {
-        console.warn('Could not parse configuredSlots:', e);
-      }
+        const parsed = JSON.parse(settings.releasedDates);
+        if (Array.isArray(parsed)) releasedDatesList = parsed;
+      } catch (e) {}
     }
 
-    // Check monthly/date-specific overrides (specific date takes precedence over entire month)
+    // If releasedDatesList has been configured and the date is not in the list:
+    // (If releasedDatesList is empty, allow open access or default template dates)
+    const isExplicitlyReleased = releasedDatesList.length === 0 || releasedDatesList.includes(reqDateStr);
+    if (!isExplicitlyReleased) {
+      return res.json({
+        date: reqDateStr,
+        zone: 'NAD',
+        activeWorkers: 0,
+        configuredSlots: [],
+        slots: [],
+        isReleased: false,
+        bookingsEnabled: true,
+        message: 'No approved slots released by administration for this date. Please choose another date.'
+      });
+    }
+
+    const allAreas = await prisma.serviceArea.findMany();
+
+    // 2. Parse Weekly Template & Monthly Overrides to resolve slots for this date
+    let weeklyTemplate = DEFAULT_WEEKLY_TEMPLATE;
+    if (settings?.weeklySlotTemplate) {
+      try {
+        const parsed = JSON.parse(settings.weeklySlotTemplate);
+        if (typeof parsed === 'object' && parsed !== null) weeklyTemplate = parsed;
+      } catch (e) {}
+    }
+
+    let monthlyOverrides = {};
     if (settings?.monthlySlotOverrides) {
       try {
-        const overrides = JSON.parse(settings.monthlySlotOverrides);
-        const monthKey = String(date).substring(0, 7); // 'YYYY-MM'
-        if (overrides[date] && Array.isArray(overrides[date]) && overrides[date].length > 0) {
-          configuredSlots = overrides[date].slice(0, 6);
-        } else if (overrides[monthKey] && Array.isArray(overrides[monthKey]) && overrides[monthKey].length > 0) {
-          configuredSlots = overrides[monthKey].slice(0, 6);
-        }
-      } catch (e) {
-        console.warn('Could not parse monthlySlotOverrides:', e);
-      }
+        const parsed = JSON.parse(settings.monthlySlotOverrides);
+        if (typeof parsed === 'object' && parsed !== null) monthlyOverrides = parsed;
+      } catch (e) {}
     }
 
-    const activeWorkers = Math.max(1, settings?.activeWorkers || 1);
+    // Determine Day of Week for requested date (in UTC/IST safe parsing)
+    const dParts = reqDateStr.split('-');
+    const dayDate = new Date(Number(dParts[0]), Number(dParts[1]) - 1, Number(dParts[2]));
+    const dayNames = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+    const dayOfWeekName = dayNames[dayDate.getDay()];
+
+    const monthKey = reqDateStr.substring(0, 7); // 'YYYY-MM'
+
+    let configuredSlots = DEFAULT_SLOTS;
+    let dayCapacity = Math.max(1, settings?.activeWorkers || 1);
+    let isDayClosed = false;
+
+    // Check specific date override first
+    if (monthlyOverrides[reqDateStr]) {
+      const overrideVal = monthlyOverrides[reqDateStr];
+      if (Array.isArray(overrideVal) && overrideVal.length > 0) {
+        configuredSlots = overrideVal.slice(0, 6);
+      } else if (typeof overrideVal === 'object' && overrideVal !== null) {
+        if (overrideVal.enabled === false) isDayClosed = true;
+        if (Array.isArray(overrideVal.slots)) configuredSlots = overrideVal.slots.slice(0, 6);
+        if (overrideVal.capacity) dayCapacity = Math.max(1, Number(overrideVal.capacity));
+      }
+    } else if (monthlyOverrides[monthKey] && Array.isArray(monthlyOverrides[monthKey])) {
+      // Month-wide override
+      configuredSlots = monthlyOverrides[monthKey].slice(0, 6);
+    } else if (weeklyTemplate[dayOfWeekName]) {
+      // Weekly template configuration
+      const tDay = weeklyTemplate[dayOfWeekName];
+      if (tDay.enabled === false) isDayClosed = true;
+      if (Array.isArray(tDay.slots) && tDay.slots.length > 0) configuredSlots = tDay.slots.slice(0, 6);
+      if (tDay.capacity) dayCapacity = Math.max(1, Number(tDay.capacity));
+    } else if (settings?.configuredSlots) {
+      try {
+        const parsed = JSON.parse(settings.configuredSlots);
+        if (Array.isArray(parsed) && parsed.length > 0) configuredSlots = parsed.slice(0, 6);
+      } catch (e) {}
+    }
+
+    if (isDayClosed) {
+      return res.json({
+        date: reqDateStr,
+        zone: 'NAD',
+        activeWorkers: 0,
+        configuredSlots: [],
+        slots: [],
+        isReleased: true,
+        isClosed: true,
+        message: 'Administration has marked this day closed for doorstep services.'
+      });
+    }
+
+    const activeWorkers = dayCapacity;
     const maxTravelKm = Number(settings?.maxTravelKm || 15.0);
 
     // Determine target booking service area & zone
@@ -211,12 +358,12 @@ export const getAvailableBookingSlots = async (req, res) => {
       targetZone = normalizeToZone(address);
     }
 
-    // Auto-release any expired payment locks before querying slot availability
+    // Auto-release any expired payment locks (>7 minutes)
     await cleanupExpiredSlotLocks();
 
-    // Query all active bookings for this date (confirmed or valid unexpired lock)
-    const startOfDay = new Date(`${date}T00:00:00.000Z`);
-    const endOfDay = new Date(`${date}T23:59:59.999Z`);
+    // Query all bookings for this date (confirmed or valid unexpired lock)
+    const startOfDay = new Date(`${reqDateStr}T00:00:00.000Z`);
+    const endOfDay = new Date(`${reqDateStr}T23:59:59.999Z`);
     const nowTime = new Date();
 
     const rawBookings = await prisma.booking.findMany({
@@ -232,29 +379,27 @@ export const getAvailableBookingSlots = async (req, res) => {
       }
     });
 
-    // Only count bookings that are paid, or currently within unexpired payment lock window
-    const existingBookings = rawBookings.filter(b => {
-      if (b.status === 'CANCELLED') return false;
-      if (b.paymentStatus === 'PAID') return true;
-      if (b.paymentStatus === 'PENDING') {
-        if (!b.paymentLockExpiresAt) return true;
-        return new Date(b.paymentLockExpiresAt) > nowTime;
+    // Map confirmed vs currently locked bookings
+    const confirmedBookings = [];
+    const activePaymentLocks = [];
+
+    rawBookings.forEach(b => {
+      if (b.status === 'CANCELLED') return;
+      if (b.paymentStatus === 'PAID') {
+        confirmedBookings.push(b);
+      } else if (b.paymentStatus === 'PENDING') {
+        if (b.paymentLockExpiresAt && new Date(b.paymentLockExpiresAt) > nowTime) {
+          activePaymentLocks.push(b);
+        }
       }
-      return false;
     });
 
-    // Custom distance matrix if stored
-    let customMatrix = null;
-    if (settings?.zoneDistanceMatrix) {
-      try {
-        customMatrix = JSON.parse(settings.zoneDistanceMatrix);
-      } catch (e) {}
-    }
+    const norm = (str) => (str || '').toUpperCase().replace(/\s+/g, ' ').trim();
 
-    // Map each existing booking to its serviceArea and zone
+    // Map existing bookings per slot
     const bookingsBySlot = {};
-    for (const b of existingBookings) {
-      const bSlot = b.timeSlot;
+    for (const b of confirmedBookings) {
+      const bSlot = norm(b.timeSlot);
       if (!bookingsBySlot[bSlot]) bookingsBySlot[bSlot] = [];
       const bArea = b.serviceArea || allAreas.find(a => a.id === b.serviceAreaId) || null;
       bookingsBySlot[bSlot].push({
@@ -266,7 +411,14 @@ export const getAvailableBookingSlots = async (req, res) => {
       });
     }
 
-    // Helper to calculate distance between a booking and candidate target
+    // Distance calculation helper
+    let customMatrix = null;
+    if (settings?.zoneDistanceMatrix) {
+      try {
+        customMatrix = JSON.parse(settings.zoneDistanceMatrix);
+      } catch (e) {}
+    }
+
     const calcDistance = (bBookingItem) => {
       const prevArea = bBookingItem.serviceArea;
       if (prevArea && targetArea) {
@@ -309,108 +461,166 @@ export const getAvailableBookingSlots = async (req, res) => {
     }
     const currentTotalMinutes = curH * 60 + curM;
 
-    const reqDateStr = String(date).split('T')[0];
     const isPastDate = reqDateStr < todayIst;
     const isToday = reqDateStr === todayIst;
 
-    // Evaluate each configured slot
+    // Evaluate each configured approved slot
     const slotsResult = configuredSlots.map((slotTime, idx) => {
-      const bookingsInThisSlot = bookingsBySlot[slotTime] || [];
+      const normalizedSlot = norm(slotTime);
+      const slotId = `SLOT_${reqDateStr.replace(/-/g, '')}_${String(idx + 1).padStart(2, '0')}`;
 
-      // 1. If date is in the past, no slots can be booked
+      const confirmedInThisSlot = confirmedBookings.filter(b => norm(b.timeSlot) === normalizedSlot);
+      const locksInThisSlot = activePaymentLocks.filter(b => norm(b.timeSlot) === normalizedSlot);
+      const myLock = requestingUserId ? locksInThisSlot.find(b => Number(b.userId) === Number(requestingUserId)) : null;
+      const isLockedByYou = Boolean(myLock);
+
+      const waitingCount = getSlotWaitQueueCount(slotId);
+
+      // 1. Past date check
       if (isPastDate) {
         return {
+          id: slotId,
           slot: slotTime,
           available: false,
+          status: 'PAST',
           reason: 'This date has already passed. Please select an upcoming date.',
-          bookedCount: bookingsInThisSlot.length,
+          bookedCount: confirmedInThisSlot.length,
+          lockedCount: 0,
           capacity: activeWorkers,
           isPastSlot: true
         };
       }
 
-      // 2. If date is today, customer cannot book up to current slot (past slots or current ongoing slot)
+      // 2. Past or ongoing slot for today
       if (isToday) {
         const slotWindow = parseSlotTimeWindow(slotTime);
         if (slotWindow && slotWindow.startMinutes <= currentTotalMinutes) {
           const isOngoing = currentTotalMinutes < slotWindow.endMinutes;
           return {
+            id: slotId,
             slot: slotTime,
             available: false,
+            status: 'PAST',
             reason: isOngoing 
               ? 'This arrival window is currently in progress. Please select an upcoming slot.'
               : 'This arrival window has already passed for today. Please select an upcoming slot.',
-            bookedCount: bookingsInThisSlot.length,
+            bookedCount: confirmedInThisSlot.length,
+            lockedCount: 0,
             capacity: activeWorkers,
             isPastSlot: true
           };
         }
       }
 
-      // 3. Check direct capacity limit
-      if (bookingsInThisSlot.length >= activeWorkers) {
+      // 3. Fully confirmed/paid bookings check
+      if (confirmedInThisSlot.length >= activeWorkers) {
         return {
+          id: slotId,
           slot: slotTime,
           available: false,
-          reason: 'Slot fully booked',
-          bookedCount: bookingsInThisSlot.length,
+          status: 'BOOKED',
+          reason: 'Slot fully booked and confirmed by customer',
+          bookedCount: confirmedInThisSlot.length,
+          lockedCount: 0,
           capacity: activeWorkers
         };
       }
 
-      // 2. Routing & distance check when capacity is 1 field technician
+      // 4. Temporary Payment Lock Check (Slot in checkout)
+      if (confirmedInThisSlot.length + locksInThisSlot.length >= activeWorkers) {
+        if (isLockedByYou) {
+          return {
+            id: slotId,
+            slot: slotTime,
+            available: true,
+            status: 'LOCKED_BY_YOU',
+            isLockedByYou: true,
+            lockExpiresAt: myLock.paymentLockExpiresAt,
+            bookingId: myLock.id,
+            reason: 'You have reserved this slot for checkout. Complete payment to confirm.',
+            bookedCount: confirmedInThisSlot.length,
+            lockedCount: locksInThisSlot.length,
+            capacity: activeWorkers
+          };
+        }
+
+        // Locked by another customer completing checkout
+        const earliestExpiry = locksInThisSlot[0]?.paymentLockExpiresAt;
+        return {
+          id: slotId,
+          slot: slotTime,
+          available: false,
+          status: 'LOCKED',
+          lockExpiresAt: earliestExpiry,
+          reason: 'Proceeding to payment gateway - Please choose another slot (Warning: Do not refresh or close)',
+          bookedCount: confirmedInThisSlot.length,
+          lockedCount: locksInThisSlot.length,
+          capacity: activeWorkers
+        };
+      }
+
+      // 5. Intelligent routing & distance check when capacity is 1 field technician
       if (activeWorkers === 1) {
-        // Check previous slot
-        const prevSlot = idx > 0 ? configuredSlots[idx - 1] : null;
+        const prevSlot = idx > 0 ? norm(configuredSlots[idx - 1]) : null;
         if (prevSlot && bookingsBySlot[prevSlot] && bookingsBySlot[prevSlot].length > 0) {
           const prevBooking = bookingsBySlot[prevSlot][0];
           const dist = calcDistance(prevBooking);
           if (dist > maxTravelKm) {
             const areaLabel = prevBooking.areaName || prevBooking.zone;
             return {
+              id: slotId,
               slot: slotTime,
               available: false,
+              status: 'DISTANCE_CONFLICT',
               reason: `Technician in ${areaLabel} (${dist}km away). Cannot reach ${targetArea?.name || targetZone} in time.`,
               distanceKm: dist,
               conflictZone: areaLabel,
-              bookedCount: bookingsInThisSlot.length,
+              bookedCount: confirmedInThisSlot.length,
+              lockedCount: locksInThisSlot.length,
               capacity: activeWorkers
             };
           }
         }
 
-        // Check next slot
-        const nextSlot = idx < configuredSlots.length - 1 ? configuredSlots[idx + 1] : null;
+        const nextSlot = idx < configuredSlots.length - 1 ? norm(configuredSlots[idx + 1]) : null;
         if (nextSlot && bookingsBySlot[nextSlot] && bookingsBySlot[nextSlot].length > 0) {
           const nextBooking = bookingsBySlot[nextSlot][0];
           const dist = calcDistance(nextBooking);
           if (dist > maxTravelKm) {
             const areaLabel = nextBooking.areaName || nextBooking.zone;
             return {
+              id: slotId,
               slot: slotTime,
               available: false,
+              status: 'DISTANCE_CONFLICT',
               reason: `Technician scheduled in ${areaLabel} next slot (${dist}km away).`,
               distanceKm: dist,
               conflictZone: areaLabel,
-              bookedCount: bookingsInThisSlot.length,
+              bookedCount: confirmedInThisSlot.length,
+              lockedCount: locksInThisSlot.length,
               capacity: activeWorkers
             };
           }
         }
       }
 
-      // Available
+      // 6. Available Slot
       return {
+        id: slotId,
         slot: slotTime,
         available: true,
+        status: 'AVAILABLE',
         reason: 'Available',
-        bookedCount: bookingsInThisSlot.length,
-        capacity: activeWorkers
+        bookedCount: confirmedInThisSlot.length,
+        lockedCount: locksInThisSlot.length,
+        capacity: activeWorkers,
+        waitingCount
       };
     });
 
     res.json({
-      date,
+      date: reqDateStr,
+      isReleased: true,
       targetZone: targetArea?.name || targetZone,
       activeWorkers,
       maxTravelKm,
@@ -422,7 +632,27 @@ export const getAvailableBookingSlots = async (req, res) => {
   }
 };
 
-// Admin: Get current slots & dispatch settings
+// User: Join waiting queue for a locked slot
+export const joinSlotQueue = async (req, res) => {
+  try {
+    const { slotId } = req.body;
+    if (!slotId) return res.status(400).json({ error: 'slotId is required' });
+
+    addToSlotWaitQueue(slotId, req.user.id);
+    const count = getSlotWaitQueueCount(slotId);
+
+    res.json({
+      success: true,
+      slotId,
+      waitingCount: count,
+      message: 'You have been placed in the waiting queue. If the customer does not complete payment, this slot will automatically become available for you.'
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Admin: Get current slots, weekly template, and dispatch configuration
 export const getAdminSlotsConfig = async (req, res) => {
   try {
     const settings = await prisma.systemSettings.findUnique({ where: { id: 1 } });
@@ -433,6 +663,22 @@ export const getAdminSlotsConfig = async (req, res) => {
       try {
         const p = JSON.parse(settings.configuredSlots);
         if (Array.isArray(p)) configuredSlots = p.slice(0, 6);
+      } catch (e) {}
+    }
+
+    let weeklySlotTemplate = DEFAULT_WEEKLY_TEMPLATE;
+    if (settings?.weeklySlotTemplate) {
+      try {
+        const p = JSON.parse(settings.weeklySlotTemplate);
+        if (typeof p === 'object' && p !== null) weeklySlotTemplate = p;
+      } catch (e) {}
+    }
+
+    let releasedDates = [];
+    if (settings?.releasedDates) {
+      try {
+        const p = JSON.parse(settings.releasedDates);
+        if (Array.isArray(p)) releasedDates = p;
       } catch (e) {}
     }
 
@@ -456,6 +702,8 @@ export const getAdminSlotsConfig = async (req, res) => {
       activeWorkers: settings?.activeWorkers || 1,
       maxTravelKm: settings?.maxTravelKm || 15.0,
       configuredSlots,
+      weeklySlotTemplate,
+      releasedDates,
       monthlySlotOverrides,
       serviceAreas,
       zoneDistanceMatrix: dynamicMatrix
@@ -466,16 +714,30 @@ export const getAdminSlotsConfig = async (req, res) => {
   }
 };
 
-// Admin: Save slots & dispatch settings
+// Admin: Update slots, weekly template, released dates and dispatch settings
 export const updateAdminSlotsConfig = async (req, res) => {
   try {
-    const { activeWorkers, maxTravelKm, configuredSlots, monthlySlotOverrides, zoneDistanceMatrix } = req.body;
+    const { 
+      activeWorkers, 
+      maxTravelKm, 
+      configuredSlots, 
+      weeklySlotTemplate, 
+      releasedDates, 
+      monthlySlotOverrides, 
+      zoneDistanceMatrix 
+    } = req.body;
 
     const data = {};
     if (activeWorkers !== undefined) data.activeWorkers = Math.max(1, Number(activeWorkers));
     if (maxTravelKm !== undefined) data.maxTravelKm = Math.max(1, Number(maxTravelKm));
     if (configuredSlots !== undefined) {
       data.configuredSlots = JSON.stringify(Array.isArray(configuredSlots) ? configuredSlots.slice(0, 6) : DEFAULT_SLOTS);
+    }
+    if (weeklySlotTemplate !== undefined) {
+      data.weeklySlotTemplate = typeof weeklySlotTemplate === 'string' ? weeklySlotTemplate : JSON.stringify(weeklySlotTemplate);
+    }
+    if (releasedDates !== undefined) {
+      data.releasedDates = typeof releasedDates === 'string' ? releasedDates : JSON.stringify(releasedDates);
     }
     if (monthlySlotOverrides !== undefined) {
       data.monthlySlotOverrides = typeof monthlySlotOverrides === 'string' ? monthlySlotOverrides : JSON.stringify(monthlySlotOverrides);
@@ -497,5 +759,135 @@ export const updateAdminSlotsConfig = async (req, res) => {
   } catch (error) {
     console.error('Error updating slots config:', error);
     res.status(500).json({ error: error.message });
+  }
+};
+
+// Admin Helper: Batch Release a Week based on Default Weekly Template
+export const adminReleaseWeek = async (req, res) => {
+  try {
+    const { weekStartDate } = req.body; // e.g. '2026-11-02'
+    if (!weekStartDate) return res.status(400).json({ error: 'weekStartDate (YYYY-MM-DD) is required' });
+
+    const settings = await prisma.systemSettings.findUnique({ where: { id: 1 } });
+    let weeklyTemplate = DEFAULT_WEEKLY_TEMPLATE;
+    if (settings?.weeklySlotTemplate) {
+      try {
+        const p = JSON.parse(settings.weeklySlotTemplate);
+        if (typeof p === 'object' && p !== null) weeklyTemplate = p;
+      } catch (e) {}
+    }
+
+    let existingReleased = [];
+    if (settings?.releasedDates) {
+      try {
+        const p = JSON.parse(settings.releasedDates);
+        if (Array.isArray(p)) existingReleased = p;
+      } catch (e) {}
+    }
+
+    const dayNames = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+    const parts = weekStartDate.split('-');
+    const baseDate = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+
+    const newReleasedDates = [...existingReleased];
+    const generatedWeekDays = [];
+
+    for (let i = 0; i < 7; i++) {
+      const cur = new Date(baseDate);
+      cur.setDate(baseDate.getDate() + i);
+      const y = cur.getFullYear();
+      const m = String(cur.getMonth() + 1).padStart(2, '0');
+      const d = String(cur.getDate()).padStart(2, '0');
+      const dateStr = `${y}-${m}-${d}`;
+
+      const dayName = dayNames[cur.getDay()];
+      const dayTemplate = weeklyTemplate[dayName] || { enabled: true, slots: DEFAULT_SLOTS, capacity: 1 };
+
+      if (dayTemplate.enabled !== false) {
+        if (!newReleasedDates.includes(dateStr)) {
+          newReleasedDates.push(dateStr);
+        }
+      }
+      generatedWeekDays.push({ date: dateStr, dayName, slots: dayTemplate.slots, capacity: dayTemplate.capacity, enabled: dayTemplate.enabled !== false });
+    }
+
+    newReleasedDates.sort();
+
+    await prisma.systemSettings.update({
+      where: { id: 1 },
+      data: { releasedDates: JSON.stringify(newReleasedDates) }
+    });
+
+    res.json({
+      success: true,
+      message: `Week released successfully! ${generatedWeekDays.length} days populated with default weekly template.`,
+      releasedDates: newReleasedDates,
+      days: generatedWeekDays
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Admin Helper: Batch Release an Entire Month based on Default Weekly Template
+export const adminReleaseMonth = async (req, res) => {
+  try {
+    const { month } = req.body; // e.g. '2026-11'
+    if (!month) return res.status(400).json({ error: 'month (YYYY-MM) is required' });
+
+    const settings = await prisma.systemSettings.findUnique({ where: { id: 1 } });
+    let weeklyTemplate = DEFAULT_WEEKLY_TEMPLATE;
+    if (settings?.weeklySlotTemplate) {
+      try {
+        const p = JSON.parse(settings.weeklySlotTemplate);
+        if (typeof p === 'object' && p !== null) weeklyTemplate = p;
+      } catch (e) {}
+    }
+
+    let existingReleased = [];
+    if (settings?.releasedDates) {
+      try {
+        const p = JSON.parse(settings.releasedDates);
+        if (Array.isArray(p)) existingReleased = p;
+      } catch (e) {}
+    }
+
+    const [yearStr, monthStr] = month.split('-');
+    const year = Number(yearStr);
+    const monthIndex = Number(monthStr) - 1;
+    const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+
+    const dayNames = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+    const newReleasedDates = [...existingReleased];
+    let releasedCount = 0;
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const cur = new Date(year, monthIndex, day);
+      const dateStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const dayName = dayNames[cur.getDay()];
+      const dayTemplate = weeklyTemplate[dayName] || { enabled: true };
+
+      if (dayTemplate.enabled !== false) {
+        if (!newReleasedDates.includes(dateStr)) {
+          newReleasedDates.push(dateStr);
+          releasedCount++;
+        }
+      }
+    }
+
+    newReleasedDates.sort();
+
+    await prisma.systemSettings.update({
+      where: { id: 1 },
+      data: { releasedDates: JSON.stringify(newReleasedDates) }
+    });
+
+    res.json({
+      success: true,
+      message: `Month ${month} released successfully! ${releasedCount} new dates approved for booking.`,
+      releasedDates: newReleasedDates
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 };

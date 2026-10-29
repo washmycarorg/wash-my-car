@@ -139,7 +139,7 @@ const Bookings = () => {
   };
 
   const fetchBookingsList = () => {
-    return getBookings().then(bks => setBookings(bks)).catch(err => console.error(err));
+    return getBookings().then(bks => setBookings(bks)).catch(() => {});
   };
 
   const fetchRescheduleSlots = async (targetDate, serviceAreaId, address) => {
@@ -337,9 +337,14 @@ const Bookings = () => {
               )}
               <StatusBadge status={booking.status} />
             </div>
-            <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-              {carLabel} {booking.car?.carNumber && <strong style={{ color: 'var(--primary-blue)', letterSpacing: '0.05em' }}>({booking.car.carNumber})</strong>} &bull; {dateStr} &bull; {booking.timeSlot}
-              {areaLabel && <> &bull; {areaLabel}</>}
+            <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+              <span>{carLabel} {booking.car?.carNumber && <strong style={{ color: 'var(--primary-blue)', letterSpacing: '0.05em' }}>({booking.car.carNumber})</strong>} &bull; {dateStr} &bull; {booking.timeSlot}</span>
+              {booking.slotId && (
+                <span style={{ fontFamily: 'monospace', fontSize: '0.7rem', fontWeight: 800, background: '#E0F2FE', color: '#0369A1', padding: '0.1rem 0.4rem', borderRadius: '4px', border: '1px solid #BAE6FD' }}>
+                  {booking.slotId}
+                </span>
+              )}
+              {areaLabel && <span>&bull; {areaLabel}</span>}
             </div>
             {booking.addons && booking.addons.length > 0 && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.35rem' }}>
